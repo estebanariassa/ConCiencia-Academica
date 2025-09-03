@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { User, UserType } from '../types';
@@ -9,7 +10,8 @@ import {
   FaCog, 
   FaChevronDown,
   FaEnvelope,
-  FaLock
+  FaLock,
+  FaExclamationCircle
 } from 'react-icons/fa';
 
 // Importación corregida usando new URL()
@@ -25,9 +27,49 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const navigate = useNavigate();
+
+  // Función para validar correo electrónico
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Función para manejar cambios en el email con validación
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
+    
+    // Limpiar error si el campo está vacío
+    if (!value) {
+      setEmailError('');
+      return;
+    }
+    
+    // Validar formato de email
+    if (!validateEmail(value)) {
+      setEmailError('Por favor, ingresa un correo electrónico válido');
+    } else {
+      setEmailError('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validación del email antes de enviar
+    if (!email || !validateEmail(email)) {
+      setEmailError('Por favor, ingresa un correo electrónico válido');
+      return;
+    }
+    
+    // Validación básica
+    if (!email || !password) {
+      alert('Por favor, completa todos los campos');
+      return;
+    }
+    
     setIsLoading(true);
 
     // Simulate API call
@@ -42,6 +84,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
     onLogin(mockUser);
     setIsLoading(false);
+    
+    // Redireccionar al dashboard después del login
+    navigate('/dashboard');
   };
 
   const getUserTypeLabel = (type: UserType) => {
@@ -69,6 +114,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         return <FaGraduationCap className={size} />;
     }
   };
+
 
   return (
     <div 
@@ -156,21 +202,38 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             {/* Email con icono */}
             <div className="space-y-1">
               <label className="block text-sm font-medium text-foreground">
-                {userType === 'student' ? 'Código Estudiantil / Email' : 'Email Institucional'}
+                {userType === 'student' ? 'Correo Institucional' : 'Email Institucional'}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <FaEnvelope className="h-4 w-4 text-muted-foreground" />
                 </div>
                 <input
-                  type="text"
+                  type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={handleEmailChange}
                   placeholder={userType === 'student' ? 'estudiante@universidad.edu' : 'profesor@universidad.edu'}
                   required
-                  className="w-full pl-10 pr-3 py-2 border border-border rounded-lg bg-input-background outline-none transition-colors input-focus text-sm"
+                  className={`w-full pl-10 pr-3 py-2 border rounded-lg bg-input-background outline-none transition-colors input-focus text-sm ${
+                    emailError ? 'border-red-500 focus:border-red-500' : 'border-border focus:border-primary'
+                  }`}
                 />
+                {emailError && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <FaExclamationCircle className="h-4 w-4 text-red-500" />
+                  </div>
+                )}
               </div>
+              {emailError && (
+                <motion.p
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-sm text-red-500 flex items-center gap-1 mt-1"
+                >
+                  <FaExclamationCircle className="h-3 w-3" />
+                  {emailError}
+                </motion.p>
+              )}
             </div>
 
             {/* Contraseña con icono */}
