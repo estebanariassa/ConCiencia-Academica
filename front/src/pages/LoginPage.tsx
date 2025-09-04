@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import {Card} from '../components/Card';
+import Card from '../components/Card';
 import Button from '../components/Button';
 import { User, UserType } from '../types';
 import { 
