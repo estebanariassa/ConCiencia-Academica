@@ -118,14 +118,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex items-center justify-center p-4 bg-gray-100"
       style={{
         backgroundImage: `url(${fondo})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center'
       }}
     >
-      <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+      {/* Overlay más oscuro para mejor contraste */}
+      <div className="absolute inset-0 bg-black bg-opacity-60"></div>
       
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -133,7 +134,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md relative z-10"
       >
-        <Card className="card-shadow p-6">
+        <Card className="bg-white shadow-xl p-6">
           {/* Header con birrete */}
           <div className="text-center mb-6">
             <motion.div
@@ -142,12 +143,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               transition={{ delay: 0.2, duration: 0.3 }}
               className="flex justify-center mb-3"
             >
-              <div className="h-16 w-16 bg-primary rounded-full flex items-center justify-center">
-                <FaGraduationCap className="h-8 w-8 text-primary-foreground" />
+              <div className="h-16 w-16 bg-red-600 rounded-full flex items-center justify-center">
+                <FaGraduationCap className="h-8 w-8 text-white" />
               </div>
             </motion.div>
-            <h1 className="text-2xl font-bold text-foreground">Sistema de Evaluación</h1>
-            <p className="text-muted-foreground mt-2 text-sm">
+            <h1 className="text-2xl font-bold text-gray-800">Sistema de Evaluación</h1>
+            <p className="text-gray-600 mt-2 text-sm">
               Accede con tus credenciales institucionales
             </p>
           </div>
@@ -155,18 +156,18 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Tipo de Usuario - Dropdown */}
             <div>
-              <h2 className="text-base font-medium text-foreground mb-3">Tipo de Usuario</h2>
+              <h2 className="text-base font-medium text-gray-700 mb-3">Tipo de Usuario</h2>
               <div className="relative">
                 <button
                   type="button"
-                  className="flex items-center justify-between w-full p-3 border border-border rounded-lg bg-card hover:border-primary/50 transition-colors text-base"
+                  className="flex items-center justify-between w-full p-3 border border-gray-300 rounded-lg bg-white hover:border-red-500 transition-colors text-base"
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                   <div className="flex items-center">
-                    <span className="mr-2">{getUserTypeIcon(userType, "h-4 w-4")}</span>
-                    <span className="text-foreground">{getUserTypeLabel(userType)}</span>
+                    <span className="mr-2 text-red-600">{getUserTypeIcon(userType, "h-4 w-4")}</span>
+                    <span className="text-gray-800">{getUserTypeLabel(userType)}</span>
                   </div>
-                  <FaChevronDown className={`h-4 w-4 transition-transform ${isDropdownOpen ? 'transform rotate-180' : ''}`} />
+                  <FaChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${isDropdownOpen ? 'transform rotate-180' : ''}`} />
                 </button>
                 
                 <AnimatePresence>
@@ -176,21 +177,21 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
-                      className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-10"
+                      className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10"
                     >
                       {(['student', 'teacher', 'coordinator'] as UserType[]).map((type) => (
                         <div
                           key={type}
-                          className={`flex items-center p-3 hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors text-base ${
-                            userType === type ? 'bg-accent text-accent-foreground' : ''
+                          className={`flex items-center p-3 hover:bg-gray-100 cursor-pointer transition-colors text-base ${
+                            userType === type ? 'bg-gray-100' : ''
                           }`}
                           onClick={() => {
                             setUserType(type);
                             setIsDropdownOpen(false);
                           }}
                         >
-                          <span className="mr-2">{getUserTypeIcon(type, "h-4 w-4")}</span>
-                          <span>{getUserTypeLabel(type)}</span>
+                          <span className="mr-2 text-red-600">{getUserTypeIcon(type, "h-4 w-4")}</span>
+                          <span className="text-gray-800">{getUserTypeLabel(type)}</span>
                         </div>
                       ))}
                     </motion.div>
@@ -201,12 +202,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
             {/* Email con icono */}
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-foreground">
+              <label className="block text-sm font-medium text-gray-700">
                 {userType === 'student' ? 'Correo Institucional' : 'Email Institucional'}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaEnvelope className="h-4 w-4 text-muted-foreground" />
+                  <FaEnvelope className="h-4 w-4 text-gray-500" />
                 </div>
                 <input
                   type="email"
@@ -214,8 +215,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   onChange={handleEmailChange}
                   placeholder={userType === 'student' ? 'estudiante@universidad.edu' : 'profesor@universidad.edu'}
                   required
-                  className={`w-full pl-10 pr-3 py-2 border rounded-lg bg-input-background outline-none transition-colors input-focus text-sm ${
-                    emailError ? 'border-red-500 focus:border-red-500' : 'border-border focus:border-primary'
+                  className={`w-full pl-10 pr-3 py-2 border rounded-lg bg-white outline-none transition-colors focus:border-red-500 focus:ring-1 focus:ring-red-500 text-sm ${
+                    emailError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                   }`}
                 />
                 {emailError && (
@@ -228,7 +229,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 <motion.p
                   initial={{ opacity: 0, y: -5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-sm text-red-500 flex items-center gap-1 mt-1"
+                  className="text-sm text-red-600 flex items-center gap-1 mt-1"
                 >
                   <FaExclamationCircle className="h-3 w-3" />
                   {emailError}
@@ -238,10 +239,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
             {/* Contraseña con icono */}
             <div className="space-y-1">
-              <label className="block text-sm font-medium text-foreground">Contraseña</label>
+              <label className="block text-sm font-medium text-gray-700">Contraseña</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FaLock className="h-4 w-4 text-muted-foreground" />
+                  <FaLock className="h-4 w-4 text-gray-500" />
                 </div>
                 <input
                   type="password"
@@ -249,7 +250,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full pl-10 pr-3 py-2 border border-border rounded-lg bg-input-background outline-none transition-colors input-focus text-sm"
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white outline-none transition-colors focus:border-red-500 focus:ring-1 focus:ring-red-500 text-sm"
                 />
               </div>
             </div>
@@ -258,12 +259,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Button
                 type="submit"
-                className="w-full py-2 btn-primary text-base"
+                className="w-full py-2 bg-red-600 hover:bg-red-700 text-white text-base"
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2">
-                    <div className="loading-spinner" />
+                    <div className="loading-spinner border-white" />
                     Iniciando sesión...
                   </div>
                 ) : (
@@ -278,17 +279,17 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
           {/* Enlace de olvidé contraseña */}
           <div className="text-center mt-4">
-            <a href="#" className="text-sm text-primary hover:text-primary/80 transition-colors">
+            <a href="#" className="text-sm text-red-600 hover:text-red-800 transition-colors">
               ¿Olvidaste tu contraseña?
             </a>
           </div>
 
           {/* Línea divisoria */}
-          <div className="my-4 border-t border-border"></div>
+          <div className="my-4 border-t border-gray-300"></div>
 
           {/* Footer */}
           <div className="text-center">
-            <p className="text-xs text-muted-foreground">Universidad XYZ - Sistema de Evaluación Docente</p>
+            <p className="text-xs text-gray-600">Universidad XYZ - Sistema de Evaluación Docente</p>
           </div>
         </Card>
       </motion.div>
