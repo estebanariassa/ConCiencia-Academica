@@ -10,11 +10,11 @@ Este proyecto trata sobre una nueva alternativa para realizar la evaluacion temp
 # Como correr el proyecto
 
 
-# Requisitos Previos
+## Requisitos Previos
 - Node.js (versión 16 o superior)
 - npm (incluido con Node.js)
 
-# Instalación y Ejecución
+## Instalación y Ejecución
 
 1. Clona el repositorio:
 ```bash
