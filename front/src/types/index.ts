@@ -6,3 +6,77 @@ export interface User {
   type: UserType;
   email: string;
 }
+
+export interface Course {
+  id: string;
+  name: string;
+  code: string;
+  schedule: string;
+}
+
+export interface Teacher {
+  id: string;
+  name: string;
+  department: string;
+  email: string;
+  courses: Course[];
+}
+
+export interface Evaluation {
+  id: string;
+  teacherId: string;
+  courseId: string;
+  studentId: string;
+  date: Date;
+  answers: EvaluationAnswer[];
+  completed: boolean;
+  comments?: string;
+  overallRating: number;
+}
+
+export interface EvaluationAnswer {
+  questionId: string;
+  rating: number;
+  comment?: string;
+}
+
+export interface EvaluationQuestion {
+  id: string;
+  category: string;
+  text: string;
+  description?: string;
+  type: 'rating' | 'text' | 'multipleChoice';
+  options?: string[];
+  required: boolean;
+  order: number;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'success' | 'error';
+  date: Date;
+  read: boolean;
+  link?: string;
+}
+
+export interface Department {
+  id: string;
+  name: string;
+  headTeacherId?: string;
+  totalTeachers: number;
+}
+
+export interface Stats {
+  evaluationsPending: number;
+  evaluationsCompleted: number;
+  currentCourses: number;
+  averageRating?: number;
+  totalEvaluations?: number;
+  coursesTeaching?: number;
+  pendingReviews?: number;
+  totalTeachers?: number;
+  pendingApprovals?: number;
+}

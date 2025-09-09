@@ -2,19 +2,37 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState } from 'react'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
-import { User } from './types'
+import TeacherSelection from './pages/evaluation/TeacherSelection'
+import { User, Teacher, Course } from './types'
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
+  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null)
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
 
+  const handleLogin = (userData: User) => {
+    setUser(userData)
+  }
+
+  // Estas funciones ahora serán pasadas a los componentes y usarán useNavigate internamente
   const handleStartEvaluation = () => {
-    // Aquí puedes navegar a la página de evaluación o abrir un modal, etc.
-    console.log('Iniciar evaluación');
+    // La navegación se manejará dentro del componente Dashboard con useNavigate
   }
 
   const handleViewReports = () => {
-    // Aquí puedes navegar a la página de reportes
-    console.log('Ver reportes');
+    console.log('Ver reportes')
+  }
+
+  const handleTeacherCourseSelected = (teacher: Teacher, course: Course) => {
+    setSelectedTeacher(teacher)
+    setSelectedCourse(course)
+    console.log('Profesor seleccionado:', teacher.name)
+    console.log('Curso seleccionado:', course.name)
+  }
+
+  const handleBackFromEvaluation = () => {
+    setSelectedTeacher(null)
+    setSelectedCourse(null)
   }
 
   return (
@@ -26,22 +44,66 @@ function App() {
         />
         <Route 
           path="/login" 
-          element={user ? <Navigate to="/dashboard" replace /> : <LoginPage onLogin={setUser} />} 
+          element={
+            <LoginPageWrapper 
+              user={user} 
+              onLogin={handleLogin} 
+            />
+          } 
         />
         <Route 
           path="/dashboard" 
           element={
-            user ? 
-              <Dashboard 
-                user={user} 
-                onStartEvaluation={handleStartEvaluation}
-                onViewReports={handleViewReports}
-              /> 
-              : <Navigate to="/login" replace />} 
+            <DashboardWrapper 
+              user={user} 
+              onStartEvaluation={handleStartEvaluation}
+              onViewReports={handleViewReports}
+            />
+          } 
+        />
+        <Route 
+          path="/evaluate" 
+          element={
+            <TeacherSelectionWrapper 
+              user={user}
+              onTeacherCourseSelected={handleTeacherCourseSelected}
+              onBack={handleBackFromEvaluation}
+            />
+          } 
         />
       </Routes>
     </BrowserRouter>
   )
+}
+
+// Wrapper components para usar useNavigate
+function LoginPageWrapper({ user, onLogin }: { user: User | null, onLogin: (user: User) => void }) {
+  if (user) {
+    return <Navigate to="/dashboard" replace />
+  }
+  return <LoginPage onLogin={onLogin} />
+}
+
+function DashboardWrapper({ user, onStartEvaluation, onViewReports }: { 
+  user: User | null, 
+  onStartEvaluation: () => void, 
+  onViewReports: () => void 
+}) {
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  return <Dashboard user={user} onStartEvaluation={onStartEvaluation} onViewReports={onViewReports} />
+}
+
+function TeacherSelectionWrapper({ user, onTeacherCourseSelected, onBack }: { 
+  user: User | null,
+  onTeacherCourseSelected: (teacher: Teacher, course: Course) => void,
+  onBack: () => void
+}) {
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  return <TeacherSelection onTeacherCourseSelected={onTeacherCourseSelected} onBack={onBack} />
 }
 
 export default App

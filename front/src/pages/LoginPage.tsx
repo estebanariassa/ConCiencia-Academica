@@ -1,3 +1,4 @@
+// pages/LoginPage.tsx
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -115,7 +116,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     }
   };
 
-
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-4 bg-gray-100"
@@ -132,9 +132,9 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md relative z-10"
+        className="w-full max-w-lg relative z-10" // Cambiado de max-w-md a max-w-lg
       >
-        <Card className="bg-white shadow-xl p-6">
+        <Card className="bg-white shadow-xl p-8"> {/* Aumentado el padding de p-6 a p-8 */}
           {/* Header con birrete */}
           <div className="text-center mb-6">
             <motion.div
