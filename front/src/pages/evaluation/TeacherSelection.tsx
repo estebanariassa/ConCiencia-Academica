@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   CardHeader, 
   CardContent, 
@@ -20,10 +21,10 @@ import {
   MapPin,
   BookOpen,
   User
-} from 'lucide-react';
+} from 'lucide-react';  
 
 // Importar la imagen de fondo
-const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
+const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
 
 interface TeacherSelectionProps {
   onTeacherCourseSelected: (teacher: Teacher, course: Course) => void;
@@ -34,6 +35,7 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack }: Te
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const navigate = useNavigate();
 
   // Mock data
   const mockTeachers: Teacher[] = [
@@ -110,18 +112,25 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack }: Te
     }
   };
 
+  const handleBackToDashboard = () => {
+    navigate('/dashboard');
+  };
+
   return (
-    <div 
-      className="min-h-screen bg-gray-50"
-      style={{
-        backgroundImage: `url(${fondo})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
-      }}
-    >
-      {/* Overlay para mejor legibilidad */}
-      <div className="absolute inset-0 bg-white bg-opacity-60"></div>
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Fondo fijo que cubre toda la página */}
+      <div 
+        className="fixed inset-0 z-0"
+        style={{
+          backgroundImage: `url(${fondo})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        }}
+      >
+        {/* Overlay oscuro que cubre toda la página */}
+        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+      </div>
       
       <div className="relative z-10">
         {/* Header */}
@@ -131,9 +140,9 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack }: Te
           className="bg-white border-b border-gray-200 p-4 lg:p-6"
         >
           <div className="max-w-7xl mx-auto flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={onBack}>
+            <Button variant="ghost" size="sm" onClick={handleBackToDashboard}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver
+              Volver al Dashboard
             </Button>
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Evaluación Docente - Paso 1 de 2</h1>
