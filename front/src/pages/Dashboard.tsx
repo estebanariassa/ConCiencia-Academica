@@ -210,24 +210,28 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
         </motion.header>
 
         <main className="max-w-[1800px] mx-auto p-6 lg:p-8 space-y-8">
-          {/* Welcome Section */}
+          {/* Welcome Section con fondo blanco para mejor visibilidad */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="space-y-3"
           >
-            <h2 className="text-3xl font-semibold text-gray-900">
-              {getGreeting()}, {user.name.split(' ')[0]}!
-            </h2>
-            <p className="text-lg text-gray-600">
-              Aquí tienes un resumen de tu actividad reciente en el sistema.
-            </p>
+            <Card className="bg-white shadow-md border border-gray-200 p-6">
+              <CardContent className="space-y-3">
+                <h2 className="text-3xl font-semibold text-gray-900">
+                  {getGreeting()}, {user.name.split(' ')[0]}!
+                </h2>
+                <p className="text-lg text-gray-600">
+                  Aquí tienes un resumen de tu actividad reciente en el sistema.
+                </p>
+              </CardContent>
+            </Card>
           </motion.div>
 
           {/* Stats Cards - Específicas para cada tipo de usuario */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Tarjeta 1 */}
+          {/* Para estudiantes: 3 cards, para otros: 3 cards (sin la cuarta) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Tarjeta 1 - Evaluaciones Pendientes / Calificación Promedio / Total de Profesores */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -264,7 +268,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               </Card>
             </motion.div>
 
-            {/* Tarjeta 2 */}
+            {/* Tarjeta 2 - Evaluaciones Completadas / Evaluaciones Totales */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -297,7 +301,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               </Card>
             </motion.div>
 
-            {/* Tarjeta 3 */}
+            {/* Tarjeta 3 - Cursos Actuales / Cursos Impartidos / Aprobaciones Pendientes */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -329,44 +333,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                     {user.type === 'student' ? 'Cursos matriculados' : 
                      user.type === 'teacher' ? 'Este semestre' : 
                      'Por revisar'}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Tarjeta 4 - Específica para cada tipo */}
-            <motion.div
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              transition={{ delay: 0.5 }}
-            >
-              <Card className="bg-white shadow-md border border-gray-200 p-6">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                  <CardTitle className="text-lg font-medium text-gray-900">
-                    {user.type === 'student' ? 'Promedio Académico' : 
-                     user.type === 'teacher' ? 'Revisiones Pendientes' : 
-                     'Calificación Promedio'}
-                  </CardTitle>
-                  {user.type === 'student' ? <TrendingUp className="h-6 w-6 text-purple-600" /> :
-                   user.type === 'teacher' ? <Clock className="h-6 w-6 text-orange-600" /> :
-                   <BarChart3 className="h-6 w-6 text-purple-600" />}
-                </CardHeader>
-                <CardContent>
-                  <div className={`text-3xl font-bold ${
-                    user.type === 'student' ? 'text-purple-600' : 
-                    user.type === 'teacher' ? 'text-orange-600' : 
-                    'text-purple-600'
-                  }`}>
-                    {user.type === 'student' ? userData.stats.averageGrade :
-                     user.type === 'teacher' ? userData.stats.pendingReviews :
-                     userData.stats.averageRating}
-                    {user.type === 'student' && '/10'}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {user.type === 'student' ? 'Promedio actual' : 
-                     user.type === 'teacher' ? 'Por calificar' : 
-                     'Del departamento'}
                   </p>
                 </CardContent>
               </Card>
