@@ -133,11 +133,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-lg relative z-10" // Cambiado de max-w-md a max-w-lg
+        className="w-full max-w-lg relative z-10" 
       >
-        <Card className="bg-white shadow-xl p-8"> {/* Aumentado el padding de p-6 a p-8 */}
+        <Card className="bg-white shadow-x p-8"> 
           {/* Header con logo de la universidad */}
-          <div className="text-center mb-6">
+          <div className="text-center mb-8">
             <motion.div
               initial={{ scale: 0.8 }}
               animate={{ scale: 1 }}
@@ -148,7 +148,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               <img 
                 src={logoUniversidad} 
                 alt="Logo Universidad de Medellín" 
-                className="h-[130px] w-[1500px] object-contain"
+                className="h-[140px] w-[150px] object-contain"
               />
             </motion.div>
             <h1 className="text-2xl font-bold text-gray-800">ConCiencia Academica</h1>
