@@ -32,6 +32,9 @@ import {
 // Importar la imagen de fondo
 const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
 
+// Importar tu logo - asegúrate de tener el archivo en la ruta correcta
+const logoUniversidad = new URL('../assets/logo_conciencia.webp', import.meta.url).href;
+
 interface DashboardProps {
   user: User;
   onStartEvaluation: () => void;
@@ -71,15 +74,14 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
       case 'student':
         return {
           stats: {
-            evaluationsPending: 3,
-            evaluationsCompleted: 12,
+            evaluationsPending: 2, // Modificado a 2 para coincidir con la imagen
+            evaluationsCompleted: 5, // Modificado
             currentCourses: 6,
             averageGrade: 8.7
           },
           upcomingEvaluations: [
             { id: 1, course: 'Matemáticas I', teacher: 'Dr. Juan Pérez', deadline: '2025-01-25' },
-            { id: 2, course: 'Física II', teacher: 'Dra. Ana Martín', deadline: '2025-01-28' },
-            { id: 3, course: 'Química Orgánica', teacher: 'Prof. Luis García', deadline: '2025-02-02' }
+            { id: 2, course: 'Física II', teacher: 'Dra. Ana Martín', deadline: '2025-01-28' }
           ],
           notifications: [
             { id: 1, text: 'Nueva evaluación disponible para Matemáticas I', time: '2 horas', urgent: true },
@@ -126,8 +128,8 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
       default:
         return {
           stats: {
-            evaluationsPending: 3,
-            evaluationsCompleted: 12,
+            evaluationsPending: 2,
+            evaluationsCompleted: 5,
             currentCourses: 6,
             averageGrade: 8.7
           },
@@ -176,12 +178,15 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
         >
           <div className="max-w-[1800px] mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 bg-red-600 rounded-lg flex items-center justify-center">
-                <GraduationCap className="h-6 w-6 text-white" />
-              </div>
+              {/* Aquí se reemplaza el birrete por tu logo */}
+              <img 
+                src={logoUniversidad} 
+                alt="Logo Universidad de Medellín" 
+  className="h-[100px] w-[120px] object-contain"
+              />
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Sistema de Evaluación</h1>
-                <p className="text-sm text-gray-600">Universidad XYZ</p>
+                <h1 className="text-xl font-semibold text-gray-900">ConCiencia Academica</h1>
+                <p className="text-m text-gray-600">Universidad de Medellín</p>
               </div>
             </div>
             
@@ -210,7 +215,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
         </motion.header>
 
         <main className="max-w-[1800px] mx-auto p-6 lg:p-8 space-y-8">
-          {/* Welcome Section con fondo blanco para mejor visibilidad */}
+          {/* Welcome Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -229,9 +234,8 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
           </motion.div>
 
           {/* Stats Cards - Específicas para cada tipo de usuario */}
-          {/* Para estudiantes: 3 cards, para otros: 3 cards (sin la cuarta) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Tarjeta 1 - Evaluaciones Pendientes / Calificación Promedio / Total de Profesores */}
+            {/* Tarjeta 1 - Evaluaciones Pendientes */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -241,34 +245,22 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               <Card className="bg-white shadow-md border border-gray-200 p-6">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                   <CardTitle className="text-lg font-medium text-gray-900">
-                    {user.type === 'student' ? 'Evaluaciones Pendientes' : 
-                     user.type === 'teacher' ? 'Calificación Promedio' : 
-                     'Total de Profesores'}
+                    Evaluaciones Pendientes
                   </CardTitle>
-                  {user.type === 'student' ? <ClipboardCheck className="h-6 w-6 text-red-600" /> :
-                   user.type === 'teacher' ? <Star className="h-6 w-6 text-yellow-600" /> :
-                   <Users className="h-6 w-6 text-blue-600" />}
+                  <ClipboardCheck className="h-6 w-6 text-red-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-3xl font-bold ${
-                    user.type === 'student' ? 'text-red-600' : 
-                    user.type === 'teacher' ? 'text-yellow-600' : 
-                    'text-blue-600'
-                  }`}>
-                    {user.type === 'student' ? userData.stats.evaluationsPending :
-                     user.type === 'teacher' ? userData.stats.averageRating :
-                     userData.stats.totalTeachers}
+                  <div className="text-3xl font-bold text-red-600">
+                    {userData.stats.evaluationsPending}
                   </div>
                   <p className="text-sm text-gray-500 mt-2">
-                    {user.type === 'student' ? 'Deben completarse pronto' : 
-                     user.type === 'teacher' ? 'De 5.0 puntos' : 
-                     'En el sistema'}
+                    Deben completarse pronto
                   </p>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* Tarjeta 2 - Evaluaciones Completadas / Evaluaciones Totales */}
+            {/* Tarjeta 2 - Evaluaciones Completadas */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -278,30 +270,22 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               <Card className="bg-white shadow-md border border-gray-200 p-6">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                   <CardTitle className="text-lg font-medium text-gray-900">
-                    {user.type === 'student' ? 'Evaluaciones Completadas' : 
-                     user.type === 'teacher' ? 'Evaluaciones Totales' : 
-                     'Evaluaciones Completadas'}
+                    Evaluaciones Completadas
                   </CardTitle>
-                  {user.type === 'student' ? <Star className="h-6 w-6 text-green-600" /> :
-                   user.type === 'teacher' ? <ClipboardCheck className="h-6 w-6 text-green-600" /> :
-                   <ClipboardCheck className="h-6 w-6 text-green-600" />}
+                  <Star className="h-6 w-6 text-green-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-green-600">
-                    {user.type === 'student' ? userData.stats.evaluationsCompleted :
-                     user.type === 'teacher' ? userData.stats.totalEvaluations :
-                     userData.stats.evaluationsCompleted}
+                    {userData.stats.evaluationsCompleted}
                   </div>
                   <p className="text-sm text-gray-500 mt-2">
-                    {user.type === 'student' ? 'Este período académico' : 
-                     user.type === 'teacher' ? 'Recibidas este semestre' : 
-                     'En el sistema'}
+                    Este período académico
                   </p>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* Tarjeta 3 - Cursos Actuales / Cursos Impartidos / Aprobaciones Pendientes */}
+            {/* Tarjeta 3 - Cursos Actuales */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -311,28 +295,16 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               <Card className="bg-white shadow-md border border-gray-200 p-6">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                   <CardTitle className="text-lg font-medium text-gray-900">
-                    {user.type === 'student' ? 'Cursos Actuales' : 
-                     user.type === 'teacher' ? 'Cursos Impartidos' : 
-                     'Aprobaciones Pendientes'}
+                    Cursos Actuales
                   </CardTitle>
-                  {user.type === 'student' ? <BookOpen className="h-6 w-6 text-blue-600" /> :
-                   user.type === 'teacher' ? <BookOpen className="h-6 w-6 text-blue-600" /> :
-                   <ClipboardCheck className="h-6 w-6 text-orange-600" />}
+                  <BookOpen className="h-6 w-6 text-blue-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-3xl font-bold ${
-                    user.type === 'student' ? 'text-blue-600' : 
-                    user.type === 'teacher' ? 'text-blue-600' : 
-                    'text-orange-600'
-                  }`}>
-                    {user.type === 'student' ? userData.stats.currentCourses :
-                     user.type === 'teacher' ? userData.stats.coursesTeaching :
-                     userData.stats.pendingApprovals}
+                  <div className="text-3xl font-bold text-blue-600">
+                    {userData.stats.currentCourses}
                   </div>
                   <p className="text-sm text-gray-500 mt-2">
-                    {user.type === 'student' ? 'Cursos matriculados' : 
-                     user.type === 'teacher' ? 'Este semestre' : 
-                     'Por revisar'}
+                    Cursos matriculados
                   </p>
                 </CardContent>
               </Card>
@@ -365,14 +337,10 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                           <ClipboardCheck className="h-8 w-8" />
                           <div className="text-center">
                             <div className="font-medium text-lg">
-                              {user.type === 'student' ? 'Nueva Evaluación' : 
-                               user.type === 'teacher' ? 'Ver Mis Evaluaciones' : 
-                               'Gestionar Evaluaciones'}
+                              Nueva Evaluación
                             </div>
                             <div className="text-sm opacity-80">
-                              {user.type === 'student' ? 'Evaluar un docente' : 
-                               user.type === 'teacher' ? 'Revisar resultados' : 
-                               'Administrar proceso'}
+                              Evaluar un docente
                             </div>
                           </div>
                         </Button>
@@ -386,14 +354,10 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                           <BarChart3 className="h-8 w-8" />
                           <div className="text-center">
                             <div className="font-medium text-lg">
-                              {user.type === 'student' ? 'Ver Calendario' : 
-                               user.type === 'teacher' ? 'Mis Reportes' : 
-                               'Reportes Generales'}
+                              Ver Calendario
                             </div>
                             <div className="text-sm opacity-80">
-                              {user.type === 'student' ? 'Fechas importantes' : 
-                               user.type === 'teacher' ? 'Ver estadísticas' : 
-                               'Generar reportes'}
+                              Fechas importantes
                             </div>
                           </div>
                         </Button>
@@ -412,9 +376,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                 <Card className="bg-white shadow-md border border-gray-200 p-6">
                   <CardHeader className="pb-4">
                     <CardTitle className="text-xl text-gray-900">
-                      {user.type === 'student' ? 'Evaluaciones Próximas' : 
-                       user.type === 'teacher' ? 'Próximos Cierres' : 
-                       'Próximas Revisiones'}
+                      Evaluaciones Próximas
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-5">
@@ -429,7 +391,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                         <div>
                           <p className="font-medium text-lg text-gray-900">{evaluation.course}</p>
                           <p className="text-sm text-gray-600">
-                            {user.type === 'student' ? evaluation.teacher : evaluation.period}
+                            {evaluation.teacher}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
