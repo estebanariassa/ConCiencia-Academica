@@ -17,6 +17,7 @@ import {
 
 // Importación corregida usando new URL()
 const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
+const logoUniversidad = new URL('../assets/logo_conciencia.webp', import.meta.url).href;
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
@@ -135,7 +136,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         className="w-full max-w-lg relative z-10" // Cambiado de max-w-md a max-w-lg
       >
         <Card className="bg-white shadow-xl p-8"> {/* Aumentado el padding de p-6 a p-8 */}
-          {/* Header con birrete */}
+          {/* Header con logo de la universidad */}
           <div className="text-center mb-6">
             <motion.div
               initial={{ scale: 0.8 }}
@@ -143,11 +144,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               transition={{ delay: 0.2, duration: 0.3 }}
               className="flex justify-center mb-3"
             >
-              <div className="h-16 w-16 bg-red-600 rounded-full flex items-center justify-center">
-                <FaGraduationCap className="h-8 w-8 text-white" />
-              </div>
+              {/* Reemplazado el círculo rojo con birrete por el logo */}
+              <img 
+                src={logoUniversidad} 
+                alt="Logo Universidad de Medellín" 
+                className="h-[130px] w-[1500px] object-contain"
+              />
             </motion.div>
-            <h1 className="text-2xl font-bold text-gray-800">Sistema de Evaluación</h1>
+            <h1 className="text-2xl font-bold text-gray-800">ConCiencia Academica</h1>
             <p className="text-gray-600 mt-2 text-sm">
               Accede con tus credenciales institucionales
             </p>
@@ -289,7 +293,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
           {/* Footer */}
           <div className="text-center">
-            <p className="text-xs text-gray-600">Universidad XYZ - Sistema de Evaluación Docente</p>
+            <p className="text-xs text-gray-600">Universidad de Medellín - ConCiencia Academica</p>
           </div>
         </Card>
       </motion.div>
