@@ -45,7 +45,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
   const navigate = useNavigate();
   
   const handleStartEvaluation = () => {
-    navigate('/evaluate');
+    navigate('/evaluate/selection');
   };
 
   const getUserIcon = () => {

@@ -109,6 +109,13 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack }: Te
   const handleContinue = () => {
     if (selectedTeacher && selectedCourse) {
       onTeacherCourseSelected(selectedTeacher, selectedCourse);
+      // Navegar a la página de evaluación
+      navigate('/evaluate/form', { 
+        state: { 
+          teacher: selectedTeacher, 
+          course: selectedCourse 
+        } 
+      });
     }
   };
 

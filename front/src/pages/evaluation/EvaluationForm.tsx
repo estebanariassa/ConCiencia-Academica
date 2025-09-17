@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '../../components/Card';
+import Card, { CardHeader, CardContent, CardTitle, CardDescription } from '../../components/Card';
 import Button from '../../components/Button';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/Avatar';
 import { ArrowLeft, ChevronRight, Star } from 'lucide-react';
