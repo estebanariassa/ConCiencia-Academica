@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
-import Card, { CardHeader, CardContent, CardTitle, CardDescription } from '../../components/Card';
+import { CardHeader, CardContent, CardTitle, CardDescription } from '../../components/Card';
+import Card from '../../components/Card';
 import Button from '../../components/Button';
+import LikertScale from '../../components/LikertScale';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/Avatar';
-import { ArrowLeft, ChevronRight, Star } from 'lucide-react';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 
 const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
 
@@ -99,18 +101,18 @@ export default function EvaluationForm() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <div className="bg-white rounded-lg p-4 shadow-md border border-gray-200">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">
+            <div className="bg-white rounded-lg p-6 shadow-lg border border-gray-200">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-lg font-medium text-gray-900">
                   Pregunta {currentQuestion + 1} de {questions.length}
                 </span>
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-lg font-medium text-gray-900">
                   {Math.round(progress)}% completado
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-gray-200 rounded-full h-3">
                 <motion.div
-                  className="bg-red-600 h-2 rounded-full"
+                  className="bg-red-600 h-3 rounded-full"
                   initial={{ width: 0 }}
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.5 }}
@@ -125,17 +127,17 @@ export default function EvaluationForm() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Card className="bg-white shadow-md border border-gray-200 p-6">
+            <Card className="bg-white shadow-lg border border-gray-200 p-6">
               <div className="flex items-center gap-4">
-                <Avatar>
+                <Avatar className="h-16 w-16">
                   <AvatarImage src="" />
-                  <AvatarFallback className="bg-red-600 text-white">
+                  <AvatarFallback className="bg-red-600 text-white text-lg">
                     {teacher?.name?.split(' ').map(n => n[0]).join('')}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">{teacher?.name}</h2>
-                  <p className="text-sm text-gray-600">{course?.name} - {course?.code}</p>
+                  <h2 className="text-xl font-semibold text-gray-900">{teacher?.name}</h2>
+                  <p className="text-md text-gray-600">{course?.name} - {course?.code}</p>
                 </div>
               </div>
             </Card>
@@ -147,54 +149,30 @@ export default function EvaluationForm() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            <Card className="bg-white shadow-md border border-gray-200 p-6">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-gray-900">{questions[currentQuestion].category}</CardTitle>
-                <CardDescription>
+            <Card className="bg-white shadow-lg border border-gray-200 p-6">
+              <CardHeader className="pb-6">
+                <CardTitle className="text-xl text-gray-900">{questions[currentQuestion].category}</CardTitle>
+                <CardDescription className="text-md">
                   {questions[currentQuestion].question}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Rating Options */}
-                <div className="space-y-4">
-                  <div className="flex justify-center space-x-2">
-                    {[1, 2, 3, 4, 5].map((rating) => (
-                      <motion.button
-                        key={rating}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className={`p-3 rounded-lg border-2 transition-colors ${
-                          ratings[currentQuestion] === rating
-                            ? 'border-red-500 bg-red-50'
-                            : 'border-gray-300 hover:border-red-300'
-                        }`}
-                        onClick={() => handleRatingSelect(rating)}
-                      >
-                        <div className="flex items-center">
-                          {[...Array(rating)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-6 w-6 ${
-                                ratings[currentQuestion] === rating
-                                  ? 'fill-red-500 text-red-500'
-                                  : 'text-gray-300'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="text-xs font-medium mt-1 block">
-                          {rating}
-                        </span>
-                      </motion.button>
-                    ))}
-                  </div>
+                {/* Rating Scale */}
+                <div className="space-y-6">
+                  <LikertScale
+                    value={ratings[currentQuestion]}
+                    onChange={handleRatingSelect}
+                    options={5}
+                    leftLabel="Muy Deficiente"
+                    rightLabel="Excelente"
+                  />
 
                   {/* Rating Labels */}
-                  <div className="flex justify-between px-2">
+                  <div className="flex justify-between px-2 mt-4">
                     {ratingLabels.map((label, index) => (
                       <span
                         key={index}
-                        className="text-xs text-gray-600 font-medium text-center"
+                        className="text-sm text-gray-600 font-medium text-center"
                         style={{ width: `${100 / ratingLabels.length}%` }}
                       >
                         {label}
@@ -207,7 +185,7 @@ export default function EvaluationForm() {
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className={`text-center p-3 rounded-lg ${
+                      className={`text-center p-4 rounded-lg text-lg font-medium ${
                         ratings[currentQuestion] >= 4
                           ? 'bg-green-50 text-green-700'
                           : ratings[currentQuestion] >= 3
@@ -222,20 +200,21 @@ export default function EvaluationForm() {
                 </div>
 
                 {/* Navigation Buttons */}
-                <div className="flex justify-between mt-8">
+                <div className="flex justify-between mt-10">
                   <Button
                     variant="outline"
                     onClick={handlePrevious}
                     disabled={currentQuestion === 0}
+                    className="px-6 py-3 text-lg"
                   >
                     Anterior
                   </Button>
                   <Button
                     onClick={handleNext}
-                    className="bg-red-600 hover:bg-red-700"
+                    className="bg-red-600 hover:bg-red-700 px-6 py-3 text-lg"
                   >
                     {currentQuestion === questions.length - 1 ? 'Finalizar Evaluación' : 'Siguiente'}
-                    <ChevronRight className="h-4 w-4 ml-2" />
+                    <ChevronRight className="h-5 w-5 ml-2" />
                   </Button>
                 </div>
               </CardContent>
