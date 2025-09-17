@@ -3,6 +3,7 @@ import { useState } from 'react'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import TeacherSelection from './pages/evaluation/TeacherSelection'
+import EvaluationForm from './pages/evaluation/EvaluationForm'
 import { User, Teacher, Course } from './types'
 
 function App() {
@@ -14,7 +15,6 @@ function App() {
     setUser(userData)
   }
 
-  // Estas funciones ahora serán pasadas a los componentes y usarán useNavigate internamente
   const handleStartEvaluation = () => {
     // La navegación se manejará dentro del componente Dashboard con useNavigate
   }
@@ -62,12 +62,20 @@ function App() {
           } 
         />
         <Route 
-          path="/evaluate" 
+          path="/evaluate/selection" 
           element={
             <TeacherSelectionWrapper 
               user={user}
               onTeacherCourseSelected={handleTeacherCourseSelected}
               onBack={handleBackFromEvaluation}
+            />
+          } 
+        />
+        <Route 
+          path="/evaluate/form" 
+          element={
+            <EvaluationFormWrapper 
+              user={user}
             />
           } 
         />
@@ -104,6 +112,13 @@ function TeacherSelectionWrapper({ user, onTeacherCourseSelected, onBack }: {
     return <Navigate to="/login" replace />
   }
   return <TeacherSelection onTeacherCourseSelected={onTeacherCourseSelected} onBack={onBack} />
+}
+
+function EvaluationFormWrapper({ user }: { user: User | null }) {
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  return <EvaluationForm />
 }
 
 export default App
