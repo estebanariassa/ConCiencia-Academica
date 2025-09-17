@@ -9,6 +9,7 @@ import {
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Badge from '../components/Badge';
+import Header from '../components/Header'; // Asegúrate de que esta ruta sea correcta
 import { Avatar, AvatarFallback, AvatarImage } from '../components/Avatar';
 import { User } from '../types';
 import { 
@@ -32,9 +33,6 @@ import {
 // Importar la imagen de fondo
 const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
 
-// Importar tu logo - asegúrate de tener el archivo en la ruta correcta
-const logoUniversidad = new URL('../assets/logo_conciencia.webp', import.meta.url).href;
-
 interface DashboardProps {
   user: User;
   onStartEvaluation: () => void;
@@ -46,19 +44,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
   
   const handleStartEvaluation = () => {
     navigate('/evaluate/selection');
-  };
-
-  const getUserIcon = () => {
-    switch (user.type) {
-      case 'student':
-        return <GraduationCap className="h-5 w-5" />;
-      case 'teacher':
-        return <UserCheck className="h-5 w-5" />;
-      case 'coordinator':
-        return <Settings className="h-5 w-5" />;
-      default:
-        return <GraduationCap className="h-5 w-5" />;
-    }
   };
 
   const getGreeting = () => {
@@ -74,8 +59,8 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
       case 'student':
         return {
           stats: {
-            evaluationsPending: 2, // Modificado a 2 para coincidir con la imagen
-            evaluationsCompleted: 5, // Modificado
+            evaluationsPending: 2,
+            evaluationsCompleted: 5,
             currentCourses: 6,
             averageGrade: 8.7
           },
@@ -170,51 +155,10 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
       
       {/* Contenido principal */}
       <div className="relative z-10">
-        {/* Header simplificado */}
-        <motion.header
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="bg-white border-b border-gray-200 p-4 lg:p-6"
-        >
-          <div className="max-w-[1800px] mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* Aquí se reemplaza el birrete por tu logo */}
-              <img 
-                src={logoUniversidad} 
-                alt="Logo Universidad de Medellín" 
-  className="h-[100px] w-[120px] object-contain"
-              />
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">ConCiencia Academica</h1>
-                <p className="text-m text-gray-600">Universidad de Medellín</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-4 w-4" />
-                <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-600 rounded-full"></span>
-              </Button>
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-red-600 text-white">
-                    {user.name.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden sm:block">
-                  <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                  <div className="flex items-center gap-1">
-                    {getUserIcon()}
-                    <p className="text-xs text-gray-600 capitalize">{user.type}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.header>
-
-        <main className="max-w-[1800px] mx-auto p-6 lg:p-8 space-y-8">
+        {/* Usamos el componente Header */}
+        <Header user={user} />
+        
+        <main className="max-w-[1700px] mx-auto p-6 lg:p-8 space-y-8">
           {/* Welcome Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
