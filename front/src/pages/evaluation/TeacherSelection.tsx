@@ -148,17 +148,20 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
           subtitle="Selecciona el profesor y curso a evaluar"
         />
 
-        {/* Botón de volver independiente */}
-        <div className="bg-white border-b border-gray-200 py-3">
-          <div className="max-w-7xl mx-auto px-4 lg:px-6">
-            <Button variant="ghost" size="sm" onClick={handleBackToDashboard}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver
+        <main className="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
+          {/* Botón de volver independiente - Posicionado en la esquina superior izquierda */}
+          <div className="flex justify-start">
+            <Button 
+              variant="ghost" 
+              size="lg" 
+              onClick={handleBackToDashboard}
+              className="ml-2 text-lg py-2 px-4 bg-white bg-opacity-90 rounded-lg shadow-md hover:bg-gray-100 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Volver al Dashboard
             </Button>
           </div>
-        </div>
 
-        <main className="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
           {/* Search Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

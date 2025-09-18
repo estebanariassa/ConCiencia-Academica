@@ -44,7 +44,7 @@ export default function Header({
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="bg-white border-b border-gray-200 px-4 lg:px-6 py-1 lg:py-1.5"
+        className="bg-white border-b border-gray-200 px-4 lg:px-4 py-8 lg:py-1"
       >
         <div className="w-full">
           {/* Primera fila: logo a la izquierda, usuario a la derecha */}
@@ -65,8 +65,8 @@ export default function Header({
             {/* Título y subtítulo centrados - Solo visible en desktop */}
             {(title || subtitle) && (
               <div className="hidden lg:flex flex-col items-center flex-1 mx-4">
-                {title && <h2 className="text-xl font-semibold text-gray-900 text-center" style={{ marginLeft: '-300px' }}>{title}</h2>}
-                  <p className="text-sm text-gray-600 text-center mt-1" style={{ marginLeft: '-300px' }}>
+                {title && <h2 className="text-xl font-semibold text-gray-900 text-center" style={{ marginLeft: '-330px' }}>{title}</h2>}
+                  <p className="text-sm text-gray-600 text-center mt-1" style={{ marginLeft: '-330px' }}>
     {subtitle}
   </p>
               </div>
