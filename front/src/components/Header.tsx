@@ -40,83 +40,97 @@ export default function Header({
   };
 
   return (
-    <motion.header
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4 lg:py-6"
-    >
-      <div className="w-full">
-        {/* Primera fila: logo a la izquierda, usuario a la derecha */}
-        <div className="flex items-center justify-between w-full">
-          {/* Logo y nombre de la universidad */}
-          <div className="flex items-center gap-3">
-            <img 
-              src={logoUniversidad} 
-              alt="Logo Universidad de Medellín" 
-              className="h-[60px] w-[70px] lg:h-[100px] lg:w-[120px] object-contain"
-            />
-            <div className="hidden md:block">
-              <h1 className="text-lg lg:text-xl font-semibold text-gray-900">ConCiencia Academica</h1>
-              <p className="text-sm lg:text-base text-gray-600">Universidad de Medellín</p>
+    <>
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="bg-white border-b border-gray-200 px-4 lg:px-6 py-1 lg:py-1.5"
+      >
+        <div className="w-full">
+          {/* Primera fila: logo a la izquierda, usuario a la derecha */}
+          <div className="flex items-center justify-between w-full">
+            {/* Logo y nombre de la universidad - Reducido para móviles */}
+            <div className="flex items-center gap-3">
+                    <img 
+        src={logoUniversidad}
+        alt="Logo Universidad de Medellín"
+       className="h-[120px] w-auto object-contain"
+              />
+              <div className="hidden md:block">
+                <h1 className="text-lg lg:text-xl font-semibold text-gray-900">ConCiencia Academica</h1>
+                <p className="text-sm lg:text-base text-gray-600">Universidad de Medellín</p>
+              </div>
             </div>
-          </div>
-          
-          {/* Elementos del usuario (campana y avatar) */}
-          <div className="flex items-center gap-4">
-            {user && (
-              <>
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-600 rounded-full"></span>
-                </Button>
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarImage src="" />
-                    <AvatarFallback className="bg-red-600 text-white">
-                      {user.name.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="hidden sm:block">
-                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                    <div className="flex items-center gap-1">
-                      {getUserIcon()}
-                      <p className="text-xs text-gray-600 capitalize">{user.type}</p>
+            
+            {/* Título y subtítulo centrados - Solo visible en desktop */}
+            {(title || subtitle) && (
+              <div className="hidden lg:flex flex-col items-center flex-1 mx-4">
+                {title && <h2 className="text-xl font-semibold text-gray-900 text-center" style={{ marginLeft: '-300px' }}>{title}</h2>}
+                  <p className="text-sm text-gray-600 text-center mt-1" style={{ marginLeft: '-300px' }}>
+    {subtitle}
+  </p>
+              </div>
+            )}
+            
+            {/* Elementos del usuario (campana y avatar) */}
+            <div className="flex items-center gap-4">
+              {user && (
+                <>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="h-4 w-4" />
+                    <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-600 rounded-full"></span>
+                  </Button>
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarImage src="" />
+                      <AvatarFallback className="bg-red-600 text-white">
+                        {user.name.split(' ').map(n => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="hidden sm:block">
+                      <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                      <div className="flex items-center gap-1">
+                        {getUserIcon()}
+                        <p className="text-xs text-gray-600 capitalize">{user.type}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Segunda fila: título y subtítulo para móviles */}
+          <div className="w-full mt-4 lg:mt-2">
+            {/* Título y subtítulo para móviles */}
+            {(title || subtitle) && (
+              <div className="lg:hidden text-center mb-2">
+                {title && <h2 className="text-xl font-semibold text-gray-900">{title}</h2>}
+                {subtitle && <p className="text-sm text-gray-600">{subtitle}</p>}
+              </div>
+            )}
+
+            {/* Contenido adicional */}
+            {children && (
+              <div>
+                {children}
+              </div>
             )}
           </div>
         </div>
+      </motion.header>
 
-        {/* Segunda fila: contenido adicional */}
-        <div className="w-full mt-4">
-          {/* Título y subtítulo personalizados */}
-          {(title || subtitle) && (
-            <div className="mb-2">
-              {title && <h2 className="text-xl font-semibold text-gray-900">{title}</h2>}
-              {subtitle && <p className="text-sm text-gray-600">{subtitle}</p>}
-            </div>
-          )}
-
-          {/* Botón de retroceso */}
-          {showBackButton && onBack && (
-            <div className="mb-2">
-              <Button variant="ghost" size="sm" onClick={onBack}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver
-              </Button>
-            </div>
-          )}
-
-          {/* Contenido adicional */}
-          {children && (
-            <div>
-              {children}
-            </div>
-          )}
+      {/* Botón de retroceso fuera del header */}
+      {showBackButton && onBack && (
+        <div className="bg-white border-b border-gray-200 py-3">
+          <div className="max-w-7xl mx-auto px-4 lg:px-6">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver
+            </Button>
+          </div>
         </div>
-      </div>
-    </motion.header>
+      )}
+    </>
   );
 }

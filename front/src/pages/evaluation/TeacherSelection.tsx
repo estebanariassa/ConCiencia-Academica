@@ -10,8 +10,9 @@ import {
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Badge from '../../components/Badge';
+import Header from '../../components/Header';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/Avatar';
-import { Teacher, Course } from '../../types';
+import { Teacher, Course, User } from '../../types';
 import { 
   Search, 
   ArrowLeft, 
@@ -20,7 +21,7 @@ import {
   Clock,
   MapPin,
   BookOpen,
-  User
+  User as UserIcon
 } from 'lucide-react';  
 
 // Importar la imagen de fondo
@@ -29,9 +30,10 @@ const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
 interface TeacherSelectionProps {
   onTeacherCourseSelected: (teacher: Teacher, course: Course) => void;
   onBack: () => void;
+  user: User;
 }
 
-export default function TeacherSelection({ onTeacherCourseSelected, onBack }: TeacherSelectionProps) {
+export default function TeacherSelection({ onTeacherCourseSelected, onBack, user }: TeacherSelectionProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -109,7 +111,6 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack }: Te
   const handleContinue = () => {
     if (selectedTeacher && selectedCourse) {
       onTeacherCourseSelected(selectedTeacher, selectedCourse);
-      // Navegar a la página de evaluación
       navigate('/evaluate/form', { 
         state: { 
           teacher: selectedTeacher, 
@@ -140,23 +141,22 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack }: Te
       </div>
       
       <div className="relative z-10">
-        {/* Header */}
-        <motion.header
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="bg-white border-b border-gray-200 p-4 lg:p-6"
-        >
-          <div className="max-w-7xl mx-auto flex items-center gap-4">
+        {/* Header sin botón de volver */}
+        <Header 
+          user={user}
+          title="Evaluación Docente - Paso 1 de 2"
+          subtitle="Selecciona el profesor y curso a evaluar"
+        />
+
+        {/* Botón de volver independiente */}
+        <div className="bg-white border-b border-gray-200 py-3">
+          <div className="max-w-7xl mx-auto px-4 lg:px-6">
             <Button variant="ghost" size="sm" onClick={handleBackToDashboard}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver al Dashboard
+              Volver
             </Button>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Evaluación Docente - Paso 1 de 2</h1>
-              <p className="text-sm text-gray-600">Selecciona el profesor y curso a evaluar</p>
-            </div>
           </div>
-        </motion.header>
+        </div>
 
         <main className="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
           {/* Search Section */}
@@ -328,7 +328,7 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack }: Te
                                 <p className="font-medium text-gray-900">{selectedTeacher.name}</p>
                                 <p className="text-sm text-gray-600">{selectedTeacher.department}</p>
                                 <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
-                                  <User className="h-3 w-3" />
+                                  <UserIcon className="h-3 w-3" />
                                   {selectedTeacher.email}
                                 </p>
                               </div>
