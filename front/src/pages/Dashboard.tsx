@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
   CardHeader, 
@@ -9,16 +9,13 @@ import {
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Badge from '../components/Badge';
-import Header from '../components/Header'; // Asegúrate de que esta ruta sea correcta
+import Header from '../components/Header';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/Avatar';
 import { User } from '../types';
 import { 
-  GraduationCap, 
-  UserCheck, 
   Settings, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   ClipboardCheck, 
-  BarChart3, 
   Bell, 
   Star,
   BookOpen,
@@ -27,8 +24,12 @@ import {
   Users,
   Mail,
   Phone,
-  MapPin
+  MapPin,
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
+import { useState } from 'react';
 
 // Importar la imagen de fondo
 const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
@@ -39,11 +40,170 @@ interface DashboardProps {
   onViewReports: () => void;
 }
 
+// Componente de Calendario (definido internamente)
+const Calendar = ({ onClose }: { onClose: () => void }) => {
+  const [currentDate, setCurrentDate] = useState(new Date(2025, 8, 1)); // Septiembre 2025
+
+  // Fechas importantes
+  const surveyStart = new Date(2025, 8, 16); // 16 de septiembre
+  const surveyEnd = new Date(2025, 8, 26);   // 26 de septiembre
+
+  const navigateMonth = (direction: number) => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(currentDate.getMonth() + direction);
+    setCurrentDate(newDate);
+  };
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    return new Date(year, month, 1).getDay();
+  };
+
+  const formatMonthYear = (date: Date) => {
+    const options = { year: 'numeric', month: 'long' };
+    return date.toLocaleDateString('es-ES', options);
+  };
+
+  const isSameDay = (date1: Date, date2: Date) => {
+    return (
+      date1.getDate() === date2.getDate() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getFullYear() === date2.getFullYear()
+    );
+  };
+
+  const renderDays = () => {
+    const daysInMonth = getDaysInMonth(currentDate);
+    const firstDay = getFirstDayOfMonth(currentDate);
+    const days = [];
+    let firstDayIndex = firstDay - 1;
+    if (firstDayIndex < 0) firstDayIndex = 6;
+
+    // Días vacíos al inicio
+    for (let i = 0; i < firstDayIndex; i++) {
+      days.push(<div key={`empty-${i}`} className="h-10"></div>);
+    }
+
+    // Días del mes
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), i);
+      
+      let dayClass = "calendar-day text-center p-2 rounded-lg text-gray-700";
+      let tooltip = "";
+
+      if (isSameDay(dayDate, surveyStart)) {
+        dayClass = "calendar-day tooltip text-center p-2 rounded-lg bg-blue-50 text-blue-600 font-medium border border-blue-200";
+        tooltip = "Apertura de la encuesta";
+      } else if (isSameDay(dayDate, surveyEnd)) {
+        dayClass = "calendar-day tooltip text-center p-2 rounded-lg bg-red-50 text-red-600 font-medium border border-red-200";
+        tooltip = "Cierre de la encuesta";
+      }
+
+      days.push(
+        <div 
+          key={`day-${i}`} 
+          className={dayClass}
+          data-tooltip={tooltip}
+        >
+          {i}
+        </div>
+      );
+    }
+
+    return days;
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ type: "spring", damping: 20, stiffness: 300 }}
+        className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100"
+        >
+          <X className="h-5 w-5 text-gray-500" />
+        </button>
+        
+        {/* Header del calendario */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-800">
+            {formatMonthYear(currentDate)}
+          </h2>
+          <div className="flex space-x-2">
+            <button 
+              onClick={() => navigateMonth(-1)}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button 
+              onClick={() => navigateMonth(1)}
+              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+        
+        {/* Días de la semana */}
+        <div className="grid grid-cols-7 gap-2 mb-3">
+          {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(day => (
+            <div key={day} className="text-center text-sm font-medium text-gray-500">
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        {/* Días del mes */}
+        <div className="grid grid-cols-7 gap-2">
+          {renderDays()}
+        </div>
+        
+        {/* Leyenda */}
+        <div className="flex justify-center mt-6 space-x-4">
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+            <span className="text-xs text-gray-600">Apertura encuesta</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+            <span className="text-xs text-gray-600">Cierre encuesta</span>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 export default function Dashboard({ user, onStartEvaluation, onViewReports }: DashboardProps) {
   const navigate = useNavigate();
+  const [showCalendar, setShowCalendar] = useState(false);
   
   const handleStartEvaluation = () => {
     navigate('/evaluate/selection');
+  };
+
+  const toggleCalendar = () => {
+    setShowCalendar(!showCalendar);
   };
 
   const getGreeting = () => {
@@ -291,11 +451,11 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                       </motion.div>
                       <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                         <Button
-                          onClick={onViewReports}
+                          onClick={toggleCalendar}
                           variant="outline"
                           className="w-full h-auto py-5 flex flex-col items-center gap-3 border-gray-300"
                         >
-                          <BarChart3 className="h-8 w-8" />
+                          <CalendarIcon className="h-8 w-8" />
                           <div className="text-center">
                             <div className="font-medium text-lg">
                               Ver Calendario
@@ -429,6 +589,11 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
           </div>
         </main>
       </div>
+
+      {/* Modal de Calendario */}
+      <AnimatePresence>
+        {showCalendar && <Calendar onClose={toggleCalendar} />}
+      </AnimatePresence>
     </div>
   );
 }
