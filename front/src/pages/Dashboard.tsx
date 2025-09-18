@@ -24,12 +24,12 @@ import {
   Users,
   Mail,
   Phone,
-  MapPin,
-  X,
-  ChevronLeft,
-  ChevronRight
+  MapPin
 } from 'lucide-react';
 import { useState } from 'react';
+
+// Importar el componente Calendar externo
+import Calendar from '../components/Calendar';
 
 // Importar la imagen de fondo
 const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
@@ -39,161 +39,6 @@ interface DashboardProps {
   onStartEvaluation: () => void;
   onViewReports: () => void;
 }
-
-// Componente de Calendario (definido internamente)
-const Calendar = ({ onClose }: { onClose: () => void }) => {
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 8, 1)); // Septiembre 2025
-
-  // Fechas importantes
-  const surveyStart = new Date(2025, 8, 16); // 16 de septiembre
-  const surveyEnd = new Date(2025, 8, 26);   // 26 de septiembre
-
-  const navigateMonth = (direction: number) => {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(currentDate.getMonth() + direction);
-    setCurrentDate(newDate);
-  };
-
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    return new Date(year, month + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    return new Date(year, month, 1).getDay();
-  };
-
-  const formatMonthYear = (date: Date) => {
-    const options = { year: 'numeric', month: 'long' } as const;
-    return date.toLocaleDateString('es-ES', options);
-  };
-
-  const isSameDay = (date1: Date, date2: Date) => {
-    return (
-      date1.getDate() === date2.getDate() &&
-      date1.getMonth() === date2.getMonth() &&
-      date1.getFullYear() === date2.getFullYear()
-    );
-  };
-
-  const renderDays = () => {
-    const daysInMonth = getDaysInMonth(currentDate);
-    const firstDay = getFirstDayOfMonth(currentDate);
-    const days = [];
-    let firstDayIndex = firstDay - 1;
-    if (firstDayIndex < 0) firstDayIndex = 6;
-
-    // Días vacíos al inicio
-    for (let i = 0; i < firstDayIndex; i++) {
-      days.push(<div key={`empty-${i}`} className="h-16"></div>);
-    }
-
-    // Días del mes
-    for (let i = 1; i <= daysInMonth; i++) {
-      const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), i);
-      
-      let dayClass = "calendar-day text-center p-3 rounded-lg text-gray-700 h-16 flex items-center justify-center";
-      let tooltip = "";
-
-      if (isSameDay(dayDate, surveyStart)) {
-        dayClass = "calendar-day tooltip text-center p-3 rounded-lg bg-blue-100 text-blue-700 font-medium border border-blue-300 h-16 flex items-center justify-center";
-        tooltip = "Apertura de la encuesta";
-      } else if (isSameDay(dayDate, surveyEnd)) {
-        dayClass = "calendar-day tooltip text-center p-3 rounded-lg bg-red-100 text-red-700 font-medium border border-red-300 h-16 flex items-center justify-center";
-        tooltip = "Cierre de la encuesta";
-      }
-
-      days.push(
-        <div 
-          key={`day-${i}`} 
-          className={dayClass}
-          data-tooltip={tooltip}
-        >
-          {i}
-        </div>
-      );
-    }
-
-    return days;
-  };
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <motion.div 
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        transition={{ type: "spring", damping: 20, stiffness: 300 }}
-        className="bg-white rounded-xl shadow-lg p-6 w-full max-w-4xl relative"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxHeight: '90vh', overflowY: 'auto' }}
-      >
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 z-10"
-        >
-          <X className="h-6 w-6 text-gray-500" />
-        </button>
-        
-        {/* Header del calendario */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            {formatMonthYear(currentDate)}
-          </h2>
-          <div className="flex space-x-2">
-            <button 
-              onClick={() => navigateMonth(-1)}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
-            <button 
-              onClick={() => navigateMonth(1)}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </button>
-          </div>
-        </div>
-        
-        {/* Días de la semana */}
-        <div className="grid grid-cols-7 gap-3 mb-4">
-          {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(day => (
-            <div key={day} className="text-center text-base font-medium text-gray-500 py-2">
-              {day}
-            </div>
-          ))}
-        </div>
-        
-        {/* Días del mes */}
-        <div className="grid grid-cols-7 gap-3">
-          {renderDays()}
-        </div>
-        
-        {/* Leyenda */}
-        <div className="flex justify-center mt-6 space-x-6">
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-blue-500 mr-2"></div>
-            <span className="text-sm text-gray-600">Apertura encuesta</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
-            <span className="text-sm text-gray-600">Cierre encuesta</span>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-};
 
 export default function Dashboard({ user, onStartEvaluation, onViewReports }: DashboardProps) {
   const navigate = useNavigate();
@@ -591,7 +436,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
         </main>
       </div>
 
-      {/* Modal de Calendario */}
+      {/* Modal de Calendario - Usando el componente externo */}
       <AnimatePresence>
         {showCalendar && <Calendar onClose={toggleCalendar} />}
       </AnimatePresence>
