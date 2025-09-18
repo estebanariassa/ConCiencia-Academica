@@ -4,7 +4,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { CardHeader, CardContent, CardTitle, CardDescription } from '../../components/Card';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
+import Header from '../../components/Header';
 import LikertScale from '../../components/LikertScale';
+import ProgressBar from '../../components/ProgressBar';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/Avatar';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 
@@ -77,49 +79,36 @@ export default function EvaluationForm() {
       </div>
       
       <div className="relative z-10">
-        <motion.header
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="bg-white border-b border-gray-200 p-4 lg:p-6"
-        >
-          <div className="max-w-4xl mx-auto flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver
-            </Button>
-            <div className="flex-1">
-              <h1 className="text-xl font-semibold text-gray-900">Evaluación Docente - Paso 2 de 2</h1>
-              <p className="text-sm text-gray-600">Evalúa el desempeño del profesor</p>
-            </div>
+        {/* Header con componente reutilizable */}
+        <Header 
+          title="Evaluación Docente - Paso 2 de 2"
+          subtitle="Evalúa el desempeño del profesor"
+        />
+
+        {/* Barra de progreso justo debajo del header */}
+        <div className="bg-white border-b border-gray-200 py-3">
+          <div className="max-w-4xl mx-auto px-4 lg:px-6">
+            <ProgressBar 
+              current={currentQuestion + 1} 
+              total={questions.length} 
+              label={`Pregunta ${currentQuestion + 1} de ${questions.length}`}
+            />
           </div>
-        </motion.header>
+        </div>
 
         <main className="max-w-4xl mx-auto p-4 lg:p-6 space-y-6">
-          {/* Progress Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <div className="bg-white rounded-lg p-6 shadow-lg border border-gray-200">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-lg font-medium text-gray-900">
-                  Pregunta {currentQuestion + 1} de {questions.length}
-                </span>
-                <span className="text-lg font-medium text-gray-900">
-                  {Math.round(progress)}% completado
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <motion.div
-                  className="bg-red-600 h-3 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.5 }}
-                />
-              </div>
-            </div>
-          </motion.div>
+          {/* Botón de volver independiente */}
+          <div className="flex justify-start">
+            <Button 
+              variant="ghost" 
+              size="lg" 
+              onClick={() => navigate(-1)}
+              className="ml-2 text-lg py-2 px-4 bg-white bg-opacity-90 rounded-lg shadow-md hover:bg-gray-100 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Volver a seleccionar Docente
+            </Button>
+          </div>
 
           {/* Teacher Info */}
           <motion.div

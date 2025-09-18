@@ -17,12 +17,14 @@ export default function LikertScale({
   leftLabel = "En desacuerdo",
   rightLabel = "De acuerdo"
 }: LikertScaleProps) {
-  // Función para calcular el tamaño basado en la distancia al centro
+  // Función para calcular el tamaño basado en la posición (más pequeño a la izquierda, más grande a la derecha)
   const getCircleSize = (option: number, totalOptions: number) => {
-    const center = Math.ceil(totalOptions / 2);
-    const distanceFromCenter = Math.abs(option - center);
-    // Tamaño base más un incremento según la distancia al centro
-    return 48 + (distanceFromCenter * 16); // 48px para el centro, +16px por cada paso
+    // Tamaño base para la opción más pequeña (izquierda)
+    const baseSize = 48;
+    // Incremento por cada paso a la derecha
+    const increment = 10;
+    // El tamaño será baseSize + (option - 1) * increment
+    return baseSize + (option - 1) * increment;
   };
 
   // Función para determinar el color basado en la posición
