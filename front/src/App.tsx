@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import TeacherSelection from './pages/evaluation/TeacherSelection'
 import EvaluationForm from './pages/evaluation/EvaluationForm'
+import ReportsPage from './pages/Reports/ReportsPage' // Nueva importación
 import { User, Teacher, Course } from './types'
 
 function App() {
@@ -79,6 +80,15 @@ function App() {
             />
           } 
         />
+        {/* Nueva ruta para reportes */}
+        <Route 
+          path="/reports" 
+          element={
+            <ReportsPageWrapper 
+              user={user}
+            />
+          } 
+        />
       </Routes>
     </BrowserRouter>
   )
@@ -119,6 +129,14 @@ function EvaluationFormWrapper({ user }: { user: User | null }) {
     return <Navigate to="/login" replace />
   }
   return <EvaluationForm />
+}
+
+// Nuevo wrapper para ReportsPage
+function ReportsPageWrapper({ user }: { user: User | null }) {
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  return <ReportsPage user={user} />
 }
 
 export default App

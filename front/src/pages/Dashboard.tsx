@@ -50,6 +50,10 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
     navigate('/evaluate/selection');
   };
 
+  const handleViewReports = () => {
+  // Navegar a la ruta de reportes
+  navigate('/reports');
+}
   const toggleCalendar = () => {
     setShowCalendar(!showCalendar);
   };
