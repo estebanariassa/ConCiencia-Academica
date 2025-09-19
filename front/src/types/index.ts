@@ -80,3 +80,23 @@ export interface Stats {
   totalTeachers?: number;
   pendingApprovals?: number;
 }
+
+export interface BaseEvaluation {
+  id: number;
+  course: string;
+  deadline: string;
+}
+
+export interface StudentEvaluation extends BaseEvaluation {
+  teacher: string;
+}
+
+export interface TeacherEvaluation extends BaseEvaluation {
+  period: string;
+}
+
+export interface CoordinatorEvaluation extends BaseEvaluation {
+  period: string;
+}
+
+export type EvaluationItem = StudentEvaluation | TeacherEvaluation | CoordinatorEvaluation;

@@ -24,7 +24,9 @@ import {
   Users,
   Mail,
   Phone,
-  MapPin
+  MapPin,
+  BarChart3,
+  UserCog
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -78,6 +80,24 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             { id: 1, text: 'Nueva evaluación disponible para Matemáticas I', time: '2 horas', urgent: true },
             { id: 2, text: 'Recordatorio: Evaluación de Física II vence mañana', time: '1 día', urgent: false },
             { id: 3, text: 'Resultados de evaluación publicados', time: '3 días', urgent: false }
+          ],
+          quickActions: [
+            {
+              icon: ClipboardCheck,
+              label: 'Nueva Evaluación',
+              description: 'Evaluar un docente',
+              onClick: handleStartEvaluation,
+              variant: 'default' as const,
+              className: 'bg-red-600 hover:bg-red-700 text-white'
+            },
+            {
+              icon: CalendarIcon,
+              label: 'Ver Calendario',
+              description: 'Fechas importantes',
+              onClick: toggleCalendar,
+              variant: 'outline' as const,
+              className: 'border-gray-300'
+            }
           ]
         };
       case 'teacher':
@@ -96,6 +116,24 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             { id: 1, text: '15 estudiantes han completado tu evaluación', time: '2 horas', urgent: false },
             { id: 2, text: 'Recordatorio: Cierre de evaluaciones este viernes', time: '1 día', urgent: true },
             { id: 3, text: 'Nuevo mensaje de un estudiante', time: '3 días', urgent: false }
+          ],
+          quickActions: [
+            {
+              icon: BarChart3,
+              label: 'Análisis y Reportes',
+              description: 'Ver mis estadísticas',
+              onClick: onViewReports,
+              variant: 'default' as const,
+              className: 'bg-red-600 hover:bg-red-650 text-white'
+            },
+            {
+              icon: CalendarIcon,
+              label: 'Ver Calendario',
+              description: 'Fechas importantes',
+              onClick: toggleCalendar,
+              variant: 'outline' as const,
+              className: 'border-gray-300'
+            }
           ]
         };
       case 'coordinator':
@@ -114,6 +152,24 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             { id: 1, text: 'Reporte de evaluaciones del departamento listo', time: '2 horas', urgent: false },
             { id: 2, text: '3 profesores requieren revisión de evaluaciones', time: '1 día', urgent: true },
             { id: 3, text: 'Reunión de coordinación el próximo lunes', time: '3 días', urgent: false }
+          ],
+          quickActions: [
+            {
+              icon: Users,
+              label: 'Gestión de Profesores',
+              description: 'Administrar docentes',
+              onClick: () => console.log('Gestión de Profesores'),
+              variant: 'default' as const,
+              className: 'bg-green-600 hover:bg-green-700 text-white'
+            },
+            {
+              icon: BarChart3,
+              label: 'Reportes Generales',
+              description: 'Ver reportes del departamento',
+              onClick: onViewReports,
+              variant: 'outline' as const,
+              className: 'border-gray-300'
+            }
           ]
         };
       default:
@@ -131,6 +187,24 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
           notifications: [
             { id: 1, text: 'Nueva evaluación disponible', time: '2 horas', urgent: true },
             { id: 2, text: 'Recordatorio: Evaluación pendiente', time: '1 día', urgent: false }
+          ],
+          quickActions: [
+            {
+              icon: ClipboardCheck,
+              label: 'Nueva Evaluación',
+              description: 'Evaluar un docente',
+              onClick: handleStartEvaluation,
+              variant: 'default' as const,
+              className: 'bg-red-600 hover:bg-red-700 text-white'
+            },
+            {
+              icon: CalendarIcon,
+              label: 'Ver Calendario',
+              description: 'Fechas importantes',
+              onClick: toggleCalendar,
+              variant: 'outline' as const,
+              className: 'border-gray-300'
+            }
           ]
         };
     }
@@ -141,6 +215,19 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 }
+  };
+
+  // Función para obtener el subtítulo de la evaluación según el tipo de usuario
+  const getEvaluationSubtitle = (evaluation: any) => {
+    switch (user.type) {
+      case 'student':
+        return evaluation.teacher;
+      case 'teacher':
+      case 'coordinator':
+        return evaluation.period;
+      default:
+        return '';
+    }
   };
 
   return (
@@ -174,7 +261,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             <Card className="bg-white shadow-md border border-gray-200 p-6">
               <CardContent className="space-y-3">
                 <h2 className="text-3xl font-semibold text-gray-900">
-                  {getGreeting()}, {user.name.split(' ')[0]}!
+                  {getGreeting()}, {user.type === 'teacher' ? '' : ''} {user.name.split(' ')[0]}!
                 </h2>
                 <p className="text-lg text-gray-600">
                   Aquí tienes un resumen de tu actividad reciente en el sistema.
@@ -185,7 +272,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
 
           {/* Stats Cards - Específicas para cada tipo de usuario */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Tarjeta 1 - Evaluaciones Pendientes */}
+            {/* Tarjeta 1 - Diferente según el tipo de usuario */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -195,22 +282,35 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               <Card className="bg-white shadow-md border border-gray-200 p-6">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                   <CardTitle className="text-lg font-medium text-gray-900">
-                    Evaluaciones Pendientes
+                    {user.type === 'student' ? 'Evaluaciones Pendientes' : 
+                     user.type === 'teacher' ? 'Calificación Promedio' : 
+                     'Total de Profesores'}
                   </CardTitle>
-                  <ClipboardCheck className="h-6 w-6 text-red-600" />
+                  {user.type === 'student' ? <ClipboardCheck className="h-6 w-6 text-red-600" /> :
+                   user.type === 'teacher' ? <Star className="h-6 w-6 text-yellow-600" /> :
+                   <Users className="h-6 w-6 text-blue-600" />}
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-red-600">
-                    {userData.stats.evaluationsPending}
+                  <div className={`text-3xl font-bold ${
+                    user.type === 'student' ? 'text-red-600' :
+                    user.type === 'teacher' ? 'text-yellow-600' :
+                    'text-blue-600'
+                  }`}>
+                    {user.type === 'student' ? userData.stats.evaluationsPending :
+                     user.type === 'teacher' ? userData.stats.averageRating :
+                     userData.stats.totalTeachers}
+                    {user.type === 'teacher' && '/5.0'}
                   </div>
                   <p className="text-sm text-gray-500 mt-2">
-                    Deben completarse pronto
+                    {user.type === 'student' ? 'Deben completarse pronto' :
+                     user.type === 'teacher' ? 'Última evaluación' :
+                     'En el departamento'}
                   </p>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* Tarjeta 2 - Evaluaciones Completadas */}
+            {/* Tarjeta 2 - Evaluaciones Completadas/Total Evaluaciones */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -220,22 +320,28 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               <Card className="bg-white shadow-md border border-gray-200 p-6">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                   <CardTitle className="text-lg font-medium text-gray-900">
-                    Evaluaciones Completadas
+                    {user.type === 'student' ? 'Evaluaciones Completadas' : 
+                     user.type === 'teacher' ? 'Total Evaluaciones' :
+                     'Evaluaciones Completadas'}
                   </CardTitle>
                   <Star className="h-6 w-6 text-green-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-green-600">
-                    {userData.stats.evaluationsCompleted}
+                    {user.type === 'student' ? userData.stats.evaluationsCompleted :
+                     user.type === 'teacher' ? userData.stats.totalEvaluations :
+                     userData.stats.evaluationsCompleted}
                   </div>
                   <p className="text-sm text-gray-500 mt-2">
-                    Este período académico
+                    {user.type === 'student' ? 'Este período académico' :
+                     user.type === 'teacher' ? 'Evaluaciones recibidas' :
+                     'En el sistema'}
                   </p>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* Tarjeta 3 - Cursos Actuales */}
+            {/* Tarjeta 3 - Cursos Actuales/Cursos Impartidos */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -245,16 +351,22 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               <Card className="bg-white shadow-md border border-gray-200 p-6">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                   <CardTitle className="text-lg font-medium text-gray-900">
-                    Cursos Actuales
+                    {user.type === 'student' ? 'Cursos Actuales' : 
+                     user.type === 'teacher' ? 'Cursos Impartidos' :
+                     'Aprobaciones Pendientes'}
                   </CardTitle>
                   <BookOpen className="h-6 w-6 text-blue-600" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-blue-600">
-                    {userData.stats.currentCourses}
+                    {user.type === 'student' ? userData.stats.currentCourses :
+                     user.type === 'teacher' ? userData.stats.coursesTeaching :
+                     userData.stats.pendingApprovals}
                   </div>
                   <p className="text-sm text-gray-500 mt-2">
-                    Cursos matriculados
+                    {user.type === 'student' ? 'Cursos matriculados' :
+                     user.type === 'teacher' ? 'Este semestre' :
+                     'Por revisar'}
                   </p>
                 </CardContent>
               </Card>
@@ -279,39 +391,25 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                        <Button
-                          onClick={handleStartEvaluation}
-                          className="w-full h-auto py-5 bg-red-600 hover:bg-red-700 text-white flex flex-col items-center gap-3"
-                        >
-                          <ClipboardCheck className="h-8 w-8" />
-                          <div className="text-center">
-                            <div className="font-medium text-lg">
-                              Nueva Evaluación
+                      {userData.quickActions.map((action, index) => (
+                        <motion.div key={index} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                          <Button
+                            onClick={action.onClick}
+                            variant={action.variant}
+                            className={`w-full h-auto py-5 flex flex-col items-center gap-3 ${action.className}`}
+                          >
+                            <action.icon className="h-8 w-8" />
+                            <div className="text-center">
+                              <div className="font-medium text-lg">
+                                {action.label}
+                              </div>
+                              <div className="text-sm opacity-80">
+                                {action.description}
+                              </div>
                             </div>
-                            <div className="text-sm opacity-80">
-                              Evaluar un docente
-                            </div>
-                          </div>
-                        </Button>
-                      </motion.div>
-                      <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                        <Button
-                          onClick={toggleCalendar}
-                          variant="outline"
-                          className="w-full h-auto py-5 flex flex-col items-center gap-3 border-gray-300"
-                        >
-                          <CalendarIcon className="h-8 w-8" />
-                          <div className="text-center">
-                            <div className="font-medium text-lg">
-                              Ver Calendario
-                            </div>
-                            <div className="text-sm opacity-80">
-                              Fechas importantes
-                            </div>
-                          </div>
-                        </Button>
-                      </motion.div>
+                          </Button>
+                        </motion.div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -326,7 +424,9 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                 <Card className="bg-white shadow-md border border-gray-200 p-6">
                   <CardHeader className="pb-4">
                     <CardTitle className="text-xl text-gray-900">
-                      Evaluaciones Próximas
+                      {user.type === 'student' ? 'Evaluaciones Próximas' :
+                       user.type === 'teacher' ? 'Próximos Cierres' :
+                       'Próximas Revisiones'}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-5">
@@ -341,7 +441,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                         <div>
                           <p className="font-medium text-lg text-gray-900">{evaluation.course}</p>
                           <p className="text-sm text-gray-600">
-                            {evaluation.teacher}
+                            {getEvaluationSubtitle(evaluation)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -410,7 +510,11 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                       </Avatar>
                       <div>
                         <p className="font-medium text-gray-900">{user.name}</p>
-                        <p className="text-sm text-gray-600 capitalize">{user.type}</p>
+                        <p className="text-sm text-gray-600 capitalize">
+                          {user.type === 'student' ? 'Estudiante' :
+                           user.type === 'teacher' ? 'Profesor' :
+                           'Coordinador'}
+                        </p>
                       </div>
                     </div>
                     
