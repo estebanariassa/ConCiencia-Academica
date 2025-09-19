@@ -34,34 +34,34 @@ export default function ConfirmationModal({
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md"
+        className="bg-white rounded-xl shadow-lg p-10 w-full max-w-lg" 
       >
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold text-gray-900">{title}</h3>
+        <div className="flex justify-between items-center mb-100"> 
+          <h3 className="text-2xl font-semibold text-gray-900">{title}</h3> 
           <button 
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
           >
-            <X className="h-5 w-5" />
+            <X className="h-6 w-6" /> 
           </button>
         </div>
         
-        <div className="text-center mb-6">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-          <p className="text-lg text-gray-700">{message}</p>
+        <div className="text-center mb-8"> 
+          <CheckCircle className="h-20 w-20 text-green-500 mx-auto mb-6" /> 
+          <p className="text-xl text-gray-700">{message}</p> 
         </div>
         
-        <div className="flex justify-center space-x-4">
+        <div className="flex justify-center space-x-6"> 
           <Button
             variant="outline"
             onClick={onClose}
-            className="px-6 py-3"
+            className="px-12 py-4" 
           >
             {cancelText}
           </Button>
           <Button
             onClick={onConfirm}
-            className="bg-red-600 hover:bg-red-700 px-6 py-3"
+            className="bg-red-600 hover:bg-red-700 px-12 py-4" 
           >
             {confirmText}
           </Button>

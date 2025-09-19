@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CardHeader, CardContent, CardTitle, CardDescription } from '../../components/Card';
 import Card from '../../components/Card';
@@ -8,6 +8,7 @@ import Header from '../../components/Header';
 import LikertScale from '../../components/LikertScale';
 import ProgressBar from '../../components/ProgressBar';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/Avatar';
+import ConfirmationModal from '../../components/ConfirmationModal';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 
 const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
@@ -24,6 +25,7 @@ export default function EvaluationForm() {
   const { teacher, course } = location.state || {};
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [ratings, setRatings] = useState<number[]>(Array(10).fill(0));
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const questions: EvaluationQuestion[] = [
     { id: '1', category: 'Claridad Expositiva', question: 'El profesor explica claramente los conceptos del curso' },
@@ -50,9 +52,8 @@ export default function EvaluationForm() {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
-      // Submit evaluation
-      console.log('Evaluation completed:', { teacher, course, ratings });
-      navigate('/dashboard');
+      // Mostrar modal de confirmación en lugar de navegar directamente
+      setShowConfirmation(true);
     }
   };
 
@@ -60,6 +61,17 @@ export default function EvaluationForm() {
     if (currentQuestion > 0) {
       setCurrentQuestion(currentQuestion - 1);
     }
+  };
+
+  const handleConfirmSubmit = () => {
+    // Lógica para enviar la evaluación
+    console.log('Evaluation completed:', { teacher, course, ratings });
+    setShowConfirmation(false);
+    navigate('/dashboard');
+  };
+
+  const handleCancelSubmit = () => {
+    setShowConfirmation(false);
   };
 
   const progress = ((currentQuestion + 1) / questions.length) * 100;
@@ -203,6 +215,17 @@ export default function EvaluationForm() {
           </motion.div>
         </main>
       </div>
+
+      {/* Modal de Confirmación usando el componente reutilizable */}
+      <ConfirmationModal
+        isOpen={showConfirmation}
+        onClose={handleCancelSubmit}
+        onConfirm={handleConfirmSubmit}
+        title="Confirmar Evaluación"
+        message="¿Estás seguro de que deseas finalizar la evaluación? Una vez enviada, no podrás modificarla."
+        confirmText="Confirmar y Enviar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }
