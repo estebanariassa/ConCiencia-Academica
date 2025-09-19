@@ -50,10 +50,11 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
     navigate('/evaluate/selection');
   };
 
+  // Modificamos handleViewReports para que navegue a la ruta de reportes
   const handleViewReports = () => {
-  // Navegar a la ruta de reportes
-  navigate('/reports');
-}
+    navigate('/reports');
+  };
+
   const toggleCalendar = () => {
     setShowCalendar(!showCalendar);
   };
@@ -126,7 +127,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               icon: BarChart3,
               label: 'Análisis y Reportes',
               description: 'Ver mis estadísticas',
-              onClick: onViewReports,
+              onClick: handleViewReports, // Cambiado para usar la nueva función
               variant: 'default' as const,
               className: 'bg-red-600 hover:bg-red-650 text-white'
             },
@@ -170,7 +171,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               icon: BarChart3,
               label: 'Reportes Generales',
               description: 'Ver reportes del departamento',
-              onClick: onViewReports,
+              onClick: handleViewReports, // Cambiado para usar la nueva función
               variant: 'outline' as const,
               className: 'border-gray-300'
             }
