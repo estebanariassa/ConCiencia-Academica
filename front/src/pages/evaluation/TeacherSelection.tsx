@@ -11,7 +11,6 @@ import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Badge from '../../components/Badge';
 import Header from '../../components/Header';
-import { Avatar, AvatarFallback, AvatarImage } from '../../components/Avatar';
 import { Teacher, Course, User } from '../../types';
 import { 
   Search, 
@@ -224,12 +223,6 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                       whileTap={{ scale: 0.98 }}
                     >
                       <div className="flex items-start gap-3">
-                        <Avatar>
-                          <AvatarImage src="" />
-                          <AvatarFallback className="bg-red-600 text-white">
-                            {teacher.name.split(' ').map(n => n[0]).join('')}
-                          </AvatarFallback>
-                        </Avatar>
                         <div className="flex-1">
                           <h3 className="font-medium text-gray-900">{teacher.name}</h3>
                           <p className="text-sm text-gray-600">{teacher.department}</p>

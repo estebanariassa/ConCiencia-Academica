@@ -7,7 +7,6 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 import LikertScale from '../../components/LikertScale';
 import ProgressBar from '../../components/ProgressBar';
-import { Avatar, AvatarFallback, AvatarImage } from '../../components/Avatar';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 
@@ -130,12 +129,6 @@ export default function EvaluationForm() {
           >
             <Card className="bg-white shadow-lg border border-gray-200 p-6">
               <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarImage src="" />
-                  <AvatarFallback className="bg-red-600 text-white text-lg">
-                    {teacher?.name?.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">{teacher?.name}</h2>
                   <p className="text-md text-gray-600">{course?.name} - {course?.code}</p>

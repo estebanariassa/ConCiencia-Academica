@@ -10,7 +10,6 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import Badge from '../components/Badge';
 import Header from '../components/Header';
-import { Avatar, AvatarFallback, AvatarImage } from '../components/Avatar';
 import { User } from '../types';
 import { 
   Settings, 
@@ -507,12 +506,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src="" />
-                        <AvatarFallback className="bg-red-600 text-white">
-                          {user.name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
                       <div>
                         <p className="font-medium text-gray-900">{user.name}</p>
                         <p className="text-sm text-gray-600 capitalize">
