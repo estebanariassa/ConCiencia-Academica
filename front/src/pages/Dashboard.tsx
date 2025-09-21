@@ -25,7 +25,9 @@ import {
   Phone,
   MapPin,
   BarChart3,
-  UserCog
+  UserCog,
+  AlertCircle,
+  User as UserIcon
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -41,6 +43,30 @@ interface DashboardProps {
   onViewReports: () => void;
 }
 
+// Componente reutilizable para las cards
+interface SectionCardProps {
+  title: string;
+  icon: React.ComponentType<any>;
+  children: React.ReactNode;
+  className?: string;
+}
+
+const SectionCard = ({ title, icon: Icon, children, className = '' }: SectionCardProps) => {
+  return (
+    <Card className={`bg-white shadow-md border border-gray-200 p-6 ${className}`}>
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-2">
+          <Icon className="h-5 w-5 text-gray-700" />
+          <CardTitle className="text-xl text-gray-900">{title}</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {children}
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function Dashboard({ user, onStartEvaluation, onViewReports }: DashboardProps) {
   const navigate = useNavigate();
   const [showCalendar, setShowCalendar] = useState(false);
@@ -49,7 +75,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
     navigate('/evaluate/selection');
   };
 
-  // Modificamos handleViewReports para que navegue a la ruta de reportes
   const handleViewReports = () => {
     navigate('/reports');
   };
@@ -126,7 +151,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               icon: BarChart3,
               label: 'Análisis y Reportes',
               description: 'Ver mis estadísticas',
-              onClick: handleViewReports, // Cambiado para usar la nueva función
+              onClick: handleViewReports,
               variant: 'default' as const,
               className: 'bg-red-600 hover:bg-red-650 text-white'
             },
@@ -170,7 +195,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               icon: BarChart3,
               label: 'Reportes Generales',
               description: 'Ver reportes del departamento',
-              onClick: handleViewReports, // Cambiado para usar la nueva función
+              onClick: handleViewReports,
               variant: 'outline' as const,
               className: 'border-gray-300'
             }
@@ -273,114 +298,139 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               </CardContent>
             </Card>
           </motion.div>
+{/* Stats Cards - Específicas para cada tipo de usuario */}
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {/* Tarjeta 1 - Diferente según el tipo de usuario */}
+  <motion.div
+    variants={cardVariants}
+    initial="hidden"
+    animate="visible"
+    transition={{ delay: 0.2 }}
+  >
+    <Card className="bg-white shadow-md border border-gray-200 p-6">
+      <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <CardTitle className="text-lg font-medium text-gray-900 text-left">
+          {user.type === 'student'
+            ? 'Evaluaciones Pendientes'
+            : user.type === 'teacher'
+            ? 'Calificación Promedio'
+            : 'Total de Profesores'}
+        </CardTitle>
+        {user.type === 'student' ? (
+          <ClipboardCheck className="h-6 w-6 text-red-600 ml-4" />
+        ) : user.type === 'teacher' ? (
+          <Star className="h-6 w-6 text-yellow-600 ml-4" />
+        ) : (
+          <Users className="h-6 w-6 text-blue-600 ml-4" />
+        )}
+      </CardHeader>
+      <CardContent>
+        <div
+          className={`text-3xl font-bold ${
+            user.type === 'student'
+              ? 'text-red-600'
+              : user.type === 'teacher'
+              ? 'text-yellow-600'
+              : 'text-blue-600'
+          }`}
+        >
+          {user.type === 'student'
+            ? userData.stats.evaluationsPending
+            : user.type === 'teacher'
+            ? userData.stats.averageRating
+            : userData.stats.totalTeachers}
+          {user.type === 'teacher' && '/5.0'}
+        </div>
+        <p className="text-sm text-gray-500 mt-2 text-left">
+          {user.type === 'student'
+            ? 'Deben completarse pronto'
+            : user.type === 'teacher'
+            ? 'Última evaluación'
+            : 'En el departamento'}
+        </p>
+      </CardContent>
+    </Card>
+  </motion.div>
 
-          {/* Stats Cards - Específicas para cada tipo de usuario */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Tarjeta 1 - Diferente según el tipo de usuario */}
-            <motion.div
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="bg-white shadow-md border border-gray-200 p-6">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                  <CardTitle className="text-lg font-medium text-gray-900">
-                    {user.type === 'student' ? 'Evaluaciones Pendientes' : 
-                     user.type === 'teacher' ? 'Calificación Promedio' : 
-                     'Total de Profesores'}
-                  </CardTitle>
-                  {user.type === 'student' ? <ClipboardCheck className="h-6 w-6 text-red-600" /> :
-                   user.type === 'teacher' ? <Star className="h-6 w-6 text-yellow-600" /> :
-                   <Users className="h-6 w-6 text-blue-600" />}
-                </CardHeader>
-                <CardContent>
-                  <div className={`text-3xl font-bold ${
-                    user.type === 'student' ? 'text-red-600' :
-                    user.type === 'teacher' ? 'text-yellow-600' :
-                    'text-blue-600'
-                  }`}>
-                    {user.type === 'student' ? userData.stats.evaluationsPending :
-                     user.type === 'teacher' ? userData.stats.averageRating :
-                     userData.stats.totalTeachers}
-                    {user.type === 'teacher' && '/5.0'}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {user.type === 'student' ? 'Deben completarse pronto' :
-                     user.type === 'teacher' ? 'Última evaluación' :
-                     'En el departamento'}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
+  {/* Tarjeta 2 - Evaluaciones Completadas/Total Evaluaciones */}
+  <motion.div
+    variants={cardVariants}
+    initial="hidden"
+    animate="visible"
+    transition={{ delay: 0.3 }}
+  >
+    <Card className="bg-white shadow-md border border-gray-200 p-6">
+      <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <CardTitle className="text-lg font-medium text-gray-900 text-left">
+          {user.type === 'student'
+            ? 'Evaluaciones Completadas'
+            : user.type === 'teacher'
+            ? 'Total Evaluaciones'
+            : 'Evaluaciones Completadas'}
+        </CardTitle>
+        <Star className="h-6 w-6 text-green-600 ml-4" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-3xl font-bold text-green-600">
+          {user.type === 'student'
+            ? userData.stats.evaluationsCompleted
+            : user.type === 'teacher'
+            ? userData.stats.totalEvaluations
+            : userData.stats.evaluationsCompleted}
+        </div>
+        <p className="text-sm text-gray-500 mt-2 text-left">
+          {user.type === 'student'
+            ? 'Este período académico'
+            : user.type === 'teacher'
+            ? 'Evaluaciones recibidas'
+            : 'En el sistema'}
+        </p>
+      </CardContent>
+    </Card>
+  </motion.div>
 
-            {/* Tarjeta 2 - Evaluaciones Completadas/Total Evaluaciones */}
-            <motion.div
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="bg-white shadow-md border border-gray-200 p-6">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                  <CardTitle className="text-lg font-medium text-gray-900">
-                    {user.type === 'student' ? 'Evaluaciones Completadas' : 
-                     user.type === 'teacher' ? 'Total Evaluaciones' :
-                     'Evaluaciones Completadas'}
-                  </CardTitle>
-                  <Star className="h-6 w-6 text-green-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-green-600">
-                    {user.type === 'student' ? userData.stats.evaluationsCompleted :
-                     user.type === 'teacher' ? userData.stats.totalEvaluations :
-                     userData.stats.evaluationsCompleted}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {user.type === 'student' ? 'Este período académico' :
-                     user.type === 'teacher' ? 'Evaluaciones recibidas' :
-                     'En el sistema'}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Tarjeta 3 - Cursos Actuales/Cursos Impartidos */}
-            <motion.div
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              transition={{ delay: 0.4 }}
-            >
-              <Card className="bg-white shadow-md border border-gray-200 p-6">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                  <CardTitle className="text-lg font-medium text-gray-900">
-                    {user.type === 'student' ? 'Cursos Actuales' : 
-                     user.type === 'teacher' ? 'Cursos Impartidos' :
-                     'Aprobaciones Pendientes'}
-                  </CardTitle>
-                  <BookOpen className="h-6 w-6 text-blue-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-blue-600">
-                    {user.type === 'student' ? userData.stats.currentCourses :
-                     user.type === 'teacher' ? userData.stats.coursesTeaching :
-                     userData.stats.pendingApprovals}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {user.type === 'student' ? 'Cursos matriculados' :
-                     user.type === 'teacher' ? 'Este semestre' :
-                     'Por revisar'}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
+  {/* Tarjeta 3 - Cursos Actuales/Cursos Impartidos */}
+  <motion.div
+    variants={cardVariants}
+    initial="hidden"
+    animate="visible"
+    transition={{ delay: 0.4 }}
+  >
+    <Card className="bg-white shadow-md border border-gray-200 p-6">
+      <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <CardTitle className="text-lg font-medium text-gray-900 text-left">
+          {user.type === 'student'
+            ? 'Cursos Actuales'
+            : user.type === 'teacher'
+            ? 'Cursos Impartidos'
+            : 'Aprobaciones Pendientes'}
+        </CardTitle>
+        <BookOpen className="h-6 w-6 text-blue-600 ml-4" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-3xl font-bold text-blue-600">
+          {user.type === 'student'
+            ? userData.stats.currentCourses
+            : user.type === 'teacher'
+            ? userData.stats.coursesTeaching
+            : userData.stats.pendingApprovals}
+        </div>
+        <p className="text-sm text-gray-500 mt-2 text-left">
+          {user.type === 'student'
+            ? 'Cursos matriculados'
+            : user.type === 'teacher'
+            ? 'Este semestre'
+            : 'Por revisar'}
+        </p>
+      </CardContent>
+    </Card>
+  </motion.div>
+</div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Columna principal */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Acciones Rápidas */}
+              {/* Card combinada de Acciones Rápidas y Evaluaciones Próximas */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -388,74 +438,69 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               >
                 <Card className="bg-white shadow-md border border-gray-200 p-6">
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-xl text-gray-900">Acciones Rápidas</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <ClipboardCheck className="h-5 w-5 text-gray-700" />
+                      <CardTitle className="text-2xl text-gray-900">Cosas por hacer:</CardTitle>
+                    </div>
                     <CardDescription className="text-base">
-                      Accede rápidamente a las funciones más utilizadas
+                      Aca estan las opciones de lo que puedes realizar
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      {userData.quickActions.map((action, index) => (
-                        <motion.div key={index} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                          <Button
-                            onClick={action.onClick}
-                            variant={action.variant}
-                            className={`w-full h-auto py-5 flex flex-col items-center gap-3 ${action.className}`}
-                          >
-                            <action.icon className="h-8 w-8" />
-                            <div className="text-center">
-                              <div className="font-medium text-lg">
-                                {action.label}
+                  <CardContent className="space-y-6">
+                    {/* Acciones Rápidas */}
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Acciones Rápidas</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        {userData.quickActions.map((action, index) => (
+                          <motion.div key={index} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                            <Button
+                              onClick={action.onClick}
+                              variant={action.variant}
+                              className={`w-full h-auto py-5 flex flex-col items-center gap-3 ${action.className}`}
+                            >
+                              <action.icon className="h-8 w-8" />
+                              <div className="text-center">
+                                <div className="font-medium text-lg">
+                                  {action.label}
+                                </div>
+                                <div className="text-sm opacity-80">
+                                  {action.description}
+                                </div>
                               </div>
-                              <div className="text-sm opacity-80">
-                                {action.description}
-                              </div>
-                            </div>
-                          </Button>
-                        </motion.div>
-                      ))}
+                            </Button>
+                          </motion.div>
+                        ))}
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
 
-              {/* Evaluaciones Próximas */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-              >
-                <Card className="bg-white shadow-md border border-gray-200 p-6">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-xl text-gray-900">
-                      {user.type === 'student' ? 'Evaluaciones Próximas' :
-                       user.type === 'teacher' ? 'Próximos Cierres' :
-                       'Próximas Revisiones'}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-5">
-                    {userData.upcomingEvaluations.map((evaluation, index) => (
-                      <motion.div
-                        key={evaluation.id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.8 + index * 0.1 }}
-                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
-                      >
-                        <div>
-                          <p className="font-medium text-lg text-gray-900">{evaluation.course}</p>
-                          <p className="text-sm text-gray-600">
-                            {getEvaluationSubtitle(evaluation)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-sm bg-white py-1">
-                            <Clock className="h-4 w-4 mr-1" />
-                            {evaluation.deadline}
-                          </Badge>
-                        </div>
-                      </motion.div>
-                    ))}
+                    {/* Evaluaciones Próximas */}
+                    <div className="pt-6 border-t border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Evaluaciones Próximas</h3>
+                      <div className="space-y-5">
+                        {userData.upcomingEvaluations.map((evaluation, index) => (
+                          <motion.div
+                            key={evaluation.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.8 + index * 0.1 }}
+                            className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                          >
+                            <div>
+                              <p className="font-medium text-lg text-gray-900">{evaluation.course}</p>
+                              <p className="text-sm text-gray-600">
+                                {getEvaluationSubtitle(evaluation)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-sm bg-white py-1">
+                                <Clock className="h-4 w-4 mr-1" />
+                                {evaluation.deadline}
+                              </Badge>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -464,75 +509,57 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             {/* Columna lateral - Notificaciones e Información de Usuario */}
             <div className="space-y-8">
               {/* Notificaciones */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 }}
-              >
-                <Card className="bg-white shadow-md border border-gray-200 p-6">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-xl text-gray-900">Notificaciones</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {userData.notifications.map((notification, index) => (
-                      <motion.div
-                        key={notification.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.9 + index * 0.1 }}
-                        className={`p-4 rounded-lg border transition-colors ${
-                          notification.urgent 
-                            ? 'bg-red-50 border-red-200' 
-                            : 'bg-gray-50 border-gray-200'
-                        }`}
-                      >
-                        <p className="text-base font-medium text-gray-900">{notification.text}</p>
-                        <p className="text-sm text-gray-500 mt-2">{notification.time}</p>
-                      </motion.div>
-                    ))}
-                  </CardContent>
-                </Card>
-              </motion.div>
+              <SectionCard title="Notificaciones" icon={Bell}>
+                <div className="space-y-4">
+                  {userData.notifications.map((notification, index) => (
+                    <motion.div
+                      key={notification.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.9 + index * 0.1 }}
+                      className={`p-4 rounded-lg border transition-colors ${
+                        notification.urgent 
+                          ? 'bg-red-50 border-red-200' 
+                          : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <p className="text-base font-medium text-gray-900">{notification.text}</p>
+                      <p className="text-sm text-gray-500 mt-2">{notification.time}</p>
+                    </motion.div>
+                  ))}
+                </div>
+              </SectionCard>
 
               {/* Información del Usuario */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.0 }}
-              >
-                <Card className="bg-white shadow-md border border-gray-200 p-6">
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-xl text-gray-900">Información del Usuario</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <p className="font-medium text-gray-900">{user.name}</p>
-                        <p className="text-sm text-gray-600 capitalize">
-                          {user.type === 'student' ? 'Estudiante' :
-                           user.type === 'teacher' ? 'Profesor' :
-                           'Coordinador'}
-                        </p>
-                      </div>
+              <SectionCard title="Información del Usuario" icon={UserIcon}>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="font-medium text-gray-900">{user.name}</p>
+                      <p className="text-sm text-gray-600 capitalize">
+                        {user.type === 'student' ? 'Estudiante' :
+                          user.type === 'teacher' ? 'Profesor' :
+                          'Coordinador'}
+                      </p>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm text-gray-600">{user.email}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm text-gray-600">+123 456 7890</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-gray-500" />
-                        <p className="text-sm text-gray-600">Facultad de Ingeniería</p>
-                      </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-gray-500" />
+                      <p className="text-sm text-gray-600">{user.email}</p>
                     </div>
-                    </CardContent>
-                </Card>
-              </motion.div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-gray-500" />
+                      <p className="text-sm text-gray-600">+123 456 7890</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-gray-500" />
+                      <p className="text-sm text-gray-600">Facultad de Ingeniería</p>
+                    </div>
+                  </div>
+                </div>
+              </SectionCard>
             </div>
           </div>
         </main>
