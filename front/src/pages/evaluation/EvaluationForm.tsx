@@ -25,6 +25,8 @@ export default function EvaluationForm() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [ratings, setRatings] = useState<number[]>(Array(10).fill(0));
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showCommentsSection, setShowCommentsSection] = useState(false);
+  const [comments, setComments] = useState('');
 
   const questions: EvaluationQuestion[] = [
     { id: '1', category: 'Claridad Expositiva', question: 'El profesor explica claramente los conceptos del curso' },
@@ -48,11 +50,15 @@ export default function EvaluationForm() {
   };
 
   const handleNext = () => {
+    if (ratings[currentQuestion] === 0) {
+      alert('Por favor selecciona una calificación antes de continuar');
+      return;
+    }
+
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
-      // Mostrar modal de confirmación en lugar de navegar directamente
-      setShowConfirmation(true);
+      setShowCommentsSection(true);
     }
   };
 
@@ -62,9 +68,17 @@ export default function EvaluationForm() {
     }
   };
 
+  const handleBackToQuestions = () => {
+    setShowCommentsSection(false);
+    setCurrentQuestion(questions.length - 1);
+  };
+
+  const handleSubmit = () => {
+    setShowConfirmation(true);
+  };
+
   const handleConfirmSubmit = () => {
-    // Lógica para enviar la evaluación
-    console.log('Evaluation completed:', { teacher, course, ratings });
+    console.log('Evaluation completed:', { teacher, course, ratings, comments });
     setShowConfirmation(false);
     navigate('/dashboard');
   };
@@ -73,7 +87,9 @@ export default function EvaluationForm() {
     setShowConfirmation(false);
   };
 
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  const totalSteps = questions.length + 1; // Preguntas + sección de comentarios
+  const currentStep = showCommentsSection ? totalSteps : currentQuestion + 1;
+  const progress = (currentStep / totalSteps) * 100;
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -90,25 +106,22 @@ export default function EvaluationForm() {
       </div>
       
       <div className="relative z-10">
-        {/* Header con componente reutilizable */}
         <Header 
           title="Evaluación Docente - Paso 2 de 2"
           subtitle="Evalúa el desempeño del profesor"
         />
 
-        {/* Barra de progreso justo debajo del header */}
         <div className="bg-white border-b border-gray-200 py-3">
           <div className="max-w-4xl mx-auto px-4 lg:px-6">
             <ProgressBar 
-              current={currentQuestion + 1} 
-              total={questions.length} 
-              label={`Pregunta ${currentQuestion + 1} de ${questions.length}`}
+              current={currentStep} 
+              total={totalSteps} 
+              label={showCommentsSection ? 'Comentarios' : `Pregunta ${currentQuestion + 1} de ${questions.length}`}
             />
           </div>
         </div>
 
         <main className="max-w-4xl mx-auto p-4 lg:p-6 space-y-6">
-          {/* Botón de volver independiente */}
           <div className="flex justify-start">
             <Button 
               variant="ghost" 
@@ -121,7 +134,6 @@ export default function EvaluationForm() {
             </Button>
           </div>
 
-          {/* Teacher Info */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -137,79 +149,120 @@ export default function EvaluationForm() {
             </Card>
           </motion.div>
 
-          {/* Question Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card className="bg-white shadow-lg border border-gray-200 p-6">
-            <CardHeader className="pb-6">
-            <CardTitle className="text-2xl font-bold text-gray-900">
-                {questions[currentQuestion].category}
-            </CardTitle>
-            <CardDescription className="text-xl text-gray-700 mt-2">
-                {questions[currentQuestion].question}
-            </CardDescription>
-            </CardHeader>
-<CardContent>
-  {/* Rating Scale */}
-  <div className="space-y-8">
-    <LikertScale
-      value={ratings[currentQuestion]}
-      onChange={handleRatingSelect}
-      options={5}
-      leftLabel="En desacuerdo"
-      rightLabel="De acuerdo"
-    />
+          {!showCommentsSection ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Card className="bg-white shadow-lg border border-gray-200 p-6">
+                <CardHeader className="pb-6">
+                  <CardTitle className="text-2xl font-bold text-gray-900">
+                    {questions[currentQuestion].category}
+                  </CardTitle>
+                  <CardDescription className="text-xl text-gray-700 mt-2">
+                    {questions[currentQuestion].question}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-8">
+                    <LikertScale
+                      value={ratings[currentQuestion]}
+                      onChange={handleRatingSelect}
+                      options={5}
+                      leftLabel="En desacuerdo"
+                      rightLabel="De acuerdo"
+                    />
 
-    {/* Current Rating Feedback */}
-    {ratings[currentQuestion] > 0 && (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`text-center p-6 rounded-2xl text-xl font-semibold border-2 ${
-          ratings[currentQuestion] >= 4
-            ? 'bg-green-50 text-green-800 border-green-200'
-            : ratings[currentQuestion] >= 3
-            ? 'bg-blue-50 text-blue-800 border-blue-200'
-            : 'bg-red-50 text-red-800 border-red-200'
-        }`}
-      >
-        Has calificado: {ratings[currentQuestion]}/5
-        <br />
-        <span className="text-lg font-medium">
-          {ratingLabels[ratings[currentQuestion] - 1]}
-        </span>
-      </motion.div>
-    )}
-  </div>
+                    {ratings[currentQuestion] > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`text-center p-6 rounded-2xl text-xl font-semibold border-2 ${
+                          ratings[currentQuestion] >= 4
+                            ? 'bg-green-50 text-green-800 border-green-200'
+                            : ratings[currentQuestion] >= 3
+                            ? 'bg-blue-50 text-blue-800 border-blue-200'
+                            : 'bg-red-50 text-red-800 border-red-200'
+                        }`}
+                      >
+                        Has calificado: {ratings[currentQuestion]}/5
+                        <br />
+                        <span className="text-lg font-medium">
+                          {ratingLabels[ratings[currentQuestion] - 1]}
+                        </span>
+                      </motion.div>
+                    )}
+                  </div>
 
-  {/* Navigation Buttons */}
-  <div className="flex justify-between mt-12">
-    <Button
-      variant="outline"
-      onClick={handlePrevious}
-      disabled={currentQuestion === 0}
-      className="px-8 py-4 text-lg border-2"
-    >
-      Anterior
-    </Button>
-    <Button
-      onClick={handleNext}
-      className="bg-red-600 hover:bg-red-700 px-8 py-4 text-lg"
-    >
-      {currentQuestion === questions.length - 1 ? 'Finalizar Evaluación' : 'Siguiente'}
-      <ChevronRight className="h-6 w-6 ml-2" />
-    </Button>
-  </div>
-</CardContent>
-            </Card>
-          </motion.div>
+                  <div className="flex justify-between mt-12">
+                    <Button
+                      variant="outline"
+                      onClick={handlePrevious}
+                      disabled={currentQuestion === 0}
+                      className="px-8 py-4 text-lg border-2"
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      onClick={handleNext}
+                      className="bg-red-600 hover:bg-red-700 px-8 py-4 text-lg"
+                    >
+                      {currentQuestion === questions.length - 1 ? 'Ir a comentarios' : 'Siguiente'}
+                      <ChevronRight className="h-6 w-6 ml-2" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Card className="bg-white shadow-lg border border-gray-200 p-6">
+                <CardHeader className="pb-6">
+                  <CardTitle className="text-2xl font-bold text-gray-900">
+                    Comentarios Adicionales
+                  </CardTitle>
+                  <CardDescription className="text-xl text-gray-700 mt-2">
+                    ¿Tienes algún comentario adicional sobre el desempeño del profesor? (Opcional)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-8">
+                    <textarea
+                      value={comments}
+                      onChange={(e) => setComments(e.target.value)}
+                      placeholder="Escribe tus comentarios aquí..."
+                      className="w-full h-40 p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="flex justify-between mt-12">
+                    <Button
+                      variant="outline"
+                      onClick={handleBackToQuestions}
+                      className="px-8 py-4 text-lg border-2"
+                    >
+                      Volver a Preguntas
+                    </Button>
+                    <Button
+                      onClick={handleSubmit}
+                      className="bg-red-600 hover:bg-red-700 px-8 py-4 text-lg"
+                    >
+                      Finalizar Evaluación
+                      <ChevronRight className="h-6 w-6 ml-2" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </main>
       </div>
 
-      {/* Modal de Confirmación usando el componente reutilizable */}
       <ConfirmationModal
         isOpen={showConfirmation}
         onClose={handleCancelSubmit}

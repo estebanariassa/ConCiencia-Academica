@@ -314,12 +314,6 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                           <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
                             <h4 className="font-medium text-gray-900">Información del Profesor</h4>
                             <div className="flex items-start gap-3">
-                              <Avatar>
-                                <AvatarImage src="" />
-                                <AvatarFallback className="bg-red-600 text-white">
-                                  {selectedTeacher.name.split(' ').map(n => n[0]).join('')}
-                                </AvatarFallback>
-                              </Avatar>
                               <div>
                                 <p className="font-medium text-gray-900">{selectedTeacher.name}</p>
                                 <p className="text-sm text-gray-600">{selectedTeacher.department}</p>
