@@ -9,6 +9,7 @@ import LikertScale from '../../components/LikertScale';
 import ProgressBar from '../../components/ProgressBar';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { submitEvaluation, getCurrentUserId } from '../../lib/supabase/queries'
 
 const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
 
@@ -77,10 +78,34 @@ export default function EvaluationForm() {
     setShowConfirmation(true);
   };
 
-  const handleConfirmSubmit = () => {
-    console.log('Evaluation completed:', { teacher, course, ratings, comments });
-    setShowConfirmation(false);
-    navigate('/dashboard');
+  const handleConfirmSubmit = async () => {
+    try {
+      const studentId = await getCurrentUserId()
+      if (!studentId) {
+        alert('No hay sesión de usuario. Inicia sesión nuevamente.')
+        return
+      }
+      const answers = questions.map((q, idx) => ({
+        questionId: q.id,
+        rating: ratings[idx],
+      }))
+      const total = ratings.reduce((a, b) => a + b, 0)
+      const overallRating = Number((total / ratings.length).toFixed(2))
+
+      await submitEvaluation({
+        teacherId: String(teacher?.id),
+        courseId: String(course?.id),
+        studentId,
+        comments,
+        answers,
+        overallRating,
+      })
+
+      setShowConfirmation(false)
+      navigate('/dashboard')
+    } catch (e: any) {
+      alert(e?.message ?? 'Error guardando la evaluación')
+    }
   };
 
   const handleCancelSubmit = () => {

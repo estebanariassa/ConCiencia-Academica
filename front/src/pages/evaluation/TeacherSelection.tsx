@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -12,6 +12,7 @@ import Button from '../../components/Button';
 import Badge from '../../components/Badge';
 import Header from '../../components/Header';
 import { Teacher, Course, User } from '../../types';
+import { fetchTeachersWithCourses } from '../../lib/supabase/queries'
 import { 
   Search, 
   ArrowLeft, 
@@ -38,53 +39,34 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const navigate = useNavigate();
 
-  // Mock data
-  const mockTeachers: Teacher[] = [
-    {
-      id: '1',
-      name: 'Dr. Carlos Rodríguez',
-      department: 'Ingeniería',
-      email: 'carlos.rodriguez@universidad.edu',
-      courses: [
-        { id: '1a', name: 'Matemáticas I', code: 'MAT-101', schedule: 'Lun-Mié-Vie 8:00-9:30' },
-        { id: '1b', name: 'Álgebra Lineal', code: 'MAT-201', schedule: 'Mar-Jue 10:00-11:30' }
-      ]
-    },
-    {
-      id: '2',
-      name: 'Dra. Ana Martínez',
-      department: 'Física',
-      email: 'ana.martinez@universidad.edu',
-      courses: [
-        { id: '2a', name: 'Física I', code: 'FIS-101', schedule: 'Lun-Mié-Vie 9:30-11:00' },
-        { id: '2b', name: 'Física II', code: 'FIS-201', schedule: 'Mar-Jue 13:00-14:30' }
-      ]
-    },
-    {
-      id: '3',
-      name: 'Prof. Luis García',
-      department: 'Química',
-      email: 'luis.garcia@universidad.edu',
-      courses: [
-        { id: '3a', name: 'Química Orgánica', code: 'QUI-301', schedule: 'Lun-Mié-Vie 14:00-15:30' },
-        { id: '3b', name: 'Química Analítica', code: 'QUI-201', schedule: 'Mar-Jue 8:00-9:30' }
-      ]
-    },
-    {
-      id: '4',
-      name: 'Dra. María López',
-      department: 'Biología',
-      email: 'maria.lopez@universidad.edu',
-      courses: [
-        { id: '4a', name: 'Biología Celular', code: 'BIO-201', schedule: 'Lun-Mié-Vie 11:00-12:30' },
-        { id: '4b', name: 'Genética', code: 'BIO-301', schedule: 'Mar-Jue 15:00-16:30' }
-      ]
+  const [teachers, setTeachers] = useState<Teacher[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        setLoading(true)
+        const data = await fetchTeachersWithCourses()
+        if (!active) return
+        setTeachers(data)
+      } catch (e: any) {
+        if (!active) return
+        setError(e?.message ?? 'Error cargando docentes')
+      } finally {
+        if (active) setLoading(false)
+      }
+    })()
+    return () => {
+      active = false
     }
-  ];
+  }, [])
 
   const filteredTeachers = useMemo(() => {
-    if (!searchTerm) return mockTeachers;
-    return mockTeachers.filter(teacher =>
+    const source = teachers
+    if (!searchTerm) return source;
+    return source.filter(teacher =>
       teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       teacher.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
       teacher.courses.some(course => 
@@ -92,7 +74,7 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
         course.code.toLowerCase().includes(searchTerm.toLowerCase())
       )
     );
-  }, [searchTerm]);
+  }, [searchTerm, teachers]);
 
   const handleTeacherSelect = (teacher: Teacher) => {
     setSelectedTeacher(teacher);
@@ -207,7 +189,16 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 max-h-96 overflow-y-auto">
-                  {filteredTeachers.map((teacher, index) => (
+                  {loading && (
+                    <div className="text-center text-gray-500">Cargando docentes...</div>
+                  )}
+                  {error && (
+                    <div className="text-center text-red-600">{error}</div>
+                  )}
+                  {!loading && !error && filteredTeachers.length === 0 && (
+                    <div className="text-center text-gray-500">No se encontraron docentes</div>
+                  )}
+                  {!loading && !error && filteredTeachers.map((teacher, index) => (
                     <motion.div
                       key={teacher.id}
                       initial={{ opacity: 0, y: 10 }}
