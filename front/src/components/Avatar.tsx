@@ -28,14 +28,33 @@ export function AvatarImage({
 }
 
 
+interface AvatarFallbackProps extends React.HTMLAttributes<HTMLDivElement> {
+  text?: string; // mostrará iniciales derivadas (por ejemplo, nombre/apellido o email)
+}
+
 export function AvatarFallback({
   className = "",
+  text,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+}: AvatarFallbackProps) {
+  const getInitials = (value?: string) => {
+    if (!value) return ''
+    const cleaned = value.trim()
+    if (!cleaned) return ''
+    // Si es email, usar primera letra antes del @
+    if (cleaned.includes('@')) return cleaned[0]?.toUpperCase() ?? ''
+    const parts = cleaned.split(/\s+/)
+    const first = parts[0]?.[0] ?? ''
+    const second = parts.length > 1 ? parts[1]?.[0] ?? '' : ''
+    return (first + second).toUpperCase()
+  }
+
   return (
     <div
-      className={`flex h-full w-full items-center justify-center rounded-full bg-gray-100 ${className}`}
+      className={`flex h-full w-full items-center justify-center rounded-full bg-gray-100 text-gray-700 font-semibold ${className}`}
       {...props}
-    />
+    >
+      {getInitials(text)}
+    </div>
   );
 }

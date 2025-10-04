@@ -1,0 +1,219 @@
+import { createClient } from '@supabase/supabase-js'
+import dotenv from 'dotenv'
+
+// Cargar variables de entorno
+dotenv.config()
+
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+  throw new Error('Faltan las variables de entorno SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY')
+}
+
+// Cliente de Supabase con permisos de administrador
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+})
+
+// Funciones de base de datos usando Supabase
+export class SupabaseDB {
+  // Usuarios
+  static async createUser(userData: {
+    email: string
+    password: string
+    nombre: string
+    apellido: string
+    tipo_usuario: string
+  }) {
+    const { data, error } = await supabaseAdmin
+      .from('usuarios')
+      .insert([userData])
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  }
+
+  static async findUserByEmail(email: string) {
+    const { data, error } = await supabaseAdmin
+      .from('usuarios')
+      .select('*')
+      .eq('email', email)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error // PGRST116 = no rows returned
+    return data
+  }
+
+  static async findUserById(id: string) {
+    const { data, error } = await supabaseAdmin
+      .from('usuarios')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  }
+
+  static async updateUser(id: string, updates: any) {
+    const { data, error } = await supabaseAdmin
+      .from('usuarios')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  }
+
+  static async countUsers() {
+    const { count, error } = await supabaseAdmin
+      .from('usuarios')
+      .select('*', { count: 'exact', head: true })
+    
+    if (error) throw error
+    return count || 0
+  }
+
+  // Evaluaciones
+  static async createEvaluation(evaluationData: any) {
+    const { data, error } = await supabaseAdmin
+      .from('evaluaciones')
+      .insert([evaluationData])
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  }
+
+  static async getEvaluationsByStudent(studentId: string) {
+    const { data, error } = await supabaseAdmin
+      .from('evaluaciones')
+      .select('*')
+      .eq('estudiante_id', studentId)
+    
+    if (error) throw error
+    return data
+  }
+
+  // Preguntas de evaluación
+  static async getEvaluationQuestions() {
+    const { data, error } = await supabaseAdmin
+      .from('preguntas_evaluacion')
+      .select('*')
+      .eq('activa', true)
+      .order('orden')
+    
+    if (error) throw error
+    return data
+  }
+
+  // Respuestas de evaluación
+  static async createEvaluationResponse(responseData: any) {
+    const { data, error } = await supabaseAdmin
+      .from('respuestas_evaluacion')
+      .insert([responseData])
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  }
+
+  static async getEvaluationResponses(evaluationId: string) {
+    const { data, error } = await supabaseAdmin
+      .from('respuestas_evaluacion')
+      .select('*')
+      .eq('evaluacion_id', evaluationId)
+    
+    if (error) throw error
+    return data
+  }
+
+  // Profesores
+  static async getProfessors() {
+    const { data, error } = await supabaseAdmin
+      .from('profesores')
+      .select(`
+        *,
+        usuario:usuarios(*)
+      `)
+      .eq('activo', true)
+    
+    if (error) throw error
+    return data
+  }
+
+  // Estudiantes
+  static async getStudents() {
+    const { data, error } = await supabaseAdmin
+      .from('estudiantes')
+      .select(`
+        *,
+        usuario:usuarios(*),
+        carrera:carreras(*)
+      `)
+      .eq('activo', true)
+    
+    if (error) throw error
+    return data
+  }
+
+  // Grupos
+  static async getGroups() {
+    const { data, error } = await supabaseAdmin
+      .from('grupos')
+      .select(`
+        *,
+        curso:cursos(*),
+        periodo:periodos_academicos(*)
+      `)
+      .eq('activo', true)
+    
+    if (error) throw error
+    return data
+  }
+
+  // Carreras
+  static async getCareers() {
+    const { data, error } = await supabaseAdmin
+      .from('carreras')
+      .select('*')
+      .eq('activa', true)
+    
+    if (error) throw error
+    return data
+  }
+
+  // Cursos
+  static async getCourses() {
+    const { data, error } = await supabaseAdmin
+      .from('cursos')
+      .select('*')
+      .eq('activo', true)
+    
+    if (error) throw error
+    return data
+  }
+
+  // Períodos académicos
+  static async getAcademicPeriods() {
+    const { data, error } = await supabaseAdmin
+      .from('periodos_academicos')
+      .select('*')
+      .eq('activo', true)
+    
+    if (error) throw error
+    return data
+  }
+}
+
+export default SupabaseDB

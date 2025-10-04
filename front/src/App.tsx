@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useState } from 'react'
-import LoginPage from './pages/LoginPage'
+import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import TeacherSelection from './pages/evaluation/TeacherSelection'
 import EvaluationForm from './pages/evaluation/EvaluationForm'
@@ -96,10 +96,22 @@ function App() {
 
 // Wrapper components para usar useNavigate
 function LoginPageWrapper({ user, onLogin }: { user: User | null, onLogin: (user: User) => void }) {
-  if (user) {
-    return <Navigate to="/dashboard" replace />
-  }
-  return <LoginPage onLogin={onLogin} />
+  try {
+    const stored = localStorage.getItem('user')
+    const token = localStorage.getItem('token')
+    if (stored && token) {
+      const u = JSON.parse(stored)
+      const normalized: User = {
+        id: u.id,
+        name: `${u.nombre} ${u.apellido}`.trim(),
+        type: (u.tipo_usuario as any) ?? 'student',
+        email: u.email,
+      }
+      onLogin(normalized)
+      return <Navigate to="/dashboard" replace />
+    }
+  } catch {}
+  return <Login />
 }
 
 function DashboardWrapper({ user, onStartEvaluation, onViewReports }: { 
@@ -107,10 +119,24 @@ function DashboardWrapper({ user, onStartEvaluation, onViewReports }: {
   onStartEvaluation: () => void, 
   onViewReports: () => void 
 }) {
-  if (!user) {
-    return <Navigate to="/login" replace />
+  let effectiveUser = user
+  if (!effectiveUser) {
+    try {
+      const stored = localStorage.getItem('user')
+      const token = localStorage.getItem('token')
+      if (stored && token) {
+        const u = JSON.parse(stored)
+        effectiveUser = {
+          id: u.id,
+          name: `${u.nombre} ${u.apellido}`.trim(),
+          type: (u.tipo_usuario as any) ?? 'student',
+          email: u.email,
+        }
+      }
+    } catch {}
   }
-  return <Dashboard user={user} onStartEvaluation={onStartEvaluation} onViewReports={onViewReports} />
+  if (!effectiveUser) return <Navigate to="/login" replace />
+  return <Dashboard user={effectiveUser} onStartEvaluation={onStartEvaluation} onViewReports={onViewReports} />
 }
 
 function TeacherSelectionWrapper({ user, onTeacherCourseSelected, onBack }: { 

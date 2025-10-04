@@ -1,0 +1,252 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model usuarios {
+  id                String   @id @default(uuid()) @db.Uuid
+  email             String   @unique @db.VarChar(255)
+  password          String   @db.VarChar(255)
+  nombre            String   @db.VarChar(255)
+  apellido          String   @db.VarChar(255)
+  tipo_usuario      String   @db.VarChar(20)
+  activo            Boolean  @default(true)
+  fecha_creacion    DateTime @default(now()) @db.Timestamptz
+  fecha_actualizacion DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  profesores        profesores[]
+  estudiantes       estudiantes[]
+  notificaciones    notificaciones[]
+
+  @@map("usuarios")
+}
+
+model carreras {
+  id            Int      @id @default(autoincrement())
+  codigo        String   @unique @db.VarChar(10)
+  nombre        String   @db.VarChar(255)
+  descripcion   String?  @db.Text
+  activa        Boolean  @default(true)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  estudiantes   estudiantes[]
+
+  @@map("carreras")
+}
+
+model profesores {
+  id              String   @id @default(uuid()) @db.Uuid
+  usuario_id      String   @db.Uuid
+  codigo_profesor String?  @unique @db.VarChar(20)
+  telefono        String?  @db.VarChar(20)
+  fecha_ingreso   DateTime? @db.Date
+  activo          Boolean  @default(true)
+  fecha_creacion  DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  usuario         usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  asignaciones_profesor asignaciones_profesor[]
+  evaluaciones    evaluaciones[]
+
+  @@map("profesores")
+}
+
+model estudiantes {
+  id                String   @id @default(uuid()) @db.Uuid
+  usuario_id        String   @db.Uuid
+  carrera_id        Int
+  codigo_estudiante String   @unique @db.VarChar(20)
+  semestre_actual   Int
+  activo            Boolean  @default(true)
+  fecha_creacion    DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  usuario           usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  carrera           carreras @relation(fields: [carrera_id], references: [id])
+  inscripciones     inscripciones[]
+  evaluaciones      evaluaciones[]
+
+  @@map("estudiantes")
+}
+
+model cursos {
+  id            Int      @id @default(autoincrement())
+  codigo        String   @unique @db.VarChar(20)
+  nombre        String   @db.VarChar(255)
+  creditos      Int
+  descripcion   String?  @db.Text
+  activo        Boolean  @default(true)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  grupos        grupos[]
+
+  @@map("cursos")
+}
+
+model periodos_academicos {
+  id            Int      @id @default(autoincrement())
+  codigo        String   @unique @db.VarChar(20)
+  nombre        String   @db.VarChar(100)
+  fecha_inicio  DateTime @db.Date
+  fecha_fin     DateTime @db.Date
+  activo        Boolean  @default(true)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  grupos        grupos[]
+  evaluaciones  evaluaciones[]
+
+  @@map("periodos_academicos")
+}
+
+model grupos {
+  id            Int      @id @default(autoincrement())
+  curso_id      Int
+  periodo_id    Int
+  numero_grupo  String   @db.VarChar(10)
+  horario       String?  @db.VarChar(100)
+  aula          String?  @db.VarChar(50)
+  cupo_maximo   Int      @default(30)
+  activo        Boolean  @default(true)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  curso         cursos   @relation(fields: [curso_id], references: [id])
+  periodo       periodos_academicos @relation(fields: [periodo_id], references: [id])
+  inscripciones inscripciones[]
+  asignaciones_profesor asignaciones_profesor[]
+  evaluaciones  evaluaciones[]
+
+  @@unique([curso_id, periodo_id, numero_grupo])
+  @@map("grupos")
+}
+
+model inscripciones {
+  id                Int      @id @default(autoincrement())
+  estudiante_id     String   @db.Uuid
+  grupo_id          Int
+  fecha_inscripcion DateTime @default(now()) @db.Timestamptz
+  activa            Boolean  @default(true)
+
+  // Relations
+  estudiante        estudiantes @relation(fields: [estudiante_id], references: [id], onDelete: Cascade)
+  grupo             grupos @relation(fields: [grupo_id], references: [id], onDelete: Cascade)
+
+  @@unique([estudiante_id, grupo_id])
+  @@map("inscripciones")
+}
+
+model asignaciones_profesor {
+  id                Int      @id @default(autoincrement())
+  profesor_id       String   @db.Uuid
+  grupo_id          Int
+  fecha_asignacion  DateTime @default(now()) @db.Timestamptz
+  activa            Boolean  @default(true)
+
+  // Relations
+  profesor          profesores @relation(fields: [profesor_id], references: [id], onDelete: Cascade)
+  grupo             grupos @relation(fields: [grupo_id], references: [id], onDelete: Cascade)
+
+  @@unique([profesor_id, grupo_id])
+  @@map("asignaciones_profesor")
+}
+
+model categorias_pregunta {
+  id            Int      @id @default(autoincrement())
+  nombre        String   @db.VarChar(100)
+  descripcion   String?  @db.Text
+  orden         Int
+  activa        Boolean  @default(true)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  preguntas_evaluacion preguntas_evaluacion[]
+
+  @@map("categorias_pregunta")
+}
+
+model preguntas_evaluacion {
+  id            Int      @id @default(autoincrement())
+  categoria_id  Int
+  texto_pregunta String   @db.Text
+  descripcion   String?  @db.Text
+  tipo_pregunta String   @db.VarChar(20)
+  opciones      Json?
+  obligatoria   Boolean  @default(true)
+  orden         Int
+  activa        Boolean  @default(true)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  categoria     categorias_pregunta @relation(fields: [categoria_id], references: [id])
+  respuestas_evaluacion respuestas_evaluacion[]
+
+  @@map("preguntas_evaluacion")
+}
+
+model evaluaciones {
+  id                    String    @id @default(uuid()) @db.Uuid
+  estudiante_id         String    @db.Uuid
+  profesor_id           String    @db.Uuid
+  grupo_id              Int
+  periodo_id            Int
+  completada            Boolean   @default(false)
+  comentarios           String?   @db.Text
+  calificacion_promedio Decimal?  @db.Decimal(3,2)
+  fecha_inicio          DateTime  @default(now()) @db.Timestamptz
+  fecha_completada      DateTime? @db.Timestamptz
+  fecha_creacion        DateTime  @default(now()) @db.Timestamptz
+
+  // Relations
+  estudiante            estudiantes @relation(fields: [estudiante_id], references: [id], onDelete: Cascade)
+  profesor              profesores @relation(fields: [profesor_id], references: [id], onDelete: Restrict)
+  grupo                 grupos @relation(fields: [grupo_id], references: [id], onDelete: Restrict)
+  periodo               periodos_academicos @relation(fields: [periodo_id], references: [id])
+  respuestas_evaluacion respuestas_evaluacion[]
+
+  @@unique([estudiante_id, profesor_id, grupo_id, periodo_id])
+  @@map("evaluaciones")
+}
+
+model respuestas_evaluacion {
+  id                String    @id @default(uuid()) @db.Uuid
+  evaluacion_id     String    @db.Uuid
+  pregunta_id       Int
+  respuesta_rating  Int?
+  respuesta_texto   String?   @db.Text
+  respuesta_opcion  String?   @db.VarChar(255)
+  fecha_respuesta   DateTime  @default(now()) @db.Timestamptz
+
+  // Relations
+  evaluacion        evaluaciones @relation(fields: [evaluacion_id], references: [id], onDelete: Cascade)
+  pregunta          preguntas_evaluacion @relation(fields: [pregunta_id], references: [id])
+
+  @@unique([evaluacion_id, pregunta_id])
+  @@map("respuestas_evaluacion")
+}
+
+model notificaciones {
+  id            String   @id @default(uuid()) @db.Uuid
+  usuario_id    String   @db.Uuid
+  titulo        String   @db.VarChar(255)
+  mensaje       String   @db.Text
+  tipo          String   @db.VarChar(20)
+  leida         Boolean  @default(false)
+  enlace        String?  @db.VarChar(500)
+  fecha_creacion DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  usuario       usuarios @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@map("notificaciones")
+}

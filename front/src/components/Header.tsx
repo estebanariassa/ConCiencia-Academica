@@ -83,9 +83,7 @@ export default function Header({
                   <div className="flex items-center gap-3">
                     <Avatar>
                       <AvatarImage src="" />
-                      <AvatarFallback className="bg-red-600 text-white">
-                        {user.name.split(' ').map(n => n[0]).join('')}
-                      </AvatarFallback>
+                      <AvatarFallback className="bg-red-600 text-white" text={user.name} />
                     </Avatar>
                     <div className="hidden sm:block">
                       <p className="text-sm font-medium text-gray-900">{user.name}</p>

@@ -10,6 +10,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import Badge from '../components/Badge';
 import Header from '../components/Header';
+import { authApi } from '../api/auth';
 import { User } from '../types';
 import { 
   Settings, 
@@ -70,6 +71,22 @@ const SectionCard = ({ title, icon: Icon, children, className = '' }: SectionCar
 export default function Dashboard({ user, onStartEvaluation, onViewReports }: DashboardProps) {
   const navigate = useNavigate();
   const [showCalendar, setShowCalendar] = useState(false);
+  // Cargar user desde backend/localStorage si existe
+  const storedUser = ((): User | null => {
+    try {
+      const u = localStorage.getItem('user');
+      if (!u) return null;
+      const parsed = JSON.parse(u);
+      return {
+        id: parsed.id,
+        name: `${parsed.nombre} ${parsed.apellido}`.trim(),
+        type: (parsed.tipo_usuario as any) ?? 'student',
+        email: parsed.email,
+      } as User;
+    } catch {
+      return null;
+    }
+  })();
   
   const handleStartEvaluation = () => {
     navigate('/evaluate/selection');
@@ -91,8 +108,10 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
   };
 
   // Datos específicos por tipo de usuario
+  const currentUser = user ?? storedUser ?? { id: '', name: 'Usuario', type: 'student', email: '' };
+
   const getUserSpecificData = () => {
-    switch (user.type) {
+    switch (currentUser.type) {
       case 'student':
         return {
           stats: {
@@ -248,7 +267,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
 
   // Función para obtener el subtítulo de la evaluación según el tipo de usuario
   const getEvaluationSubtitle = (evaluation: any) => {
-    switch (user.type) {
+    switch (currentUser.type) {
       case 'student':
         return evaluation.teacher;
       case 'teacher':
@@ -278,7 +297,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
       {/* Contenido principal */}
       <div className="relative z-10">
         {/* Usamos el componente Header */}
-        <Header user={user} />
+        <Header user={currentUser} />
         
         <main className="max-w-[1700px] mx-auto p-6 lg:p-8 space-y-8">
           {/* Welcome Section */}
