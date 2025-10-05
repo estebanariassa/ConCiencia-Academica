@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import Button from './Button';
-import { Avatar, AvatarFallback, AvatarImage } from './Avatar';
-import { Bell, ArrowLeft, GraduationCap, UserCheck, Settings } from 'lucide-react';
+import UserMenu from './UserMenu';
+import { Bell, ArrowLeft } from 'lucide-react';
 import { User } from '../types';
 
 // Importar imágenes
@@ -25,20 +25,6 @@ export default function Header({
   onBack, 
   children 
 }: HeaderProps) {
-  const getUserIcon = () => {
-    if (!user) return null;
-    switch (user.type) {
-      case 'student':
-        return <GraduationCap className="h-5 w-5" />;
-      case 'teacher':
-        return <UserCheck className="h-5 w-5" />;
-      case 'coordinator':
-        return <Settings className="h-5 w-5" />;
-      default:
-        return <GraduationCap className="h-5 w-5" />;
-    }
-  };
-
   return (
     <>
       <motion.header
@@ -72,7 +58,7 @@ export default function Header({
               </div>
             )}
             
-            {/* Elementos del usuario (campana y avatar) */}
+            {/* Elementos del usuario (campana y menú de usuario) */}
             <div className="flex items-center gap-4">
               {user && (
                 <>
@@ -80,19 +66,7 @@ export default function Header({
                     <Bell className="h-4 w-4" />
                     <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-600 rounded-full"></span>
                   </Button>
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage src="" />
-                      <AvatarFallback className="bg-red-600 text-white" text={user.name} />
-                    </Avatar>
-                    <div className="hidden sm:block">
-                      <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                      <div className="flex items-center gap-1">
-                        {getUserIcon()}
-                        <p className="text-xs text-gray-600 capitalize">{user.type}</p>
-                      </div>
-                    </div>
-                  </div>
+                  <UserMenu />
                 </>
               )}
             </div>

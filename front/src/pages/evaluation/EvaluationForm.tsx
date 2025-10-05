@@ -9,7 +9,7 @@ import LikertScale from '../../components/LikertScale';
 import ProgressBar from '../../components/ProgressBar';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
-import { submitEvaluation, getCurrentUserId } from '../../lib/supabase/queries'
+// import { submitEvaluation, getCurrentUserId } from '../../lib/supabase/queries' // Removido - usar API del backend
 
 const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
 

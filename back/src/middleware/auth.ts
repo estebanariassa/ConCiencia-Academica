@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
-import { prisma } from '../config/db'
+import { SupabaseDB } from '../config/supabase-only'
 
 interface AuthRequest extends Request {
   user?: {
@@ -22,10 +22,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
     
     // Verificar que el usuario existe y está activo
-    const user = await prisma.usuarios.findUnique({
-      where: { id: decoded.userId },
-      select: { id: true, email: true, tipo_usuario: true, activo: true }
-    })
+    const user = await SupabaseDB.findUserById(decoded.userId)
 
     if (!user || !user.activo) {
       return res.status(401).json({ error: 'Usuario no válido o inactivo' })

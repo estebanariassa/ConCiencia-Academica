@@ -21,6 +21,7 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
 
 // Funciones de base de datos usando Supabase
 export class SupabaseDB {
+  static supabaseAdmin = supabaseAdmin
   // Usuarios
   static async createUser(userData: {
     email: string
@@ -94,15 +95,6 @@ export class SupabaseDB {
     return data
   }
 
-  static async getEvaluationsByStudent(studentId: string) {
-    const { data, error } = await supabaseAdmin
-      .from('evaluaciones')
-      .select('*')
-      .eq('estudiante_id', studentId)
-    
-    if (error) throw error
-    return data
-  }
 
   // Preguntas de evaluación
   static async getEvaluationQuestions() {
@@ -210,6 +202,130 @@ export class SupabaseDB {
       .from('periodos_academicos')
       .select('*')
       .eq('activo', true)
+    
+    if (error) throw error
+    return data
+  }
+
+  // Inscripciones
+  static async findInscription(studentId: string, groupId: number) {
+    const { data, error } = await supabaseAdmin
+      .from('inscripciones')
+      .select('*')
+      .eq('estudiante_id', studentId)
+      .eq('grupo_id', groupId)
+      .eq('activa', true)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  }
+
+  // Evaluaciones con relaciones
+  static async getEvaluationsByStudent(studentId: string) {
+    const { data, error } = await supabaseAdmin
+      .from('evaluaciones')
+      .select(`
+        *,
+        profesor:profesores(
+          *,
+          usuario:usuarios(nombre, apellido)
+        ),
+        grupo:grupos(
+          *,
+          curso:cursos(*),
+          periodo:periodos_academicos(*)
+        ),
+        respuestas_evaluacion(
+          *,
+          pregunta:preguntas_evaluacion(*)
+        )
+      `)
+      .eq('estudiante_id', studentId)
+      .order('fecha_creacion', { ascending: false })
+    
+    if (error) throw error
+    return data
+  }
+
+  static async findExistingEvaluation(studentId: string, profesorId: string, groupId: number, periodoId: number) {
+    const { data, error } = await supabaseAdmin
+      .from('evaluaciones')
+      .select('*')
+      .eq('estudiante_id', studentId)
+      .eq('profesor_id', profesorId)
+      .eq('grupo_id', groupId)
+      .eq('periodo_id', periodoId)
+      .single()
+    
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  }
+
+  static async createEvaluationWithResponses(evaluationData: any, responses: any[]) {
+    // Crear evaluación
+    const { data: evaluation, error: evalError } = await supabaseAdmin
+      .from('evaluaciones')
+      .insert([evaluationData])
+      .select()
+      .single()
+    
+    if (evalError) throw evalError
+
+    // Crear respuestas si existen
+    if (responses.length > 0) {
+      const responsesWithEvaluationId = responses.map(response => ({
+        ...response,
+        evaluacion_id: evaluation.id
+      }))
+
+      const { error: respError } = await supabaseAdmin
+        .from('respuestas_evaluacion')
+        .insert(responsesWithEvaluationId)
+      
+      if (respError) throw respError
+    }
+
+    return evaluation
+  }
+
+  static async getEvaluationWithRelations(evaluationId: string) {
+    const { data, error } = await supabaseAdmin
+      .from('evaluaciones')
+      .select(`
+        *,
+        profesor:profesores(
+          *,
+          usuario:usuarios(nombre, apellido)
+        ),
+        grupo:grupos(
+          *,
+          curso:cursos(*),
+          periodo:periodos_academicos(*)
+        ),
+        respuestas_evaluacion(
+          *,
+          pregunta:preguntas_evaluacion(*)
+        )
+      `)
+      .eq('id', evaluationId)
+      .single()
+    
+    if (error) throw error
+    return data
+  }
+
+  // Preguntas con categorías
+  static async getQuestionsWithCategories() {
+    const { data, error } = await supabaseAdmin
+      .from('preguntas_evaluacion')
+      .select(`
+        *,
+        categoria:categorias_pregunta(*)
+      `)
+      .eq('activa', true)
+      .order('categoria_id', { ascending: true })
+      .order('orden', { ascending: true })
     
     if (error) throw error
     return data

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { prisma } from '../config/db'
+import { SupabaseDB } from '../config/supabase-only'
 import { authenticateToken, requireRole } from '../middleware/auth'
 
 const router = Router()
@@ -21,33 +21,7 @@ const evaluacionSchema = z.object({
 // GET /evaluaciones - Listar evaluaciones del estudiante
 router.get('/', authenticateToken, requireRole(['estudiante']), async (req: any, res) => {
   try {
-    const evaluaciones = await prisma.evaluaciones.findMany({
-      where: {
-        estudiante_id: req.user.id
-      },
-      include: {
-        profesor: {
-          include: {
-            usuario: {
-              select: { nombre: true, apellido: true }
-            }
-          }
-        },
-        grupo: {
-          include: {
-            curso: true,
-            periodo: true
-          }
-        },
-        respuestas_evaluacion: {
-          include: {
-            pregunta: true
-          }
-        }
-      },
-      orderBy: { fecha_creacion: 'desc' }
-    })
-
+    const evaluaciones = await SupabaseDB.getEvaluationsByStudent(req.user.id)
     res.json(evaluaciones)
   } catch (error) {
     console.error('Error al obtener evaluaciones:', error)
@@ -61,82 +35,46 @@ router.post('/', authenticateToken, requireRole(['estudiante']), async (req: any
     const validatedData = evaluacionSchema.parse(req.body)
     
     // Verificar que el estudiante esté inscrito en el grupo
-    const inscripcion = await prisma.inscripciones.findFirst({
-      where: {
-        estudiante_id: req.user.id,
-        grupo_id: validatedData.grupo_id,
-        activa: true
-      }
-    })
+    const inscripcion = await SupabaseDB.findInscription(req.user.id, validatedData.grupo_id)
 
     if (!inscripcion) {
       return res.status(403).json({ error: 'No estás inscrito en este grupo' })
     }
 
     // Verificar que no exista una evaluación previa
-    const evaluacionExistente = await prisma.evaluaciones.findFirst({
-      where: {
-        estudiante_id: req.user.id,
-        profesor_id: validatedData.profesor_id,
-        grupo_id: validatedData.grupo_id,
-        periodo_id: validatedData.periodo_id
-      }
-    })
+    const evaluacionExistente = await SupabaseDB.findExistingEvaluation(
+      req.user.id, 
+      validatedData.profesor_id, 
+      validatedData.grupo_id, 
+      validatedData.periodo_id
+    )
 
     if (evaluacionExistente) {
       return res.status(400).json({ error: 'Ya has evaluado a este profesor en este grupo' })
     }
 
-    // Crear evaluación
-    const evaluacion = await prisma.evaluaciones.create({
-      data: {
-        estudiante_id: req.user.id,
-        profesor_id: validatedData.profesor_id,
-        grupo_id: validatedData.grupo_id,
-        periodo_id: validatedData.periodo_id,
-        comentarios: validatedData.comentarios,
-        completada: true,
-        fecha_completada: new Date()
-      }
-    })
-
-    // Crear respuestas
-    if (validatedData.respuestas.length > 0) {
-      await prisma.respuestas_evaluacion.createMany({
-        data: validatedData.respuestas.map(respuesta => ({
-          evaluacion_id: evaluacion.id,
-          pregunta_id: respuesta.pregunta_id,
-          respuesta_rating: respuesta.respuesta_rating,
-          respuesta_texto: respuesta.respuesta_texto,
-          respuesta_opcion: respuesta.respuesta_opcion
-        }))
-      })
+    // Crear evaluación con respuestas
+    const evaluationData = {
+      estudiante_id: req.user.id,
+      profesor_id: validatedData.profesor_id,
+      grupo_id: validatedData.grupo_id,
+      periodo_id: validatedData.periodo_id,
+      comentarios: validatedData.comentarios,
+      completada: true,
+      fecha_completada: new Date().toISOString()
     }
 
+    const responses = validatedData.respuestas.map(respuesta => ({
+      pregunta_id: respuesta.pregunta_id,
+      respuesta_rating: respuesta.respuesta_rating,
+      respuesta_texto: respuesta.respuesta_texto,
+      respuesta_opcion: respuesta.respuesta_opcion
+    }))
+
+    const evaluacion = await SupabaseDB.createEvaluationWithResponses(evaluationData, responses)
+
     // Obtener la evaluación completa con relaciones
-    const evaluacionCompleta = await prisma.evaluaciones.findUnique({
-      where: { id: evaluacion.id },
-      include: {
-        profesor: {
-          include: {
-            usuario: {
-              select: { nombre: true, apellido: true }
-            }
-          }
-        },
-        grupo: {
-          include: {
-            curso: true,
-            periodo: true
-          }
-        },
-        respuestas_evaluacion: {
-          include: {
-            pregunta: true
-          }
-        }
-      }
-    })
+    const evaluacionCompleta = await SupabaseDB.getEvaluationWithRelations(evaluacion.id)
 
     res.status(201).json({
       message: 'Evaluación creada exitosamente',
@@ -154,17 +92,7 @@ router.post('/', authenticateToken, requireRole(['estudiante']), async (req: any
 // GET /evaluaciones/preguntas - Obtener preguntas de evaluación
 router.get('/preguntas', authenticateToken, async (req, res) => {
   try {
-    const preguntas = await prisma.preguntas_evaluacion.findMany({
-      where: { activa: true },
-      include: {
-        categoria: true
-      },
-      orderBy: [
-        { categoria: { orden: 'asc' } },
-        { orden: 'asc' }
-      ]
-    })
-
+    const preguntas = await SupabaseDB.getQuestionsWithCategories()
     res.json(preguntas)
   } catch (error) {
     console.error('Error al obtener preguntas:', error)

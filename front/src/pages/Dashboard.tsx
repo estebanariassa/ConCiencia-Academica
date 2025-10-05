@@ -333,14 +333,18 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             ? 'Evaluaciones Pendientes'
             : user.type === 'teacher'
             ? 'Calificación Promedio'
-            : 'Total de Profesores'}
+            : user.type === 'coordinator'
+            ? 'Total de Profesores'
+            : 'Evaluaciones Pendientes'}
         </CardTitle>
         {user.type === 'student' ? (
           <ClipboardCheck className="h-6 w-6 text-red-600 ml-4" />
         ) : user.type === 'teacher' ? (
           <Star className="h-6 w-6 text-yellow-600 ml-4" />
-        ) : (
+        ) : user.type === 'coordinator' ? (
           <Users className="h-6 w-6 text-blue-600 ml-4" />
+        ) : (
+          <ClipboardCheck className="h-6 w-6 text-red-600 ml-4" />
         )}
       </CardHeader>
       <CardContent>
@@ -350,14 +354,18 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               ? 'text-red-600'
               : user.type === 'teacher'
               ? 'text-yellow-600'
-              : 'text-blue-600'
+              : user.type === 'coordinator'
+              ? 'text-blue-600'
+              : 'text-red-600'
           }`}
         >
           {user.type === 'student'
             ? userData.stats.evaluationsPending
             : user.type === 'teacher'
             ? userData.stats.averageRating
-            : userData.stats.totalTeachers}
+            : user.type === 'coordinator'
+            ? userData.stats.totalTeachers
+            : userData.stats.evaluationsPending}
           {user.type === 'teacher' && '/5.0'}
         </div>
         <p className="text-sm text-gray-500 mt-2 text-left">
@@ -365,7 +373,9 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             ? 'Deben completarse pronto'
             : user.type === 'teacher'
             ? 'Última evaluación'
-            : 'En el departamento'}
+            : user.type === 'coordinator'
+            ? 'En el departamento'
+            : 'Deben completarse pronto'}
         </p>
       </CardContent>
     </Card>

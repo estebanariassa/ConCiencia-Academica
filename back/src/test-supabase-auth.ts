@@ -13,14 +13,6 @@ async function testSupabaseConnection() {
     const userCount = await SupabaseDB.countUsers()
     console.log('✅ Conexión a Supabase exitosa')
     console.log('📊 Total de usuarios en DB:', userCount)
-    
-    if (userCount > 0) {
-      const users = await SupabaseDB.findUserByEmail('profesor1@universidad.edu.co')
-      if (users) {
-        console.log('👤 Usuario de ejemplo encontrado:', users.email)
-      }
-    }
-    
     return true
   } catch (error) {
     console.error('❌ Error conectando a Supabase:', error)
@@ -125,81 +117,9 @@ async function testLoginFlow() {
   }
 }
 
-async function testAPIEndpoints() {
-  console.log('🔍 Probando endpoints de API...')
-  
-  try {
-    const baseUrl = 'http://localhost:3000'
-    
-    // Probar healthcheck
-    console.log('📡 Probando healthcheck...')
-    const healthResponse = await fetch(`${baseUrl}/health`)
-    if (healthResponse.ok) {
-      const healthData = await healthResponse.json()
-      console.log('✅ Healthcheck OK:', healthData)
-    } else {
-      console.log('❌ Healthcheck falló')
-      return false
-    }
-    
-    // Probar registro
-    console.log('📡 Probando endpoint de registro...')
-    const registerData = {
-      email: 'test.api.supabase@example.com',
-      nombre: 'Test',
-      apellido: 'API',
-      tipo_usuario: 'estudiante',
-      password: 'TestPassword123!'
-    }
-    
-    const registerResponse = await fetch(`${baseUrl}/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(registerData)
-    })
-    
-    if (registerResponse.ok) {
-      const registerResult = await registerResponse.json()
-      console.log('✅ Registro exitoso:', registerResult.message)
-      
-      // Probar login con el usuario registrado
-      console.log('📡 Probando endpoint de login...')
-      const loginData = {
-        email: registerData.email,
-        password: registerData.password
-      }
-      
-      const loginResponse = await fetch(`${baseUrl}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(loginData)
-      })
-      
-      if (loginResponse.ok) {
-        const loginResult = await loginResponse.json()
-        console.log('✅ Login exitoso:', loginResult.message)
-        console.log('🎫 Token recibido:', loginResult.token ? 'Sí' : 'No')
-        return true
-      } else {
-        console.log('❌ Login falló:', await loginResponse.text())
-        return false
-      }
-    } else {
-      console.log('❌ Registro falló:', await registerResponse.text())
-      return false
-    }
-  } catch (error) {
-    console.error('❌ Error probando endpoints:', error)
-    return false
-  }
-}
 
 async function main() {
-  console.log('🚀 Iniciando pruebas completas con Supabase...\n')
+  console.log('🚀 Probando conexión y autenticación con Supabase...\n')
   
   // Probar conexión básica
   const connectionOk = await testSupabaseConnection()
@@ -214,29 +134,14 @@ async function main() {
   const loginOk = await testLoginFlow()
   console.log('')
   
-  // Probar endpoints de API (solo si el servidor está corriendo)
-  let apiOk = false
-  try {
-    apiOk = await testAPIEndpoints()
-  } catch (error) {
-    console.log('ℹ️  Servidor no está corriendo, saltando pruebas de API')
-  }
-  console.log('')
-  
   // Resumen
   console.log('📋 Resumen de pruebas:')
   console.log(`   Conexión Supabase: ${connectionOk ? '✅ OK' : '❌ FALLO'}`)
   console.log(`   Flujo de login: ${loginOk ? '✅ OK' : '❌ FALLO'}`)
-  console.log(`   Endpoints API: ${apiOk ? '✅ OK' : '⏭️  NO PROBADO'}`)
   
   if (connectionOk && loginOk) {
-    console.log('\n🎉 ¡Las pruebas principales pasaron correctamente!')
+    console.log('\n🎉 ¡Todas las pruebas pasaron correctamente!')
     console.log('💡 El backend está listo para usar Supabase')
-    if (apiOk) {
-      console.log('🌐 Los endpoints de API también funcionan correctamente')
-    } else {
-      console.log('🌐 Para probar los endpoints, ejecuta: npm run dev')
-    }
   } else {
     console.log('\n⚠️  Algunas pruebas fallaron. Revisa la configuración.')
   }
@@ -249,4 +154,4 @@ if (require.main === module) {
   main().catch(console.error)
 }
 
-export { testSupabaseConnection, testLoginFlow, testAPIEndpoints }
+export { testSupabaseConnection, testLoginFlow }

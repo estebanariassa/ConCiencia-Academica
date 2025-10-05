@@ -12,7 +12,7 @@ import Button from '../../components/Button';
 import Badge from '../../components/Badge';
 import Header from '../../components/Header';
 import { Teacher, Course, User } from '../../types';
-import { fetchTeachersWithCourses } from '../../lib/supabase/queries'
+// import { fetchTeachersWithCourses } from '../../lib/supabase/queries' // Removido - usar API del backend
 import { 
   Search, 
   ArrowLeft, 
