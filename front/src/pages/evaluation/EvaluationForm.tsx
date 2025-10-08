@@ -3,6 +3,9 @@ import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { submitEvaluation, fetchStudentInfo, fetchEvaluationQuestions } from '../../api/teachers';
 import { CardHeader, CardContent, CardTitle, CardDescription } from '../../components/Card';
+import { HiOutlineCalendar } from "react-icons/hi";
+import { FaRegBuilding } from "react-icons/fa"
+
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Header from '../../components/Header';
@@ -266,16 +269,16 @@ export default function EvaluationForm() {
                         </div>
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">Grupo {group.numero_grupo}</h3>
                         <div className="flex flex-wrap gap-4 mt-1">
                           {group.horario && (
-                            <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                              📅 {group.horario}
+                            <span className="flex item-center gap-2 text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                              <HiOutlineCalendar className="text-red-600" /> {group.horario}
                             </span>
                           )}
                           {group.aula && (
-                            <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                              🏢 {group.aula}
+                            <span className="flex item-center gap-2 text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                              <FaRegBuilding className="text-blue-600" /> 
+                              {group.aula}
                             </span>
                           )}
                           {group.cup && (

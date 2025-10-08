@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import Button from './Button';
 import UserMenu from './UserMenu';
 import { Bell, ArrowLeft } from 'lucide-react';
@@ -25,6 +26,11 @@ export default function Header({
   onBack, 
   children 
 }: HeaderProps) {
+  const navigate = useNavigate();
+
+  const handleLogoClick = () => {
+    navigate('/dashboard');
+  };
   return (
     <>
       <motion.header
@@ -37,10 +43,16 @@ export default function Header({
           <div className="flex items-center justify-between w-full">
             {/* Logo y nombre de la universidad - Reducido para móviles */}
             <div className="flex items-center gap-3">
-                    <img 
-        src={logoUniversidad}
-        alt="Logo Universidad de Medellín"
-       className="h-[120px] w-auto object-contain"
+              <motion.img
+                src={logoUniversidad}
+                alt="Logo Universidad de Medellín"
+                className="h-[120px] w-auto object-contain cursor-pointer select-none"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={handleLogoClick}
+                role="button"
+                aria-label="Ir al inicio"
+                title="Ir al inicio"
               />
               <div className="hidden md:block">
                 <h1 className="text-lg lg:text-xl font-semibold text-gray-900">ConCiencia Academica</h1>
