@@ -12,7 +12,7 @@ import Button from '../../components/Button';
 import Badge from '../../components/Badge';
 import Header from '../../components/Header';
 import { Teacher, Course, User } from '../../types';
-// import { fetchTeachersWithCourses } from '../../lib/supabase/queries' // Removido - usar API del backend
+import { fetchTeachersWithCourses, fetchCourseGroups } from '../../api/teachers'
 import { 
   Search, 
   ArrowLeft, 
@@ -42,6 +42,9 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [courseGroups, setCourseGroups] = useState<any[]>([])
+  const [loadingGroups, setLoadingGroups] = useState<boolean>(false)
+  const [selectedGroup, setSelectedGroup] = useState<any>(null)
 
   useEffect(() => {
     let active = true
@@ -77,25 +80,72 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
   }, [searchTerm, teachers]);
 
   const handleTeacherSelect = (teacher: Teacher) => {
+    console.log('🔍 handleTeacherSelect called with teacher:', teacher);
+    console.log('🔍 Teacher courses:', teacher.courses);
     setSelectedTeacher(teacher);
     setSelectedCourse(null);
+    setCourseGroups([]);
+    setSelectedGroup(null);
   };
 
-  const handleCourseSelect = (courseId: string) => {
-    if (!selectedTeacher) return;
-    const course = selectedTeacher.courses.find(c => c.id === courseId);
+  const handleCourseSelect = async (courseId: string) => {
+    console.log('🔍 handleCourseSelect called with courseId:', courseId, 'type:', typeof courseId);
+    console.log('🔍 selectedTeacher:', selectedTeacher);
+    console.log('🔍 All courses:', selectedTeacher?.courses);
+    
+    if (!selectedTeacher) {
+      console.log('❌ No selectedTeacher, returning');
+      return;
+    }
+    
+    // Buscar curso con comparación más flexible (string vs number)
+    const course = selectedTeacher.courses.find(c => {
+      console.log('🔍 Comparing course.id:', c.id, 'type:', typeof c.id, 'with courseId:', courseId, 'type:', typeof courseId);
+      return String(c.id) === String(courseId) || Number(c.id) === Number(courseId);
+    });
+    console.log('🔍 Found course:', course);
+    
     if (course) {
+      console.log('✅ Setting selectedCourse and loading groups...');
       setSelectedCourse(course);
+      setSelectedGroup(null);
+      setLoadingGroups(true);
+      
+      try {
+        console.log('📡 Calling fetchCourseGroups with:', {
+          profesorId: selectedTeacher.id,
+          courseId: courseId
+        });
+        
+        const groups = await fetchCourseGroups(selectedTeacher.id, courseId);
+        console.log('✅ Groups loaded successfully:', groups);
+        setCourseGroups(groups);
+      } catch (error) {
+        console.error('❌ Error loading groups:', error);
+        setCourseGroups([]);
+      } finally {
+        setLoadingGroups(false);
+        console.log('🏁 Loading groups finished');
+      }
+    } else {
+      console.log('❌ Course not found in selectedTeacher.courses');
+      console.log('🔍 Available course IDs:', selectedTeacher.courses.map(c => ({ id: c.id, type: typeof c.id, name: c.name })));
     }
   };
 
+  const handleGroupSelect = (group: any) => {
+    console.log('🔍 Group selected:', group);
+    setSelectedGroup(group);
+  };
+
   const handleContinue = () => {
-    if (selectedTeacher && selectedCourse) {
+    if (selectedTeacher && selectedCourse && selectedGroup) {
       onTeacherCourseSelected(selectedTeacher, selectedCourse);
       navigate('/evaluate/form', { 
         state: { 
           teacher: selectedTeacher, 
-          course: selectedCourse 
+          course: selectedCourse,
+          group: selectedGroup
         } 
       });
     }
@@ -260,20 +310,27 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                 <CardContent className="space-y-4">
                   {selectedTeacher ? (
                     <>
+                      {console.log('🔍 Rendering course selection for teacher:', selectedTeacher.name, 'with courses:', selectedTeacher.courses)}
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-gray-700">Curso</label>
                         <div className="relative">
                           <select 
                             value={selectedCourse?.id || ''} 
-                            onChange={(e) => handleCourseSelect(e.target.value)}
+                            onChange={(e) => {
+                              console.log('🔍 Select onChange triggered with value:', e.target.value);
+                              handleCourseSelect(e.target.value);
+                            }}
                             className="w-full p-2 border border-gray-300 rounded-lg bg-white outline-none transition-colors focus:border-red-500 focus:ring-1 focus:ring-red-500"
                           >
                             <option value="">Selecciona un curso</option>
-                            {selectedTeacher.courses.map(course => (
-                              <option key={course.id} value={course.id}>
-                                {course.name} ({course.code})
-                              </option>
-                            ))}
+                            {selectedTeacher.courses.map(course => {
+                              console.log('🔍 Rendering course option:', course);
+                              return (
+                                <option key={course.id} value={course.id}>
+                                  {course.name} ({course.code})
+                                </option>
+                              );
+                            })}
                           </select>
                         </div>
                       </div>
@@ -302,6 +359,54 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                             </div>
                           </div>
 
+                          {/* Sección de Grupos */}
+                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                            <h4 className="font-medium text-gray-900">Grupos Disponibles</h4>
+                            {loadingGroups ? (
+                              <div className="text-center text-gray-500">Cargando grupos...</div>
+                            ) : courseGroups.length > 0 ? (
+                              <div className="space-y-2">
+                                {courseGroups.map((group: any) => (
+                                  <div 
+                                    key={group.id} 
+                                    className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                      selectedGroup?.id === group.id
+                                        ? 'border-red-500 bg-red-50 shadow-md'
+                                        : 'border-gray-200 bg-white hover:border-red-300 hover:bg-gray-50'
+                                    }`}
+                                    onClick={() => handleGroupSelect(group)}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <span className="font-medium text-gray-900">Grupo {group.numero_grupo}</span>
+                                        {group.horario && (
+                                          <p className="text-sm text-gray-600">{group.horario}</p>
+                                        )}
+                                        {group.aula && (
+                                          <p className="text-sm text-gray-600">Aula: {group.aula}</p>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {group.cup && (
+                                          <Badge variant="outline" className="text-xs">
+                                            {group.cup} cupos
+                                          </Badge>
+                                        )}
+                                        {selectedGroup?.id === group.id && (
+                                          <div className="text-red-600">
+                                            <ChevronRight className="h-4 w-4" />
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center text-gray-500">No hay grupos disponibles</div>
+                            )}
+                          </div>
+
                           <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
                             <h4 className="font-medium text-gray-900">Información del Profesor</h4>
                             <div className="flex items-start gap-3">
@@ -317,14 +422,19 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                           </div>
 
                           <motion.div
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                            whileHover={{ scale: selectedGroup ? 1.02 : 1 }}
+                            whileTap={{ scale: selectedGroup ? 0.98 : 1 }}
                           >
                             <Button 
                               onClick={handleContinue}
-                              className="w-full bg-red-600 hover:bg-red-700 text-white py-3"
+                              disabled={!selectedGroup}
+                              className={`w-full py-3 ${
+                                selectedGroup 
+                                  ? 'bg-red-600 hover:bg-red-700 text-white' 
+                                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                              }`}
                             >
-                              Continuar a Evaluación
+                              {selectedGroup ? 'Continuar a Evaluación' : 'Selecciona un grupo'}
                               <ChevronRight className="h-4 w-4 ml-2" />
                             </Button>
                           </motion.div>

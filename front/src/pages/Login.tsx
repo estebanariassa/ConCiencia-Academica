@@ -28,7 +28,7 @@ export default function Login() {
   const [emailError, setEmailError] = useState('')
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, getDashboardPath } = useAuth()
 
   // Función para validar correo electrónico
   const validateEmail = (email: string) => {
@@ -75,10 +75,12 @@ export default function Login() {
 
     try {
       // Usar el AuthContext para mantener la sincronización
-      await login(email, password)
+      // Pasar el tipo de usuario seleccionado para verificación
+      await login(email, password, userType)
       
-      // Redireccionar al dashboard después del login exitoso
-      navigate('/dashboard')
+      // Redireccionar al dashboard correcto según el tipo de usuario
+      const dashboardPath = getDashboardPath()
+      navigate(dashboardPath)
     } catch (error: any) {
       console.error('Error en login:', error)
       setError(error.response?.data?.error || error.message || 'Error en la autenticación')

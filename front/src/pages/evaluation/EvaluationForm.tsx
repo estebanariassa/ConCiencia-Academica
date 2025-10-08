@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { submitEvaluation, fetchStudentInfo, fetchEvaluationQuestions } from '../../api/teachers';
 import { CardHeader, CardContent, CardTitle, CardDescription } from '../../components/Card';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
@@ -22,25 +23,61 @@ interface EvaluationQuestion {
 export default function EvaluationForm() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { teacher, course } = location.state || {};
+  const { teacher, course, group } = location.state || {};
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [ratings, setRatings] = useState<number[]>(Array(10).fill(0));
+  const [ratings, setRatings] = useState<number[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showCommentsSection, setShowCommentsSection] = useState(false);
   const [comments, setComments] = useState('');
+  const [questions, setQuestions] = useState<EvaluationQuestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [studentInfo, setStudentInfo] = useState<any>(null);
 
-  const questions: EvaluationQuestion[] = [
-    { id: '1', category: 'Claridad Expositiva', question: 'El profesor explica claramente los conceptos del curso' },
-    { id: '2', category: 'Dominio del Tema', question: 'El profesor demuestra amplio conocimiento de la materia' },
-    { id: '3', category: 'Disponibilidad', question: 'El profesor está disponible para resolver dudas' },
-    { id: '4', category: 'Material de Clase', question: 'El material proporcionado es adecuado y útil' },
-    { id: '5', category: 'Evaluación Justa', question: 'Las evaluaciones reflejan adecuadamente los contenidos' },
-    { id: '6', category: 'Motivación', question: 'El profesor motiva a los estudiantes a participar' },
-    { id: '7', category: 'Organización', question: 'Las clases están bien organizadas y estructuradas' },
-    { id: '8', category: 'Retroalimentación', question: 'Proporciona retroalimentación útil sobre el progreso' },
-    { id: '9', category: 'Respeto', question: 'Muestra respeto por las opiniones de los estudiantes' },
-    { id: '10', category: 'Innovación', question: 'Utiliza métodos innovadores en la enseñanza' }
-  ];
+  // Cargar información del estudiante y preguntas al montar el componente
+  useEffect(() => {
+    const loadStudentInfoAndQuestions = async () => {
+      try {
+        console.log('🔍 Loading student info and questions...');
+        
+        // Obtener información del estudiante
+        const studentData = await fetchStudentInfo();
+        setStudentInfo(studentData);
+        console.log('✅ Student info loaded:', studentData);
+
+        // Obtener preguntas según el curso (no la carrera del estudiante)
+        if (course?.id) {
+          const questionsData = await fetchEvaluationQuestions(String(course.id));
+          setQuestions(questionsData.questions);
+          setRatings(Array(questionsData.questions.length).fill(0));
+          console.log('✅ Questions loaded for course:', questionsData.courseName, 'Code:', questionsData.courseCode, 'Count:', questionsData.questions.length);
+        } else {
+          throw new Error('No course ID available');
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('❌ Error loading student info or questions:', error);
+        // Fallback a preguntas por defecto
+        const defaultQuestions: EvaluationQuestion[] = [
+          { id: '1', category: 'Claridad Expositiva', question: 'El profesor explica claramente los conceptos del curso' },
+          { id: '2', category: 'Dominio del Tema', question: 'El profesor demuestra amplio conocimiento de la materia' },
+          { id: '3', category: 'Disponibilidad', question: 'El profesor está disponible para resolver dudas' },
+          { id: '4', category: 'Material de Clase', question: 'El material proporcionado es adecuado y útil' },
+          { id: '5', category: 'Evaluación Justa', question: 'Las evaluaciones reflejan adecuadamente los contenidos' },
+          { id: '6', category: 'Motivación', question: 'El profesor motiva a los estudiantes a participar' },
+          { id: '7', category: 'Organización', question: 'Las clases están bien organizadas y estructuradas' },
+          { id: '8', category: 'Retroalimentación', question: 'Proporciona retroalimentación útil sobre el progreso' },
+          { id: '9', category: 'Respeto', question: 'Muestra respeto por las opiniones de los estudiantes' },
+          { id: '10', category: 'Innovación', question: 'Utiliza métodos innovadores en la enseñanza' }
+        ];
+        setQuestions(defaultQuestions);
+        setRatings(Array(defaultQuestions.length).fill(0));
+        setLoading(false);
+      }
+    };
+
+    loadStudentInfoAndQuestions();
+  }, [course?.id]);
 
   const ratingLabels = ['Muy Deficiente', 'Deficiente', 'Regular', 'Bueno', 'Excelente'];
 
@@ -80,11 +117,11 @@ export default function EvaluationForm() {
 
   const handleConfirmSubmit = async () => {
     try {
-      const studentId = await getCurrentUserId()
-      if (!studentId) {
-        alert('No hay sesión de usuario. Inicia sesión nuevamente.')
+      if (!teacher?.id || !course?.id) {
+        alert('Error: Faltan datos del profesor o curso')
         return
       }
+
       const answers = questions.map((q, idx) => ({
         questionId: q.id,
         rating: ratings[idx],
@@ -92,19 +129,35 @@ export default function EvaluationForm() {
       const total = ratings.reduce((a, b) => a + b, 0)
       const overallRating = Number((total / ratings.length).toFixed(2))
 
-      await submitEvaluation({
-        teacherId: String(teacher?.id),
-        courseId: String(course?.id),
-        studentId,
+      console.log('📤 Enviando evaluación:', {
+        teacherId: String(teacher.id),
+        courseId: String(course.id),
+        groupId: group ? String(group.id) : undefined,
+        comments,
+        answers,
+        overallRating,
+        teacher: teacher,
+        course: course,
+        group: group
+      })
+
+      const result = await submitEvaluation({
+        teacherId: String(teacher.id),
+        courseId: String(course.id),
+        groupId: group ? String(group.id) : undefined,
         comments,
         answers,
         overallRating,
       })
 
+      console.log('✅ Evaluación enviada exitosamente:', result)
       setShowConfirmation(false)
+      alert('¡Evaluación completada exitosamente!')
       navigate('/dashboard')
     } catch (e: any) {
-      alert(e?.message ?? 'Error guardando la evaluación')
+      console.error('❌ Error enviando evaluación:', e)
+      const errorMessage = e?.message ?? 'Error guardando la evaluación'
+      alert(errorMessage)
     }
   };
 
@@ -114,7 +167,33 @@ export default function EvaluationForm() {
 
   const totalSteps = questions.length + 1; // Preguntas + sección de comentarios
   const currentStep = showCommentsSection ? totalSteps : currentQuestion + 1;
-  const progress = (currentStep / totalSteps) * 100;
+
+  // Mostrar loading mientras se cargan las preguntas
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 relative">
+        <div 
+          className="fixed inset-0 z-0"
+          style={{
+            backgroundImage: `url(${fondo})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed'
+          }}
+        >
+          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        </div>
+        
+        <div className="relative z-10 flex items-center justify-center min-h-screen">
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Cargando preguntas de evaluación</h2>
+            <p className="text-gray-600">Obteniendo preguntas específicas para tu carrera...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -165,11 +244,50 @@ export default function EvaluationForm() {
             transition={{ delay: 0.2 }}
           >
             <Card className="bg-white shadow-lg border border-gray-200 p-6">
-              <div className="flex items-center gap-4">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">{teacher?.name}</h2>
-                  <p className="text-md text-gray-600">{course?.name} - {course?.code}</p>
-                </div>
+              <div className="space-y-4">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <h2 className="text-xl font-semibold text-gray-900">{teacher?.name}</h2>
+                            <p className="text-md text-gray-600">{course?.name} - {course?.code}</p>
+                            {course && (
+                              <p className="text-sm text-blue-600 font-medium">
+                                📚 Evaluación para: {course.code} - {course.name}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                
+                {group && (
+                  <div className="border-t border-gray-200 pt-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                          <span className="text-red-600 font-bold text-lg">G{group.numero_grupo}</span>
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-medium text-gray-900">Grupo {group.numero_grupo}</h3>
+                        <div className="flex flex-wrap gap-4 mt-1">
+                          {group.horario && (
+                            <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                              📅 {group.horario}
+                            </span>
+                          )}
+                          {group.aula && (
+                            <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                              🏢 {group.aula}
+                            </span>
+                          )}
+                          {group.cup && (
+                            <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                              👥 {group.cup} cupos
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
           </motion.div>

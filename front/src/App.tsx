@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import DashboardProfesor from './pages/DashboardProfesor'
+import DashboardCoordinador from './pages/DashboardCoordinador'
+import DashboardAdmin from './pages/DashboardAdmin'
 import TeacherSelection from './pages/evaluation/TeacherSelection'
 import EvaluationForm from './pages/evaluation/EvaluationForm'
 import ReportsPage from './pages/Reports/ReportsPage' // Nueva importación
@@ -43,7 +46,31 @@ function App() {
         <Route 
           path="/dashboard" 
           element={
+            user ? <DashboardRouter /> : <Navigate to="/login" replace />
+          } 
+        />
+        <Route 
+          path="/dashboard-estudiante" 
+          element={
             user ? <DashboardWrapper onStartEvaluation={handleStartEvaluation} onViewReports={handleViewReports} /> : <Navigate to="/login" replace />
+          } 
+        />
+        <Route 
+          path="/dashboard-profesor" 
+          element={
+            user ? <DashboardProfesorWrapper /> : <Navigate to="/login" replace />
+          } 
+        />
+        <Route 
+          path="/dashboard-coordinador" 
+          element={
+            user ? <DashboardCoordinadorWrapper /> : <Navigate to="/login" replace />
+          } 
+        />
+        <Route 
+          path="/dashboard-admin" 
+          element={
+            user ? <DashboardAdminWrapper /> : <Navigate to="/login" replace />
           } 
         />
         <Route 
@@ -141,6 +168,74 @@ function ReportsPageWrapper() {
   }
   
   return <ReportsPage user={user} />
+}
+
+// Router que redirige al dashboard correcto según el tipo de usuario
+function DashboardRouter() {
+  const { user: authUser, getDashboardPath } = useAuth()
+  
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // Obtener el dashboard correcto según el tipo de usuario
+  const dashboardPath = getDashboardPath()
+  
+  return <Navigate to={dashboardPath} replace />
+}
+
+function DashboardProfesorWrapper() {
+  const { user: authUser } = useAuth()
+  
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // Convertir el usuario del AuthContext al formato esperado
+  const user: User = {
+    id: authUser.id,
+    name: `${authUser.nombre} ${authUser.apellido}`.trim(),
+    type: (authUser.tipo_usuario as any) ?? 'teacher',
+    email: authUser.email,
+  }
+  
+  return <DashboardProfesor user={user} />
+}
+
+function DashboardCoordinadorWrapper() {
+  const { user: authUser } = useAuth()
+  
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // Convertir el usuario del AuthContext al formato esperado
+  const user: User = {
+    id: authUser.id,
+    name: `${authUser.nombre} ${authUser.apellido}`.trim(),
+    type: (authUser.tipo_usuario as any) ?? 'coordinator',
+    email: authUser.email,
+  }
+  
+  return <DashboardCoordinador user={user} />
+}
+
+function DashboardAdminWrapper() {
+  const { user: authUser } = useAuth()
+  
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // Convertir el usuario del AuthContext al formato esperado
+  const user: User = {
+    id: authUser.id,
+    name: `${authUser.nombre} ${authUser.apellido}`.trim(),
+    type: (authUser.tipo_usuario as any) ?? 'admin',
+    email: authUser.email,
+  }
+  
+  return <DashboardAdmin user={user} />
 }
 
 export default App

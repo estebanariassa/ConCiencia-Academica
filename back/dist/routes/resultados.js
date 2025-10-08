@@ -87,8 +87,8 @@ router.get('/estadisticas', auth_1.authenticateToken, (0, auth_1.requireRole)(['
                 : 0,
             calificacion_minima: calificaciones.length > 0 ? Math.min(...calificaciones) : 0,
             calificacion_maxima: calificaciones.length > 0 ? Math.max(...calificaciones) : 0,
-            evaluaciones_por_mes: evaluaciones?.reduce((acc, eval) => {
-                const mes = new Date(eval.fecha_completada).toISOString().substring(0, 7);
+            evaluaciones_por_mes: evaluaciones?.reduce((acc, evaluacion) => {
+                const mes = new Date(evaluacion.fecha_completada).toISOString().substring(0, 7);
                 acc[mes] = (acc[mes] || 0) + 1;
                 return acc;
             }, {}) || {}

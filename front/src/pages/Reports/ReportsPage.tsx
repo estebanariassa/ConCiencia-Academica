@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { fetchTeacherStats, fetchTeacherHistoricalStats } from '../../api/teachers';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -52,29 +53,109 @@ interface ReportsPageProps {
 
 export default function ReportsPage({ user }: ReportsPageProps) {
   const navigate = useNavigate();
-  const [selectedPeriod, setSelectedPeriod] = useState('2024-1');
+  const [selectedPeriod, setSelectedPeriod] = useState('2025-2');
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [teacherStats, setTeacherStats] = useState<any>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [historicalData, setHistoricalData] = useState<any[]>([]);
 
-  // Mock data for charts
-  const categoryData = [
-    { category: 'Claridad Expositiva', rating: 4.2, total: 45 },
-    { category: 'Conocimiento', rating: 4.7, total: 45 },
-    { category: 'Responsabilidad', rating: 4.5, total: 45 },
-    { category: 'Interacción', rating: 3.8, total: 45 },
-    { category: 'Metodología', rating: 4.1, total: 45 },
-    { category: 'Evaluación', rating: 4.3, total: 45 },
-    { category: 'Trato Personal', rating: 4.6, total: 45 },
-    { category: 'Motivación', rating: 3.9, total: 45 },
-    { category: 'Disponibilidad', rating: 4.0, total: 45 },
-    { category: 'Recomendación', rating: 4.4, total: 45 }
-  ];
+  // Cargar estadísticas del profesor
+  useEffect(() => {
+    const loadTeacherStats = async () => {
+      if (!user?.id) {
+        setLoadingStats(false);
+        return;
+      }
 
-  const trendData = [
-    { period: '2022-1', rating: 3.8 },
-    { period: '2022-2', rating: 4.0 },
+      try {
+        setLoadingStats(true);
+        setStatsError(null);
+        console.log('🔍 Loading teacher stats for reports, user ID:', user.id, 'period:', selectedPeriod);
+        
+        // Cargar estadísticas del período seleccionado
+        const stats = await fetchTeacherHistoricalStats(user.id, selectedPeriod);
+        console.log('✅ Teacher stats loaded for reports:', stats);
+        setTeacherStats(stats);
+      } catch (error) {
+        console.error('❌ Error loading teacher stats for reports:', error);
+        setStatsError('Error al cargar las estadísticas');
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    loadTeacherStats();
+  }, [user?.id, selectedPeriod]);
+
+  // Cargar datos históricos para la gráfica de tendencia
+  useEffect(() => {
+    const loadHistoricalData = async () => {
+      if (!user?.id) return;
+
+      try {
+        const periods = ['2023-1', '2023-2', '2024-1', '2024-2', '2025-1', '2025-2'];
+        const historicalPromises = periods.map(async (period) => {
+          try {
+            const stats = await fetchTeacherHistoricalStats(user.id, period);
+            return {
+              period,
+              rating: stats.calificacionPromedio || 0,
+              totalEvaluations: stats.totalEvaluaciones || 0
+            };
+          } catch (error) {
+            console.warn(`No data for period ${period}:`, error);
+            return {
+              period,
+              rating: 0,
+              totalEvaluations: 0
+            };
+          }
+        });
+
+        const results = await Promise.all(historicalPromises);
+        setHistoricalData(results);
+        console.log('✅ Historical data loaded:', results);
+      } catch (error) {
+        console.error('❌ Error loading historical data:', error);
+      }
+    };
+
+    loadHistoricalData();
+  }, [user?.id]);
+
+  // Función para manejar cambio de período
+  const handlePeriodChange = (newPeriod: string) => {
+    setSelectedPeriod(newPeriod);
+  };
+
+  // Datos reales o fallback
+  const categoryData = teacherStats?.evaluacionesPorCurso?.length > 0 ? 
+    teacherStats.evaluacionesPorCurso.map((curso: any) => ({
+      category: curso.nombre,
+      rating: curso.promedio,
+      total: curso.total
+    })) : [
+      { category: 'Claridad Expositiva', rating: 4.2, total: 45 },
+      { category: 'Conocimiento', rating: 4.7, total: 45 },
+      { category: 'Responsabilidad', rating: 4.5, total: 45 },
+      { category: 'Interacción', rating: 3.8, total: 45 },
+      { category: 'Metodología', rating: 4.1, total: 45 },
+      { category: 'Evaluación', rating: 4.3, total: 45 },
+      { category: 'Trato Personal', rating: 4.6, total: 45 },
+      { category: 'Motivación', rating: 3.9, total: 45 },
+      { category: 'Disponibilidad', rating: 4.0, total: 45 },
+      { category: 'Recomendación', rating: 4.4, total: 45 }
+    ];
+
+  // Datos de tendencia históricos reales
+  const trendData = historicalData.length > 0 ? historicalData : [
     { period: '2023-1', rating: 4.2 },
     { period: '2023-2', rating: 4.3 },
-    { period: '2024-1', rating: 4.5 }
+    { period: '2024-1', rating: 4.4 },
+    { period: '2024-2', rating: 4.5 },
+    { period: '2025-1', rating: 4.6 },
+    { period: '2025-2', rating: teacherStats?.calificacionPromedio || 4.7 }
   ];
 
   const radarData = [
@@ -86,7 +167,14 @@ export default function ReportsPage({ user }: ReportsPageProps) {
     { subject: 'Motivación', A: 3.9, fullMark: 5 }
   ];
 
-  const distributionData = [
+  // Distribución de calificaciones (simulada basada en el promedio real)
+  const distributionData = teacherStats?.totalEvaluaciones > 0 ? [
+    { name: '5 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.35)), color: '#10B981' },
+    { name: '4 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.28)), color: '#3B82F6' },
+    { name: '3 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.20)), color: '#F59E0B' },
+    { name: '2 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.12)), color: '#EF4444' },
+    { name: '1 Estrella', value: Math.round((teacherStats.totalEvaluaciones * 0.05)), color: '#6B7280' }
+  ] : [
     { name: '5 Estrellas', value: 35, color: '#10B981' },
     { name: '4 Estrellas', value: 28, color: '#3B82F6' },
     { name: '3 Estrellas', value: 20, color: '#F59E0B' },
@@ -101,11 +189,12 @@ export default function ReportsPage({ user }: ReportsPageProps) {
     { department: 'Administración', rating: 4.0, evaluations: 110 }
   ];
 
+  // Estadísticas reales o fallback
   const mockStats = {
-    totalEvaluations: user.type === 'coordinator' ? 410 : 45,
-    averageRating: 4.3,
-    responseRate: 87,
-    improvement: user.type === 'coordinator' ? 5.2 : 8.1
+    totalEvaluations: teacherStats?.totalEvaluaciones || (user.type === 'coordinator' ? 410 : 45),
+    averageRating: teacherStats?.calificacionPromedio || 4.3,
+    responseRate: 87, // TODO: Calcular tasa de respuesta real
+    improvement: user.type === 'coordinator' ? 5.2 : 8.1 // TODO: Calcular mejora real
   };
 
   return (
@@ -149,7 +238,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   <p className="text-sm text-gray-600">
                     {user.type === 'coordinator' 
                       ? 'Análisis y estadísticas departamentales' 
-                      : 'Resultados de tus evaluaciones docentes'
+                      : `Resultados de tus evaluaciones docentes - Período ${selectedPeriod}`
                     }
                   </p>
                 </div>
@@ -158,9 +247,12 @@ export default function ReportsPage({ user }: ReportsPageProps) {
               <div className="flex items-center gap-3">
                 <select 
                   value={selectedPeriod} 
-                  onChange={(e) => setSelectedPeriod(e.target.value)}
+                  onChange={(e) => handlePeriodChange(e.target.value)}
                   className="w-32 rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-red-500 focus:outline-none focus:ring-red-500 sm:text-sm"
                 >
+                  <option value="2025-2">2025-2</option>
+                  <option value="2025-1">2025-1</option>
+                  <option value="2024-2">2024-2</option>
                   <option value="2024-1">2024-1</option>
                   <option value="2023-2">2023-2</option>
                   <option value="2023-1">2023-1</option>
@@ -259,11 +351,17 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   <Calendar className="h-4 w-4 text-green-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-600">
-                    {user.type === 'coordinator' ? '24' : '6'}
-                  </div>
+                  {loadingStats ? (
+                    <div className="text-2xl font-bold text-gray-400">Cargando...</div>
+                  ) : statsError ? (
+                    <div className="text-lg font-medium text-red-600">Error</div>
+                  ) : (
+                    <div className="text-2xl font-bold text-green-600">
+                      {user.type === 'coordinator' ? '24' : (teacherStats?.totalCursos || 0)}
+                    </div>
+                  )}
                   <p className="text-xs text-gray-500">
-                    {user.type === 'coordinator' ? 'En el departamento' : 'Cursos completados'}
+                    {loadingStats ? 'Cargando datos...' : (user.type === 'coordinator' ? 'En el departamento' : 'Cursos evaluados')}
                   </p>
                 </CardContent>
               </Card>
@@ -285,21 +383,44 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={categoryData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="category" 
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                        fontSize={12}
-                      />
-                      <YAxis domain={[0, 5]} />
-                      <Tooltip />
-                      <Bar dataKey="rating" fill="#E63946" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {loadingStats ? (
+                    <div className="flex items-center justify-center h-[300px] text-gray-500">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-2"></div>
+                        <p>Cargando datos...</p>
+                      </div>
+                    </div>
+                  ) : statsError ? (
+                    <div className="flex items-center justify-center h-[300px] text-red-500">
+                      <div className="text-center">
+                        <p>Error al cargar los datos</p>
+                        <p className="text-sm text-gray-500 mt-1">No se pudieron obtener las estadísticas</p>
+                      </div>
+                    </div>
+                  ) : categoryData.length === 0 ? (
+                    <div className="flex items-center justify-center h-[300px] text-gray-500">
+                      <div className="text-center">
+                        <p>No hay datos disponibles</p>
+                        <p className="text-sm text-gray-400 mt-1">No se han encontrado evaluaciones</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={categoryData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="category" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          fontSize={12}
+                        />
+                        <YAxis domain={[0, 5]} />
+                        <Tooltip />
+                        <Bar dataKey="rating" fill="#E63946" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -318,21 +439,37 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" />
-                      <YAxis domain={[0, 5]} />
-                      <Tooltip />
-                      <Line 
-                        type="monotone" 
-                        dataKey="rating" 
-                        stroke="#E63946" 
-                        strokeWidth={3}
-                        dot={{ fill: '#E63946', strokeWidth: 2, r: 6 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {loadingStats ? (
+                    <div className="flex items-center justify-center h-[300px] text-gray-500">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-2"></div>
+                        <p>Cargando datos...</p>
+                      </div>
+                    </div>
+                  ) : statsError ? (
+                    <div className="flex items-center justify-center h-[300px] text-red-500">
+                      <div className="text-center">
+                        <p>Error al cargar los datos</p>
+                        <p className="text-sm text-gray-500 mt-1">No se pudieron obtener las estadísticas</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={trendData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="period" />
+                        <YAxis domain={[0, 5]} />
+                        <Tooltip />
+                        <Line 
+                          type="monotone" 
+                          dataKey="rating" 
+                          stroke="#E63946" 
+                          strokeWidth={3}
+                          dot={{ fill: '#E63946', strokeWidth: 2, r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -353,21 +490,37 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <RadarChart data={radarData}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="subject" />
-                      <PolarRadiusAxis domain={[0, 5]} />
-                      <Radar
-                        name="Calificación"
-                        dataKey="A"
-                        stroke="#E63946"
-                        fill="#E63946"
-                        fillOpacity={0.3}
-                        strokeWidth={2}
-                      />
-                    </RadarChart>
-                  </ResponsiveContainer>
+                  {loadingStats ? (
+                    <div className="flex items-center justify-center h-[250px] text-gray-500">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-2"></div>
+                        <p>Cargando datos...</p>
+                      </div>
+                    </div>
+                  ) : statsError ? (
+                    <div className="flex items-center justify-center h-[250px] text-red-500">
+                      <div className="text-center">
+                        <p>Error al cargar los datos</p>
+                        <p className="text-sm text-gray-500 mt-1">No se pudieron obtener las estadísticas</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <RadarChart data={radarData}>
+                        <PolarGrid />
+                        <PolarAngleAxis dataKey="subject" />
+                        <PolarRadiusAxis domain={[0, 5]} />
+                        <Radar
+                          name="Calificación"
+                          dataKey="A"
+                          stroke="#E63946"
+                          fill="#E63946"
+                          fillOpacity={0.3}
+                          strokeWidth={2}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -386,23 +539,39 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={distributionData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {distributionData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {loadingStats ? (
+                    <div className="flex items-center justify-center h-[250px] text-gray-500">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-2"></div>
+                        <p>Cargando datos...</p>
+                      </div>
+                    </div>
+                  ) : statsError ? (
+                    <div className="flex items-center justify-center h-[250px] text-red-500">
+                      <div className="text-center">
+                        <p>Error al cargar los datos</p>
+                        <p className="text-sm text-gray-500 mt-1">No se pudieron obtener las estadísticas</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie
+                          data={distributionData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {distributionData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

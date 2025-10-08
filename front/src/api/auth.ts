@@ -22,6 +22,11 @@ export interface AuthResponse {
     nombre: string
     apellido: string
     tipo_usuario: string
+    user_type?: string
+    user_role?: string
+    dashboard?: string
+    permissions?: string[]
+    role_description?: string
   }
 }
 

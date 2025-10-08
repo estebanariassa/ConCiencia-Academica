@@ -10,8 +10,15 @@ const registerSchema = z.object({
   email: z.string().email(),
   nombre: z.string().min(2),
   apellido: z.string().min(2),
-  tipo_usuario: z.enum(['estudiante', 'profesor', 'coordinador', 'admin']),
-  password: z.string().min(6)
+  tipo_usuario: z.enum(['estudiante', 'profesor', 'docente', 'coordinador', 'admin']),
+  password: z.string().min(6),
+  // Campos opcionales para profesores
+  codigo_profesor: z.string().optional(),
+  departamento: z.string().optional(),
+  // Campos opcionales para estudiantes
+  codigo_estudiante: z.string().optional(),
+  carrera_id: z.number().optional(),
+  semestre: z.string().optional()
 })
 
 const loginSchema = z.object({
@@ -34,13 +41,20 @@ router.post('/register', async (req, res) => {
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(validatedData.password, 10)
 
-    // Crear usuario
-    const user = await SupabaseDB.createUser({
+    // Crear usuario con inserción automática en tabla específica
+    const user = await SupabaseDB.createUserWithType({
       email: validatedData.email,
       password: hashedPassword,
       nombre: validatedData.nombre,
       apellido: validatedData.apellido,
       tipo_usuario: validatedData.tipo_usuario,
+      // Campos para profesores
+      codigo_profesor: validatedData.codigo_profesor,
+      departamento: validatedData.departamento,
+      // Campos para estudiantes
+      codigo_estudiante: validatedData.codigo_estudiante,
+      carrera_id: validatedData.carrera_id,
+      semestre: validatedData.semestre
     })
 
     // Generar JWT
@@ -92,6 +106,13 @@ router.post('/login', async (req, res) => {
 
     console.log(`✅ Usuario encontrado: ${user.nombre} ${user.apellido} (${user.tipo_usuario})`)
 
+    // Verificar tipo de usuario válido
+    const validUserTypes = ['estudiante', 'profesor', 'docente', 'coordinador', 'admin']
+    if (!validUserTypes.includes(user.tipo_usuario)) {
+      console.log(`❌ Tipo de usuario inválido: ${user.tipo_usuario}`)
+      return res.status(401).json({ error: 'Tipo de usuario no válido' })
+    }
+
     // Verificar contraseña
     let isValidPassword = false
     
@@ -132,6 +153,53 @@ router.post('/login', async (req, res) => {
       { expiresIn: '24h' }
     )
 
+    // Determinar el tipo de usuario para la respuesta
+    let userTypeDisplay = user.tipo_usuario
+    let userRole = user.tipo_usuario
+    
+    // Normalizar 'docente' a 'profesor' para compatibilidad
+    if (user.tipo_usuario === 'docente') {
+      userTypeDisplay = 'profesor'
+      userRole = 'profesor'
+    }
+
+    // Información adicional según el tipo de usuario
+    let additionalInfo = {}
+    
+    switch (user.tipo_usuario) {
+      case 'estudiante':
+        additionalInfo = {
+          dashboard: '/dashboard-estudiante',
+          permissions: ['view_evaluations', 'submit_evaluations'],
+          role_description: 'Estudiante del sistema'
+        }
+        break
+      case 'profesor':
+      case 'docente':
+        additionalInfo = {
+          dashboard: '/dashboard-profesor',
+          permissions: ['view_evaluations', 'create_evaluations', 'view_reports'],
+          role_description: 'Profesor/Docente del sistema'
+        }
+        break
+      case 'coordinador':
+        additionalInfo = {
+          dashboard: '/dashboard-coordinador',
+          permissions: ['view_evaluations', 'create_evaluations', 'view_reports', 'manage_users'],
+          role_description: 'Coordinador académico'
+        }
+        break
+      case 'admin':
+        additionalInfo = {
+          dashboard: '/dashboard-admin',
+          permissions: ['all'],
+          role_description: 'Administrador del sistema'
+        }
+        break
+    }
+
+    console.log(`🎉 Login exitoso para ${userTypeDisplay}: ${user.email}`)
+
     res.json({
       message: 'Login exitoso',
       token,
@@ -140,7 +208,10 @@ router.post('/login', async (req, res) => {
         email: user.email,
         nombre: user.nombre,
         apellido: user.apellido,
-        tipo_usuario: user.tipo_usuario
+        tipo_usuario: user.tipo_usuario,
+        user_type: userTypeDisplay,
+        user_role: userRole,
+        ...additionalInfo
       }
     })
   } catch (error) {
@@ -173,6 +244,51 @@ router.get('/me', async (req, res) => {
       return res.status(401).json({ error: 'Usuario no encontrado o inactivo' })
     }
 
+    // Determinar el tipo de usuario para la respuesta
+    let userTypeDisplay = user.tipo_usuario
+    let userRole = user.tipo_usuario
+    
+    // Normalizar 'docente' a 'profesor' para compatibilidad
+    if (user.tipo_usuario === 'docente') {
+      userTypeDisplay = 'profesor'
+      userRole = 'profesor'
+    }
+
+    // Información adicional según el tipo de usuario
+    let additionalInfo = {}
+    
+    switch (user.tipo_usuario) {
+      case 'estudiante':
+        additionalInfo = {
+          dashboard: '/dashboard-estudiante',
+          permissions: ['view_evaluations', 'submit_evaluations'],
+          role_description: 'Estudiante del sistema'
+        }
+        break
+      case 'profesor':
+      case 'docente':
+        additionalInfo = {
+          dashboard: '/dashboard-profesor',
+          permissions: ['view_evaluations', 'create_evaluations', 'view_reports'],
+          role_description: 'Profesor/Docente del sistema'
+        }
+        break
+      case 'coordinador':
+        additionalInfo = {
+          dashboard: '/dashboard-coordinador',
+          permissions: ['view_evaluations', 'create_evaluations', 'view_reports', 'manage_users'],
+          role_description: 'Coordinador académico'
+        }
+        break
+      case 'admin':
+        additionalInfo = {
+          dashboard: '/dashboard-admin',
+          permissions: ['all'],
+          role_description: 'Administrador del sistema'
+        }
+        break
+    }
+
     // Devolver información del usuario (sin la contraseña)
     res.json({
       id: user.id,
@@ -180,8 +296,11 @@ router.get('/me', async (req, res) => {
       nombre: user.nombre,
       apellido: user.apellido,
       tipo_usuario: user.tipo_usuario,
+      user_type: userTypeDisplay,
+      user_role: userRole,
       activo: user.activo,
-      created_at: user.created_at
+      created_at: user.created_at,
+      ...additionalInfo
     })
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
@@ -198,7 +317,20 @@ router.get('/me', async (req, res) => {
 // POST /auth/create-user - Crear usuario con hash automático (para administradores)
 router.post('/create-user', async (req, res) => {
   try {
-    const { email, password, nombre, apellido, tipo_usuario } = req.body
+    const { 
+      email, 
+      password, 
+      nombre, 
+      apellido, 
+      tipo_usuario,
+      // Campos opcionales para profesores
+      codigo_profesor,
+      departamento,
+      // Campos opcionales para estudiantes
+      codigo_estudiante,
+      carrera_id,
+      semestre
+    } = req.body
     
     // Validación básica
     if (!email || !password || !nombre || !apellido || !tipo_usuario) {
@@ -214,13 +346,20 @@ router.post('/create-user', async (req, res) => {
     // Hash automático de la contraseña
     const hashedPassword = await bcrypt.hash(password, 10)
     
-    // Crear usuario
-    const user = await SupabaseDB.createUser({
+    // Crear usuario con inserción automática en tabla específica
+    const user = await SupabaseDB.createUserWithType({
       email,
       password: hashedPassword,
       nombre,
       apellido,
-      tipo_usuario
+      tipo_usuario,
+      // Campos para profesores
+      codigo_profesor,
+      departamento,
+      // Campos para estudiantes
+      codigo_estudiante,
+      carrera_id,
+      semestre
     })
     
     res.status(201).json({

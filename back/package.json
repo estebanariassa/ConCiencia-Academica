@@ -15,8 +15,16 @@
     "fix-passwords": "ts-node src/fix-passwords.ts",
     "fix-password": "ts-node src/fix-user-password.ts",
     "auto-fix-passwords": "ts-node src/auto-fix-passwords.ts",
+    "test-user-types": "ts-node src/test-user-types-login.ts",
+    "test-complete-login": "ts-node src/test-complete-login-flow.ts",
+    "test-dashboard-routing": "ts-node src/test-dashboard-routing.ts",
+    "debug-teachers": "ts-node src/debug-teachers.ts",
+    "test-teachers-endpoint": "ts-node src/test-teachers-endpoint.ts",
     "check-db": "ts-node src/check-database.ts",
-    "investigate": "ts-node src/investigate-users.ts"
+    "investigate": "ts-node src/investigate-users.ts",
+    "debug-passwords": "ts-node src/debug-passwords.ts",
+    "test-users": "ts-node src/test-user-creation.ts",
+    "test-endpoints": "ts-node src/test-endpoints.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

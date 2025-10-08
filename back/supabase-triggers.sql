@@ -83,6 +83,51 @@ $$ LANGUAGE plpgsql;
 --    y el usuario podrá hacer login inmediatamente.
 --
 -- =====================================================
+-- ACTUALIZACIÓN DE RESTRICCIÓN DE TIPO_USUARIO
+-- =====================================================
+-- Actualizar la restricción para permitir 'docente' además de 'profesor'
+
+-- Eliminar la restricción existente
+ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_tipo_usuario_check;
+
+-- Crear la nueva restricción que incluye 'docente'
+ALTER TABLE usuarios ADD CONSTRAINT usuarios_tipo_usuario_check 
+CHECK (tipo_usuario IN ('estudiante', 'profesor', 'docente', 'coordinador', 'admin'));
+
+-- =====================================================
+-- TRIGGERS PARA INSERCIÓN AUTOMÁTICA EN TABLAS ESPECÍFICAS
+-- =====================================================
+-- Estos triggers insertan automáticamente registros en las tablas
+-- 'profesores' o 'estudiantes' cuando se crea un usuario con el tipo correspondiente.
+
+-- 6. Función para insertar en tabla específica según tipo de usuario
+CREATE OR REPLACE FUNCTION insert_user_type_record()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Insertar en tabla de profesores si el tipo es 'profesor' o 'docente'
+  IF NEW.tipo_usuario = 'profesor' OR NEW.tipo_usuario = 'docente' THEN
+    INSERT INTO profesores (usuario_id, activo)
+    VALUES (NEW.id, true);
+  END IF;
+  
+  -- Insertar en tabla de estudiantes si el tipo es 'estudiante'
+  IF NEW.tipo_usuario = 'estudiante' THEN
+    INSERT INTO estudiantes (usuario_id, activo)
+    VALUES (NEW.id, true);
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 7. Crear trigger para inserción automática en tablas específicas
+DROP TRIGGER IF EXISTS trigger_insert_user_type ON usuarios;
+CREATE TRIGGER trigger_insert_user_type
+  AFTER INSERT ON usuarios
+  FOR EACH ROW
+  EXECUTE FUNCTION insert_user_type_record();
+
+-- =====================================================
 -- VERIFICACIÓN
 -- =====================================================
 -- 
@@ -92,5 +137,9 @@ $$ LANGUAGE plpgsql;
 -- Deberías ver:
 -- - password: algo como '$2b$10$...' (hasheada)
 -- - activo: true
+--
+-- Para verificar inserción en tabla específica:
+-- SELECT * FROM profesores WHERE usuario_id = (SELECT id FROM usuarios WHERE email = 'profesor@example.com');
+-- SELECT * FROM estudiantes WHERE usuario_id = (SELECT id FROM usuarios WHERE email = 'estudiante@example.com');
 --
 -- =====================================================

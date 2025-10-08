@@ -330,6 +330,95 @@ export class SupabaseDB {
     if (error) throw error
     return data
   }
+
+  // Crear profesor
+  static async createProfessor(professorData: {
+    usuario_id: string
+    codigo?: string
+    departamento?: string
+    activo?: boolean
+  }) {
+    const { data, error } = await supabaseAdmin
+      .from('profesores')
+      .insert([{
+        usuario_id: professorData.usuario_id,
+        codigo: professorData.codigo || null,
+        departamento: professorData.departamento || null,
+        activo: professorData.activo !== undefined ? professorData.activo : true
+      }])
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  }
+
+  // Crear estudiante
+  static async createStudent(studentData: {
+    usuario_id: string
+    codigo?: string
+    carrera_id?: number
+    semestre?: string
+    activo?: boolean
+  }) {
+    const { data, error } = await supabaseAdmin
+      .from('estudiantes')
+      .insert([{
+        usuario_id: studentData.usuario_id,
+        codigo: studentData.codigo || null,
+        carrera_id: studentData.carrera_id || null,
+        semestre: studentData.semestre || null,
+        activo: studentData.activo !== undefined ? studentData.activo : true
+      }])
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  }
+
+  // Crear usuario con inserción automática en tabla específica
+  static async createUserWithType(userData: {
+    email: string
+    password: string
+    nombre: string
+    apellido: string
+    tipo_usuario: string
+    // Campos adicionales para profesores
+    codigo_profesor?: string
+    departamento?: string
+    // Campos adicionales para estudiantes
+    codigo_estudiante?: string
+    carrera_id?: number
+    semestre?: string
+  }) {
+    // Crear usuario primero
+    const user = await this.createUser({
+      email: userData.email,
+      password: userData.password,
+      nombre: userData.nombre,
+      apellido: userData.apellido,
+      tipo_usuario: userData.tipo_usuario
+    })
+
+    // Insertar en tabla específica según el tipo
+    if (userData.tipo_usuario === 'profesor' || userData.tipo_usuario === 'docente') {
+      await this.createProfessor({
+        usuario_id: user.id,
+        codigo: userData.codigo_profesor,
+        departamento: userData.departamento
+      })
+    } else if (userData.tipo_usuario === 'estudiante') {
+      await this.createStudent({
+        usuario_id: user.id,
+        codigo: userData.codigo_estudiante,
+        carrera_id: userData.carrera_id,
+        semestre: userData.semestre
+      })
+    }
+
+    return user
+  }
 }
 
 export default SupabaseDB
