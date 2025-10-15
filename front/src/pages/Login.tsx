@@ -12,7 +12,8 @@ import {
   FaChevronDown,
   FaEnvelope,
   FaLock,
-  FaExclamationCircle
+  FaExclamationCircle,
+  FaUserCheck
 } from 'react-icons/fa'
 
 // Importación corregida usando new URL()
@@ -27,8 +28,12 @@ export default function Login() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [emailError, setEmailError] = useState('')
   const [error, setError] = useState('')
+  const [availableRoles, setAvailableRoles] = useState<string[]>([])
+  const [selectedRole, setSelectedRole] = useState<string>('')
+  const [showRoleSelection, setShowRoleSelection] = useState(false)
+  const [userInfo, setUserInfo] = useState<any>(null)
   const navigate = useNavigate()
-  const { login, getDashboardPath } = useAuth()
+  const { login, loginWithRole, getDashboardPath } = useAuth()
 
   // Función para validar correo electrónico
   const validateEmail = (email: string) => {
@@ -74,15 +79,52 @@ export default function Login() {
     setError('')
 
     try {
-      // Usar el AuthContext para mantener la sincronización
-      // Pasar el tipo de usuario seleccionado para verificación
-      await login(email, password, userType)
+      // Si estamos en modo selección de rol, hacer login con el rol seleccionado
+      if (showRoleSelection && selectedRole) {
+        await loginWithRole(email, password, selectedRole)
+        const dashboardPath = getDashboardPath()
+        navigate(dashboardPath)
+        return
+      }
+
+      // Intentar login normal
+      const response = await login(email, password, userType)
+      
+      // Si la respuesta indica que se requiere selección de rol
+      if (response && 'requires_role_selection' in response && response.requires_role_selection) {
+        const authResponse = response as any // Type assertion para acceder a las propiedades
+        setUserInfo({ name: `${authResponse.user.nombre} ${authResponse.user.apellido}` })
+        setAvailableRoles(authResponse.available_roles || [])
+        setShowRoleSelection(true)
+        setError('')
+        setIsLoading(false)
+        return
+      }
       
       // Redireccionar al dashboard correcto según el tipo de usuario
       const dashboardPath = getDashboardPath()
       navigate(dashboardPath)
     } catch (error: any) {
       console.error('Error en login:', error)
+      
+      // Si el error indica que el usuario tiene múltiples roles, mostrar selección
+      if (error.message && error.message.includes('múltiples roles')) {
+        // Extraer información del usuario y roles disponibles del mensaje de error
+        const userMatch = error.message.match(/usuario: (.+?), roles: \[(.+?)\]/)
+        if (userMatch) {
+          const userName = userMatch[1]
+          const rolesString = userMatch[2]
+          const roles = rolesString.split(',').map((role: string) => role.trim().replace(/['"]/g, ''))
+          
+          setUserInfo({ name: userName })
+          setAvailableRoles(roles)
+          setShowRoleSelection(true)
+          setError('')
+          setIsLoading(false)
+          return
+        }
+      }
+      
       setError(error.response?.data?.error || error.message || 'Error en la autenticación')
     } finally {
       setIsLoading(false)
@@ -113,6 +155,50 @@ export default function Login() {
       default:
         return <FaGraduationCap className={size} />
     }
+  }
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'estudiante':
+        return 'Estudiante'
+      case 'profesor':
+      case 'docente':
+        return 'Docente'
+      case 'coordinador':
+        return 'Coordinador'
+      case 'admin':
+        return 'Administrador'
+      default:
+        return role
+    }
+  }
+
+  const getRoleIcon = (role: string, size = "h-4 w-4") => {
+    switch (role) {
+      case 'estudiante':
+        return <FaGraduationCap className={size} />
+      case 'profesor':
+      case 'docente':
+        return <FaChalkboardTeacher className={size} />
+      case 'coordinador':
+        return <FaCog className={size} />
+      case 'admin':
+        return <FaUserCheck className={size} />
+      default:
+        return <FaUserCheck className={size} />
+    }
+  }
+
+  const handleRoleSelection = (role: string) => {
+    setSelectedRole(role)
+  }
+
+  const handleBackToLogin = () => {
+    setShowRoleSelection(false)
+    setAvailableRoles([])
+    setSelectedRole('')
+    setUserInfo(null)
+    setError('')
   }
 
   return (
@@ -159,11 +245,14 @@ export default function Login() {
             {/* Tipo de Usuario - Dropdown */}
             <div>
               <h2 className="text-base font-medium text-gray-700 mb-3">Tipo de Usuario</h2>
-              <div className="relative">
+              <div className="relative z-10">
                 <button
                   type="button"
                   className="flex items-center justify-between w-full p-3 border border-gray-300 rounded-lg bg-white hover:border-red-500 transition-colors text-base"
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  onClick={() => {
+                    console.log('🔽 Dropdown clicked, current state:', isDropdownOpen);
+                    setIsDropdownOpen(!isDropdownOpen);
+                  }}
                 >
                   <div className="flex items-center">
                     <span className="mr-2 text-red-600">{getUserTypeIcon(userType, "h-4 w-4")}</span>
@@ -179,7 +268,7 @@ export default function Login() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2 }}
-                      className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10"
+                      className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50"
                     >
                       {(['student', 'teacher', 'coordinator'] as UserType[]).map((type) => (
                         <div
@@ -188,6 +277,7 @@ export default function Login() {
                             userType === type ? 'bg-gray-100' : ''
                           }`}
                           onClick={() => {
+                            console.log('👤 User type selected:', type);
                             setUserType(type)
                             setIsDropdownOpen(false)
                           }}
@@ -305,6 +395,85 @@ export default function Login() {
             <p className="text-xs text-gray-600">Universidad de Medellín - ConCiencia Academica</p>
           </div>
         </Card>
+
+        {/* Modal de Selección de Rol */}
+        <AnimatePresence>
+          {showRoleSelection && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white rounded-lg shadow-xl max-w-md w-full p-6"
+              >
+                <div className="text-center mb-6">
+                  <div className="flex justify-center mb-3">
+                    <FaUserCheck className="h-12 w-12 text-red-600" />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-800">Selecciona tu Rol</h2>
+                  <p className="text-gray-600 mt-2">
+                    Hola <span className="font-semibold">{userInfo?.name}</span>, 
+                    tienes múltiples roles disponibles. Selecciona con cuál deseas iniciar sesión:
+                  </p>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  {availableRoles.map((role) => (
+                    <button
+                      key={role}
+                      onClick={() => handleRoleSelection(role)}
+                      className={`w-full p-4 border rounded-lg text-left transition-colors ${
+                        selectedRole === role
+                          ? 'border-red-500 bg-red-50 text-red-700'
+                          : 'border-gray-300 hover:border-red-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center">
+                        <span className="mr-3 text-red-600">
+                          {getRoleIcon(role, "h-5 w-5")}
+                        </span>
+                        <div>
+                          <div className="font-medium">{getRoleLabel(role)}</div>
+                          <div className="text-sm text-gray-500">
+                            {role === 'profesor' || role === 'docente' 
+                              ? 'Acceso al dashboard de docentes'
+                              : role === 'coordinador'
+                              ? 'Acceso al dashboard de coordinadores'
+                              : role === 'estudiante'
+                              ? 'Acceso al dashboard de estudiantes'
+                              : 'Acceso administrativo'
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex space-x-3">
+                  <Button
+                    onClick={handleBackToLogin}
+                    className="flex-1 py-2 bg-gray-500 hover:bg-gray-600 text-white"
+                  >
+                    Volver
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!selectedRole || isLoading}
+                    className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {isLoading ? 'Iniciando...' : 'Continuar'}
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   )

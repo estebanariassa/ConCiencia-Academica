@@ -12,11 +12,13 @@ interface User {
   dashboard?: string
   permissions?: string[]
   role_description?: string
+  roles?: string[] // Roles múltiples
 }
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string, expectedUserType?: string) => Promise<void>
+  login: (email: string, password: string, expectedUserType?: string) => Promise<AuthResponse | void>
+  loginWithRole: (email: string, password: string, selectedRole: string) => Promise<void>
   register: (data: {
     email: string
     nombre: string
@@ -28,6 +30,8 @@ interface AuthContextType {
   loading: boolean
   isAuthenticated: boolean
   getDashboardPath: () => string
+  hasRole: (role: string) => boolean
+  hasPermission: (permission: string) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -57,29 +61,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(false)
   }, [])
 
-  const login = async (email: string, password: string, expectedUserType?: string) => {
+  const login = async (email: string, password: string, expectedUserType?: string): Promise<AuthResponse | void> => {
     try {
       const response: AuthResponse = await authApi.login({ email, password })
       
-      // Verificar que el tipo de usuario coincida con el esperado
+      // Verificar que el usuario tiene el rol apropiado (si se especifica)
       if (expectedUserType) {
-        const userTypeMapping: { [key: string]: string } = {
-          'student': 'estudiante',
-          'teacher': 'profesor',
-          'coordinator': 'coordinador',
-          'admin': 'admin'
+        const actualUserType = response.user.tipo_usuario
+        const userRoles = response.user.roles || []
+        
+        // Mapear tipos de frontend a backend
+        const typeMapping: { [key: string]: string[] } = {
+          'student': ['estudiante'],
+          'teacher': ['profesor', 'docente'],
+          'coordinator': ['coordinador'],
+          'admin': ['admin']
         }
         
-        const expectedBackendType = userTypeMapping[expectedUserType]
-        const actualUserType = response.user.tipo_usuario
+        const expectedRoles = typeMapping[expectedUserType] || []
+        const hasExpectedRole = expectedRoles.some(role => 
+          role === actualUserType || userRoles.includes(role)
+        )
         
-        // Verificar si el tipo coincide (incluyendo normalización de 'docente' a 'profesor')
-        const normalizedActualType = actualUserType === 'docente' ? 'profesor' : actualUserType
-        
-        if (expectedBackendType !== normalizedActualType) {
-          throw new Error(`El tipo de usuario seleccionado (${expectedUserType}) no coincide con el tipo de usuario en el sistema (${actualUserType})`)
+        if (!hasExpectedRole) {
+          throw new Error(`El tipo de usuario seleccionado (${expectedUserType}) no coincide con los roles del usuario en el sistema (${actualUserType}, roles: ${userRoles.join(', ')})`)
         }
       }
+      
+      // Si la respuesta indica que se requiere selección de rol, devolver la respuesta
+      if (response.requires_role_selection) {
+        return response
+      }
+      
+      // Guardar token y usuario (incluye coordinador.carrera_id si viene)
+      localStorage.setItem('token', response.token)
+      localStorage.setItem('user', JSON.stringify(response.user))
+      
+      setUser(response.user)
+      return response
+    } catch (error) {
+      console.error('Error en login:', error)
+      throw error
+    }
+  }
+
+  const loginWithRole = async (email: string, password: string, selectedRole: string) => {
+    try {
+      const response: AuthResponse = await authApi.loginWithRole({ email, password, selectedRole })
       
       // Guardar token y usuario
       localStorage.setItem('token', response.token)
@@ -87,7 +115,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       setUser(response.user)
     } catch (error) {
-      console.error('Error en login:', error)
+      console.error('Error en login con rol:', error)
       throw error
     }
   }
@@ -114,19 +142,55 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }
 
   const logout = () => {
-    authApi.logout()
-    setUser(null)
+    try {
+      // Limpiar storage primero para evitar estados inconsistentes del avatar
+      authApi.logout()
+    } finally {
+      setUser(null)
+      // Forzar navegación al login
+      try {
+        window.location.href = '/login'
+      } catch {}
+    }
   }
 
   const getDashboardPath = () => {
     if (!user) return '/login'
     
+    console.log('🔍 Debug getDashboardPath:', {
+      user: user,
+      dashboard: user.dashboard,
+      roles: user.roles,
+      tipo_usuario: user.tipo_usuario
+    })
+    
     // Usar el dashboard del backend si está disponible
     if (user.dashboard) {
+      console.log('📍 Usando dashboard del backend:', user.dashboard)
       return user.dashboard
     }
     
-    // Fallback basado en el tipo de usuario
+    // Si tiene roles múltiples, usar el de mayor prioridad
+    if (user.roles && user.roles.length > 0) {
+      console.log('🎭 Usando roles múltiples:', user.roles)
+      const rolePriority = ['admin', 'coordinador', 'profesor', 'docente', 'estudiante']
+      for (const role of rolePriority) {
+        if (user.roles.includes(role)) {
+          const userTypeMapping: { [key: string]: string } = {
+            'estudiante': '/dashboard-estudiante',
+            'profesor': '/dashboard-profesor',
+            'docente': '/dashboard-profesor',
+            'coordinador': '/dashboard-coordinador',
+            'admin': '/dashboard-admin'
+          }
+          const path = userTypeMapping[role] || '/dashboard'
+          console.log('📍 Dashboard por rol:', role, '->', path)
+          return path
+        }
+      }
+    }
+    
+    // Fallback basado en el tipo de usuario principal
     const userTypeMapping: { [key: string]: string } = {
       'estudiante': '/dashboard-estudiante',
       'profesor': '/dashboard-profesor',
@@ -135,17 +199,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       'admin': '/dashboard-admin'
     }
     
-    return userTypeMapping[user.tipo_usuario] || '/dashboard'
+    const path = userTypeMapping[user.tipo_usuario] || '/dashboard'
+    console.log('📍 Dashboard por tipo_usuario:', user.tipo_usuario, '->', path)
+    return path
+  }
+
+  // Función para verificar si el usuario tiene un rol específico
+  const hasRole = (role: string): boolean => {
+    if (!user) return false
+    return user.roles?.includes(role) || user.tipo_usuario === role
+  }
+
+  // Función para verificar si el usuario tiene un permiso específico
+  const hasPermission = (permission: string): boolean => {
+    if (!user) return false
+    return user.permissions?.includes('all') || user.permissions?.includes(permission) || false
   }
 
   const value: AuthContextType = {
     user,
     login,
+    loginWithRole,
     register,
     logout,
     loading,
     isAuthenticated: !!user,
-    getDashboardPath
+    getDashboardPath,
+    hasRole,
+    hasPermission
   }
 
   return (

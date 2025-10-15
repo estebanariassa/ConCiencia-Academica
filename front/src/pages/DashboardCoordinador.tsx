@@ -12,36 +12,21 @@ import Badge from '../components/Badge';
 import Header from '../components/Header';
 import { User } from '../types';
 import { 
-  Settings, 
   Calendar as CalendarIcon, 
-  ClipboardCheck, 
   Bell, 
-  Star,
   BookOpen,
   Clock,
-  TrendingUp,
   Users,
   Mail,
-  Phone,
-  MapPin,
   BarChart3,
-  UserCog,
-  AlertCircle,
   User as UserIcon,
   Award,
   Target,
-  MessageSquare,
-  FileText,
-  Eye,
-  Shield,
-  CheckCircle,
-  XCircle,
-  Building,
   GraduationCap,
-  PieChart,
-  Activity
+  TrendingUp
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchProfessorsByCareer, fetchCareers } from '../api/teachers';
 
 // Importar el componente Calendar externo
 import Calendar from '../components/Calendar';
@@ -81,6 +66,13 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
   const navigate = useNavigate();
   const [showCalendar, setShowCalendar] = useState(false);
   
+  // Estados para coordinadores
+  const [careers, setCareers] = useState<any[]>([]);
+  const [selectedCareer, setSelectedCareer] = useState<string>('');
+  const [professorsByCareer, setProfessorsByCareer] = useState<any[]>([]);
+  const [loadingCareers, setLoadingCareers] = useState(false);
+  const [loadingProfessors, setLoadingProfessors] = useState(false);
+  
   // Cargar user desde backend/localStorage si existe
   const storedUser = ((): User | null => {
     try {
@@ -92,31 +84,14 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
         name: `${parsed.nombre} ${parsed.apellido}`.trim(),
         type: (parsed.tipo_usuario as any) ?? 'coordinator',
         email: parsed.email,
+        roles: parsed.roles || []
       } as User;
     } catch {
       return null;
     }
   })();
-  
-  const handleViewReports = () => {
-    navigate('/reports');
-  };
 
-  const handleManageTeachers = () => {
-    navigate('/teachers');
-  };
-
-  const handleManageStudents = () => {
-    navigate('/students');
-  };
-
-  const handleViewEvaluations = () => {
-    navigate('/evaluations');
-  };
-
-  const toggleCalendar = () => {
-    setShowCalendar(!showCalendar);
-  };
+  const currentUser = user ?? storedUser ?? { id: '', name: 'Coordinador', type: 'coordinator', email: '', roles: [] };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -125,124 +100,148 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
     return '¡Buenas noches';
   };
 
-  const currentUser = user ?? storedUser ?? { id: '', name: 'Coordinador', type: 'coordinator', email: '' };
+  // Cargar carreras y seleccionar por defecto la carrera del coordinador (si existe)
+  useEffect(() => {
+    const loadCareers = async () => {
+      try {
+        setLoadingCareers(true);
+        const careersData = await fetchCareers();
+        setCareers(careersData);
+
+        // Intentar leer carrera_id del usuario almacenado
+        let coordinatorCareerId: string | null = null
+        try {
+          const raw = localStorage.getItem('user')
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            coordinatorCareerId = String(
+              parsed?.carrera_id ?? parsed?.coordinador?.carrera_id ?? parsed?.profesor?.carrera_id ?? ''
+            ) || null
+          }
+        } catch {}
+
+        if (coordinatorCareerId && careersData.some((c: any) => String(c.id) === coordinatorCareerId)) {
+          setSelectedCareer(coordinatorCareerId)
+        } else if (careersData.length > 0) {
+          setSelectedCareer(careersData[0].id.toString());
+        }
+      } catch (error) {
+        console.error('Error loading careers:', error);
+      } finally {
+        setLoadingCareers(false);
+      }
+    };
+
+    loadCareers();
+  }, []);
+
+  // Cargar profesores cuando se selecciona una carrera
+  useEffect(() => {
+    const loadProfessors = async () => {
+      if (!selectedCareer) return;
+      
+      try {
+        setLoadingProfessors(true);
+        const professorsData = await fetchProfessorsByCareer(selectedCareer);
+
+        // Helper para obtener carrera_id de múltiples formas
+        const getCareerId = (c: any) => {
+          if (!c) return undefined;
+          return (
+            c.carrera_id ??
+            c.carreraId ??
+            c.career_id ??
+            c.careerId ??
+            c.carrera?.id ??
+            c.career?.id
+          );
+        };
+
+        // Filtrar cursos por carrera seleccionada, pero NO ocultar profesores sin cursos
+        const normalized = (Array.isArray(professorsData) ? professorsData : []).map((p: any) => {
+          const cursos = Array.isArray(p.cursos) ? p.cursos.filter((c: any) => String(getCareerId(c)) === String(selectedCareer)) : [];
+          return { ...p, cursos };
+        });
+
+        setProfessorsByCareer(normalized);
+      } catch (error) {
+        console.error('Error loading professors:', error);
+      } finally {
+        setLoadingProfessors(false);
+      }
+    };
+
+    loadProfessors();
+  }, [selectedCareer]);
 
   // Datos específicos para coordinadores
   const coordinadorData = {
     stats: {
-      totalTeachers: 24,
-      evaluationsCompleted: 180,
-      averageRating: 4.5,
-      pendingApprovals: 3,
-      totalStudents: 450,
-      activeCourses: 12,
-      departments: 3
+      totalCarreras: careers.length,
+      totalProfesores: professorsByCareer.length,
+      totalCursos: professorsByCareer.reduce((acc, prof) => acc + prof.cursos.length, 0),
+      promedioEvaluaciones: 4.2 // TODO: Calcular desde la base de datos
     },
-    departmentStats: [
-      { 
-        id: 1, 
-        name: 'Matemáticas', 
-        teachers: 8, 
-        students: 150, 
-        averageRating: 4.6,
-        evaluations: 60,
-        status: 'active'
-      },
-      { 
-        id: 2, 
-        name: 'Física', 
-        teachers: 6, 
-        students: 120, 
-        averageRating: 4.4,
-        evaluations: 45,
-        status: 'active'
-      },
-      { 
-        id: 3, 
-        name: 'Química', 
-        teachers: 10, 
-        students: 180, 
-        averageRating: 4.5,
-        evaluations: 75,
-        status: 'active'
-      }
-    ],
-    pendingApprovals: [
-      { 
-        id: 1, 
-        teacher: 'Dr. Juan Pérez', 
-        course: 'Matemáticas Avanzadas', 
-        type: 'new_course',
-        submitted: '2025-01-20',
-        urgent: true
-      },
-      { 
-        id: 2, 
-        teacher: 'Dra. Ana Martín', 
-        course: 'Física Experimental', 
-        type: 'evaluation_review',
-        submitted: '2025-01-22',
-        urgent: false
-      },
-      { 
-        id: 3, 
-        teacher: 'Prof. Carlos López', 
-        course: 'Química Orgánica', 
-        type: 'curriculum_update',
-        submitted: '2025-01-23',
-        urgent: false
-      }
-    ],
-    notifications: [
-      { id: 1, text: 'Reporte de evaluaciones del departamento de Matemáticas listo', time: '2 horas', urgent: false },
-      { id: 2, text: '3 profesores requieren revisión de evaluaciones', time: '1 día', urgent: true },
-      { id: 3, text: 'Reunión de coordinación el próximo lunes', time: '3 días', urgent: false },
-      { id: 4, text: 'Nuevo profesor asignado al departamento de Física', time: '5 días', urgent: false },
-      { id: 5, text: 'Evaluaciones del semestre 2025-1 completadas al 85%', time: '1 semana', urgent: false }
-    ],
     quickActions: [
-        {
-          icon: Users,
-          label: 'Gestión de Profesores',
-          description: 'Administrar docentes',
-          onClick: handleManageTeachers,
-          variant: 'default' as const,
-          className: 'bg-red-600 hover:bg-red-700 text-white'
+      {
+        icon: Users,
+        label: 'Gestionar Profesores',
+        description: 'Ver y administrar profesores',
+        onClick: () => {
+          const fallbackCareer = (careers && careers.length > 0) ? String(careers[0].id) : ''
+          const cid = selectedCareer || fallbackCareer
+          navigate(`/profesores/gestionar?careerId=${cid}`)
         },
-        {
-          icon: BarChart3,
-          label: 'Reportes Generales',
-          description: 'Ver reportes del departamento',
-          onClick: handleViewReports,
-          variant: 'outline' as const,
-          className: 'border-red-300 text-red-600 hover:bg-red-50'
-        },
-        {
-          icon: GraduationCap,
-          label: 'Gestión de Estudiantes',
-          description: 'Administrar estudiantes',
-          onClick: handleManageStudents,
-          variant: 'outline' as const,
-          className: 'border-red-300 text-red-600 hover:bg-red-50'
-        },
-        {
-          icon: Eye,
-          label: 'Ver Evaluaciones',
-          description: 'Revisar evaluaciones',
-          onClick: handleViewEvaluations,
-          variant: 'outline' as const,
-          className: 'border-red-300 text-red-600 hover:bg-red-50'
-        },
+        variant: 'default' as const,
+        className: 'bg-red-600 hover:bg-red-700 text-white'
+      },
+      {
+        icon: BookOpen,
+        label: 'Programar Encuestas',
+        description: 'Definir período y fechas para encuestas',
+        onClick: () => navigate('/surveys/schedule'),
+        variant: 'outline' as const,
+        className: 'border-red-300 text-red-600 hover:bg-red-50'
+      },
+      {
+        icon: BarChart3,
+        label: 'Reportes Generales',
+        description: 'Ver estadísticas de la facultad',
+        onClick: () => navigate('/reports'),
+        variant: 'outline' as const,
+        className: 'border-red-300 text-red-600 hover:bg-red-50'
+      },
       {
         icon: CalendarIcon,
         label: 'Calendario',
         description: 'Fechas importantes',
-        onClick: toggleCalendar,
+        onClick: () => setShowCalendar(true),
         variant: 'outline' as const,
         className: 'border-gray-300'
       }
+    ],
+    notifications: [
+      { id: 1, text: 'Nueva evaluación disponible para revisión', time: '2 horas', urgent: false },
+      { id: 2, text: 'Recordatorio: Reunión de coordinadores mañana', time: '1 día', urgent: true },
+      { id: 3, text: 'Reporte mensual de evaluaciones listo', time: '3 días', urgent: false },
+      { id: 4, text: 'Solicitud de nuevo curso pendiente de aprobación', time: '5 días', urgent: false }
+    ],
+    upcomingDeadlines: [
+      { id: 1, task: 'Revisión de evaluaciones del período', deadline: '2025-01-25', urgent: true },
+      { id: 2, task: 'Reporte de rendimiento académico', deadline: '2025-01-28', urgent: false },
+      { id: 3, task: 'Planificación del próximo semestre', deadline: '2025-02-01', urgent: false }
     ]
   };
+
+  // Datos quemados para gráfica de tendencia de evaluaciones (promedio mensual)
+  const evaluationTrendData: { mes: string; valor: number }[] = [
+    { mes: 'Ene', valor: 4.1 },
+    { mes: 'Feb', valor: 4.3 },
+    { mes: 'Mar', valor: 4.0 },
+    { mes: 'Abr', valor: 4.2 },
+    { mes: 'May', valor: 4.4 },
+    { mes: 'Jun', valor: 4.3 }
+  ];
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -283,7 +282,7 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                   {getGreeting()}, Coord. {currentUser.name.split(' ')[0]}!
                 </h2>
                 <p className="text-lg text-gray-600">
-                  Panel de coordinación académica. Gestiona profesores, estudiantes y evaluaciones del departamento.
+                  Bienvenido a tu panel de control como coordinador. Aquí puedes supervisar los profesores de tu carrera y gestionar la actividad académica.
                 </p>
               </CardContent>
             </Card>
@@ -291,7 +290,7 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
 
           {/* Stats Cards - Específicas para coordinadores */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Total de Profesores */}
+            {/* Total Carreras */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -301,22 +300,22 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
               <Card className="bg-white shadow-md border border-gray-200 p-6">
                 <CardHeader className="flex flex-row items-center justify-between pb-4">
                   <CardTitle className="text-lg font-medium text-gray-900 text-left">
-                    Total de Profesores
+                    Encuestas Activas
                   </CardTitle>
-                  <Users className="h-6 w-6 text-blue-600 ml-4" />
+                  <GraduationCap className="h-6 w-6 text-blue-600 ml-4" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-blue-600">
-                    {coordinadorData.stats.totalTeachers}
+                    {coordinadorData.stats.totalCarreras}
                   </div>
                   <p className="text-sm text-gray-500 mt-2 text-left">
-                    En el departamento
+                    Carreras disponibles
                   </p>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* Evaluaciones Completadas */}
+            {/* Total Profesores */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -326,22 +325,22 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
               <Card className="bg-white shadow-md border border-gray-200 p-6">
                 <CardHeader className="flex flex-row items-center justify-between pb-4">
                   <CardTitle className="text-lg font-medium text-gray-900 text-left">
-                    Evaluaciones Completadas
+                    Total Profesores
                   </CardTitle>
-                  <ClipboardCheck className="h-6 w-6 text-green-600 ml-4" />
+                  <Users className="h-6 w-6 text-green-600 ml-4" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-green-600">
-                    {coordinadorData.stats.evaluationsCompleted}
+                    {coordinadorData.stats.totalProfesores}
                   </div>
                   <p className="text-sm text-gray-500 mt-2 text-left">
-                    En el sistema
+                    Profesores en la carrera seleccionada
                   </p>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* Calificación Promedio */}
+            {/* Total Cursos */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -351,22 +350,22 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
               <Card className="bg-white shadow-md border border-gray-200 p-6">
                 <CardHeader className="flex flex-row items-center justify-between pb-4">
                   <CardTitle className="text-lg font-medium text-gray-900 text-left">
-                    Calificación Promedio
+                    Cursos Activos
                   </CardTitle>
-                  <Star className="h-6 w-6 text-yellow-600 ml-4" />
+                  <BookOpen className="h-6 w-6 text-purple-600 ml-4" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-yellow-600">
-                    {coordinadorData.stats.averageRating}/5.0
+                  <div className="text-3xl font-bold text-purple-600">
+                    {coordinadorData.stats.totalCursos}
                   </div>
                   <p className="text-sm text-gray-500 mt-2 text-left">
-                    Departamento
+                    Cursos en la carrera seleccionada
                   </p>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* Aprobaciones Pendientes */}
+            {/* Promedio Evaluaciones */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
@@ -376,17 +375,30 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
               <Card className="bg-white shadow-md border border-gray-200 p-6">
                 <CardHeader className="flex flex-row items-center justify-between pb-4">
                   <CardTitle className="text-lg font-medium text-gray-900 text-left">
-                    Aprobaciones Pendientes
+                    Promedio Evaluaciones
                   </CardTitle>
-                  <AlertCircle className="h-6 w-6 text-orange-600 ml-4" />
+                  <TrendingUp className="h-6 w-6 text-yellow-600 ml-4" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-orange-600">
-                    {coordinadorData.stats.pendingApprovals}
+                  <div className="text-3xl font-bold text-yellow-600">
+                    {coordinadorData.stats.promedioEvaluaciones}/5.0
                   </div>
-                  <p className="text-sm text-gray-500 mt-2 text-left">
-                    Por revisar
-                  </p>
+                  <p className="text-sm text-gray-500 mt-2 text-left">Promedio general de la carrera</p>
+                  {/* Mini gráfica con datos quemados */}
+                  <div className="mt-4 space-y-2">
+                    {evaluationTrendData.map((d) => (
+                      <div key={d.mes} className="flex items-center gap-2">
+                        <span className="w-10 text-xs text-gray-600">{d.mes}</span>
+                        <div className="flex-1 h-2 bg-yellow-100 rounded">
+                          <div
+                            className="h-2 bg-yellow-500 rounded"
+                            style={{ width: `${(d.valor / 5) * 100}%` }}
+                          />
+                        </div>
+                        <span className="w-8 text-xs text-gray-700 text-right">{d.valor.toFixed(1)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -404,11 +416,11 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                 <Card className="bg-white shadow-md border border-gray-200 p-6">
                   <CardHeader className="pb-4">
                     <div className="flex items-center gap-2">
-                      <Shield className="h-5 w-5 text-gray-700" />
-                      <CardTitle className="text-2xl text-gray-900">Panel de Coordinación</CardTitle>
+                      <Target className="h-5 w-5 text-gray-700" />
+                      <CardTitle className="text-2xl text-gray-900">Acciones Rápidas</CardTitle>
                     </div>
                     <CardDescription className="text-base">
-                      Herramientas de gestión académica y administrativa
+                      Herramientas para gestionar tu actividad como coordinador
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -437,7 +449,7 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                 </Card>
               </motion.div>
 
-              {/* Estadísticas por Departamento */}
+              {/* Profesores por Carrera */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -446,54 +458,75 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                 <Card className="bg-white shadow-md border border-gray-200 p-6">
                   <CardHeader className="pb-4">
                     <div className="flex items-center gap-2">
-                      <Building className="h-5 w-5 text-gray-700" />
-                      <CardTitle className="text-2xl text-gray-900">Estadísticas por Departamento</CardTitle>
+                      <Users className="h-5 w-5 text-gray-700" />
+                      <CardTitle className="text-2xl text-gray-900">Profesores por Carrera</CardTitle>
                     </div>
                     <CardDescription className="text-base">
-                      Rendimiento y métricas de cada departamento
+                      Gestiona y supervisa los profesores de cada carrera
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {coordinadorData.departmentStats.map((dept, index) => (
-                        <motion.div
-                          key={dept.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.8 + index * 0.1 }}
-                          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                      {/* Selector de carrera */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Seleccionar Carrera:
+                        </label>
+                        <select
+                          value={selectedCareer}
+                          onChange={(e) => setSelectedCareer(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                          disabled={loadingCareers}
                         >
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="font-medium text-lg text-gray-900">{dept.name}</p>
-                              <Badge 
-                                variant="outline" 
-                                className="text-sm py-1 bg-green-50 text-green-700 border-green-200"
+                          {loadingCareers ? (
+                            <option>Cargando carreras...</option>
+                          ) : (
+                            careers.map((career) => (
+                              <option key={career.id} value={career.id}>
+                                {career.nombre}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </div>
+
+                      {/* Lista de profesores */}
+                      <div className="max-h-96 overflow-y-auto">
+                        {loadingProfessors ? (
+                          <div className="text-center py-8 text-gray-500">Cargando profesores...</div>
+                        ) : professorsByCareer.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">No hay profesores en esta carrera</div>
+                        ) : (
+                          <div className="space-y-3">
+                            {professorsByCareer.map((prof: any, index: number) => (
+                              <motion.div
+                                key={prof.usuario_id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.05 * index }}
+                                className="p-4 rounded-lg border cursor-pointer transition-all duration-200 border-gray-200 hover:border-red-300 hover:bg-gray-50"
                               >
-                                Activo
-                              </Badge>
-                            </div>
-                            <div className="grid grid-cols-4 gap-4 text-sm">
-                              <div>
-                                <span className="text-gray-500">Profesores:</span>
-                                <span className="ml-1 font-medium">{dept.teachers}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Estudiantes:</span>
-                                <span className="ml-1 font-medium">{dept.students}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Evaluaciones:</span>
-                                <span className="ml-1 font-medium">{dept.evaluations}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Promedio:</span>
-                                <span className="ml-1 font-medium">{dept.averageRating}/5.0</span>
-                              </div>
-                            </div>
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-1">
+                                    <h3 className="font-medium text-gray-900">{prof.nombre} {prof.apellido}</h3>
+                                    <p className="text-sm text-gray-600">{prof.email}</p>
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      {prof.cursos.map((c: any) => (
+                                        <Badge key={c.id} variant="outline" className="text-xs bg-white">
+                                          {c.codigo || c.nombre}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    {prof.cursos.length} curso{prof.cursos.length !== 1 ? 's' : ''}
+                                  </Badge>
+                                </div>
+                              </motion.div>
+                            ))}
                           </div>
-                        </motion.div>
-                      ))}
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -510,7 +543,7 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                       key={notification.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.9 + index * 0.1 }}
+                      transition={{ delay: 0.8 + index * 0.1 }}
                       className={`p-4 rounded-lg border transition-colors ${
                         notification.urgent 
                           ? 'bg-red-50 border-red-200' 
@@ -524,38 +557,30 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                 </div>
               </SectionCard>
 
-              {/* Aprobaciones Pendientes */}
-              <SectionCard title="Aprobaciones Pendientes" icon={CheckCircle}>
+              {/* Próximas Fechas Límite */}
+              <SectionCard title="Próximas Fechas Límite" icon={Clock}>
                 <div className="space-y-4">
-                  {coordinadorData.pendingApprovals.map((approval, index) => (
+                  {coordinadorData.upcomingDeadlines.map((deadline, index) => (
                     <motion.div
-                      key={approval.id}
+                      key={deadline.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 1.0 + index * 0.1 }}
+                      transition={{ delay: 0.9 + index * 0.1 }}
                       className={`p-4 rounded-lg border transition-colors ${
-                        approval.urgent 
+                        deadline.urgent 
                           ? 'bg-red-50 border-red-200' 
                           : 'bg-gray-50 border-gray-200'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <p className="font-medium text-gray-900">{approval.teacher}</p>
-                        {approval.urgent && (
+                        <p className="font-medium text-gray-900">{deadline.task}</p>
+                        {deadline.urgent && (
                           <Badge variant="outline" className="text-xs bg-red-100 text-red-700 border-red-200">
                             Urgente
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-gray-600 mb-1">{approval.course}</p>
-                      <div className="flex items-center justify-between">
-                        <Badge variant="outline" className="text-xs">
-                          {approval.type === 'new_course' ? 'Nuevo Curso' :
-                           approval.type === 'evaluation_review' ? 'Revisión' :
-                           'Actualización'}
-                        </Badge>
-                        <p className="text-sm text-gray-500">{approval.submitted}</p>
-                      </div>
+                      <p className="text-sm text-gray-500">{deadline.deadline}</p>
                     </motion.div>
                   ))}
                 </div>
@@ -567,7 +592,7 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                   <div className="flex items-center gap-3">
                     <div>
                       <p className="font-medium text-gray-900">{currentUser.name}</p>
-                      <p className="text-sm text-gray-600">Coordinador Académico</p>
+                      <p className="text-sm text-gray-600">Coordinador-Profesor</p>
                     </div>
                   </div>
                   
@@ -577,12 +602,12 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                       <p className="text-sm text-gray-600">{currentUser.email}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Building className="h-4 w-4 text-gray-500" />
+                      <GraduationCap className="h-4 w-4 text-gray-500" />
                       <p className="text-sm text-gray-600">Facultad de Ingeniería</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-gray-500" />
-                      <p className="text-sm text-gray-600">Departamento de Ciencias</p>
+                      <Award className="h-4 w-4 text-gray-500" />
+                      <p className="text-sm text-gray-600">Coordinador Académico</p>
                     </div>
                   </div>
                 </div>
@@ -594,8 +619,34 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
 
       {/* Modal de Calendario */}
       <AnimatePresence>
-        {showCalendar && <Calendar onClose={toggleCalendar} />}
+        {showCalendar && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            onClick={() => setShowCalendar(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Calendario Académico</h3>
+                <Button variant="outline" onClick={() => setShowCalendar(false)}>
+                  Cerrar
+                </Button>
+              </div>
+              <Calendar onClose={() => setShowCalendar(false)} />
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );
 }
+
+

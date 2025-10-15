@@ -7,6 +7,8 @@ import DashboardAdmin from './pages/DashboardAdmin'
 import TeacherSelection from './pages/evaluation/TeacherSelection'
 import EvaluationForm from './pages/evaluation/EvaluationForm'
 import ReportsPage from './pages/Reports/ReportsPage' // Nueva importación
+import ScheduleSurveys from './pages/ScheduleSurveys'
+import ManageProfessors from './pages/ManageProfessors'
 import { User, Teacher, Course } from './types'
 import { useAuth } from './context/AuthContext'
 
@@ -93,6 +95,18 @@ function App() {
           path="/reports" 
           element={
             <ReportsPageWrapper />
+          } 
+        />
+        <Route 
+          path="/surveys/schedule" 
+          element={
+            <ScheduleSurveys />
+          } 
+        />
+        <Route 
+          path="/profesores/gestionar" 
+          element={
+            <ManageProfessors />
           } 
         />
       </Routes>

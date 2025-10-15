@@ -8,7 +8,7 @@ export interface TeachersResponse {
 // Función para obtener profesores con sus cursos
 export async function fetchTeachersWithCourses(): Promise<Teacher[]> {
   try {
-    const response = await apiClient.get<Teacher[]>('/teachers')
+    const response = await apiClient.get<Teacher[]>('/api/teachers')
     return response.data
   } catch (error) {
     console.error('Error fetching teachers:', error)
@@ -20,7 +20,7 @@ export async function fetchTeachersWithCourses(): Promise<Teacher[]> {
 export async function fetchCourseGroups(profesorId: string, courseId: string): Promise<any[]> {
   try {
     console.log('🌐 Making API call to:', `/teachers/${profesorId}/courses/${courseId}/groups`);
-    const response = await apiClient.get(`/teachers/${profesorId}/courses/${courseId}/groups`)
+    const response = await apiClient.get(`/api/teachers/${profesorId}/courses/${courseId}/groups`)
     console.log('🌐 API Response:', response.data);
     return response.data
   } catch (error) {
@@ -37,7 +37,7 @@ export async function fetchCourseGroups(profesorId: string, courseId: string): P
 export async function fetchTeacherStats(profesorId: string): Promise<any> {
   try {
     console.log('🌐 Making API call to:', `/teachers/${profesorId}/stats`);
-    const response = await apiClient.get(`/teachers/${profesorId}/stats`)
+    const response = await apiClient.get(`/api/teachers/${profesorId}/stats`)
     console.log('🌐 Teacher Stats API Response:', response.data);
     return response.data
   } catch (error) {
@@ -54,8 +54,8 @@ export async function fetchTeacherStats(profesorId: string): Promise<any> {
 export async function fetchTeacherHistoricalStats(profesorId: string, period?: string): Promise<any> {
   try {
     const url = period 
-      ? `/teachers/${profesorId}/stats/historical?period=${period}`
-      : `/teachers/${profesorId}/stats/historical`;
+      ? `/api/teachers/${profesorId}/stats/historical?period=${period}`
+      : `/api/teachers/${profesorId}/stats/historical`;
     console.log('🌐 Making API call to:', url);
     const response = await apiClient.get(url)
     console.log('🌐 Teacher Historical Stats API Response:', response.data);
@@ -81,7 +81,7 @@ export async function submitEvaluation(evaluationData: {
 }): Promise<any> {
   try {
     console.log('🌐 Submitting evaluation:', evaluationData);
-    const response = await apiClient.post('/teachers/evaluations', evaluationData)
+    const response = await apiClient.post('/api/teachers/evaluations', evaluationData)
     console.log('🌐 Evaluation submission response:', response.data);
     return response.data
   } catch (error) {
@@ -98,7 +98,7 @@ export async function submitEvaluation(evaluationData: {
 export async function fetchEvaluationQuestions(courseId: string): Promise<any> {
   try {
     console.log('🌐 Fetching evaluation questions for courseId:', courseId);
-    const response = await apiClient.get(`/teachers/evaluation-questions/${courseId}`)
+    const response = await apiClient.get(`/api/teachers/evaluation-questions/${courseId}`)
     console.log('🌐 Evaluation questions response:', response.data);
     return response.data
   } catch (error) {
@@ -115,7 +115,7 @@ export async function fetchEvaluationQuestions(courseId: string): Promise<any> {
 export async function fetchStudentInfo(): Promise<any> {
   try {
     console.log('🌐 Fetching student info');
-    const response = await apiClient.get('/teachers/student-info')
+    const response = await apiClient.get('/api/teachers/student-info')
     console.log('🌐 Student info response:', response.data);
     return response.data
   } catch (error) {
@@ -126,6 +126,28 @@ export async function fetchStudentInfo(): Promise<any> {
       data: (error as any)?.response?.data
     });
     throw new Error('Error al obtener la información del estudiante')
+  }
+}
+
+// Función para obtener profesores por carrera (para coordinadores)
+export async function fetchProfessorsByCareer(careerId: string): Promise<any[]> {
+  try {
+    const response = await apiClient.get(`/api/teachers/by-career/${careerId}`)
+    return response.data
+  } catch (error) {
+    console.error('Error fetching professors by career:', error)
+    throw new Error('Error al cargar los profesores de la carrera')
+  }
+}
+
+// Función para obtener carreras disponibles (para coordinadores)
+export async function fetchCareers(): Promise<any[]> {
+  try {
+    const response = await apiClient.get('/api/teachers/careers')
+    return response.data
+  } catch (error) {
+    console.error('Error fetching careers:', error)
+    throw new Error('Error al cargar las carreras')
   }
 }
 

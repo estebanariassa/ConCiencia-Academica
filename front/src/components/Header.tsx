@@ -28,6 +28,8 @@ export default function Header({
 }: HeaderProps) {
   const navigate = useNavigate();
 
+  console.log('🏠 Header renderizado con user:', user);
+
   const handleLogoClick = () => {
     navigate('/dashboard');
   };

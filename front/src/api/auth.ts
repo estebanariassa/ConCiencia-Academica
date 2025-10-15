@@ -5,6 +5,12 @@ export interface LoginData {
   password: string
 }
 
+export interface LoginWithRoleData {
+  email: string
+  password: string
+  selectedRole: string
+}
+
 export interface RegisterData {
   email: string
   nombre: string
@@ -14,7 +20,7 @@ export interface RegisterData {
 }
 
 export interface AuthResponse {
-  message: string
+  message?: string
   token: string
   user: {
     id: string
@@ -27,17 +33,27 @@ export interface AuthResponse {
     dashboard?: string
     permissions?: string[]
     role_description?: string
+    roles?: string[]
+    selected_role?: string
+    multiple_roles?: boolean
   }
+  available_roles?: string[]
+  requires_role_selection?: boolean
 }
 
 export const authApi = {
   login: async (data: LoginData): Promise<AuthResponse> => {
-    const response = await apiClient.post('/auth/login', data)
+    const response = await apiClient.post('/api/auth/login', data)
+    return response.data
+  },
+
+  loginWithRole: async (data: LoginWithRoleData): Promise<AuthResponse> => {
+    const response = await apiClient.post('/api/auth/login-with-role', data)
     return response.data
   },
 
   register: async (data: RegisterData): Promise<AuthResponse> => {
-    const response = await apiClient.post('/auth/register', data)
+    const response = await apiClient.post('/api/auth/register', data)
     return response.data
   },
 

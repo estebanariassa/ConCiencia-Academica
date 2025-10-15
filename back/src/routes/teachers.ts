@@ -963,4 +963,152 @@ router.get('/test', (req, res) => {
   res.json({ message: 'Teachers endpoint working', timestamp: new Date().toISOString() })
 })
 
+// GET /teachers/by-career/:careerId - Obtener profesores por carrera (para coordinadores)
+router.get('/by-career/:careerId', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    const { careerId } = req.params
+
+    console.log('🔍 [/teachers/by-career] Request received', { userId: user?.id, careerId })
+
+    // Verificar que el usuario sea coordinador
+    if (!user.roles?.includes('coordinador') && user.tipo_usuario !== 'coordinador') {
+      return res.status(403).json({ error: 'Acceso denegado. Solo coordinadores pueden ver esta información.' })
+    }
+
+    // 1) Traer profesores activos de la carrera directamente por columna profesores.carrera_id
+    const { data: profesBase, error: profesErr } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select(`
+        id,
+        usuario_id,
+        activo,
+        codigo_profesor,
+        carrera_id,
+        usuarios:usuarios(
+          id,
+          nombre,
+          apellido,
+          email,
+          activo
+        )
+      `)
+      .eq('activo', true)
+      .eq('usuarios.activo', true)
+      .eq('carrera_id', careerId)
+
+    if (profesErr) {
+      console.error('Error consultando profesores por carrera_id:', profesErr)
+      return res.status(500).json({ error: 'Error obteniendo profesores por carrera', details: profesErr })
+    }
+
+    console.log(`🔎 Profesores base encontrados para carrera ${careerId}:`, profesBase?.length || 0)
+
+    const profesorIds = (profesBase || []).map((p: any) => p.id)
+
+    // 2) Intentar traer asignaciones y cursos de estos profesores (si existen) para enriquecer la respuesta
+    let asignaciones: any[] = []
+    try {
+      const resp = await SupabaseDB.supabaseAdmin
+        .from('asignaciones_profesor')
+        .select('id, profesor_id, curso_id, activo')
+        .in('profesor_id', profesorIds.length ? profesorIds : ['00000000-0000-0000-0000-000000000000'])
+        .eq('activo', true)
+      asignaciones = resp.data || []
+    } catch (e) {
+      // Si falla, continuar sin cursos
+      asignaciones = []
+    }
+
+    console.log('🔎 Asignaciones cargadas:', asignaciones?.length || 0)
+
+    const cursoIds = Array.from(new Set((asignaciones || []).map((a: any) => a.curso_id).filter(Boolean)))
+    let cursos: any[] = []
+    if (cursoIds.length > 0) {
+      const { data: cursosData, error: cursosErr } = await SupabaseDB.supabaseAdmin
+        .from('cursos')
+        .select('id, nombre, codigo, carrera_id')
+        .in('id', cursoIds)
+        .eq('carrera_id', careerId)
+      if (!cursosErr) cursos = cursosData || []
+    }
+    console.log('🔎 Cursos filtrados por carrera cargados:', cursos?.length || 0)
+    const cursoById = new Map((cursos || []).map((c: any) => [c.id, c]))
+
+    // Cargar nombre de la carrera para enriquecer "department"
+    let carreraNombre: string | null = null
+    try {
+      const { data: carreraData } = await SupabaseDB.supabaseAdmin
+        .from('carreras')
+        .select('id,nombre')
+        .eq('id', careerId)
+        .single()
+      carreraNombre = carreraData?.nombre || null
+    } catch {}
+
+    const asignacionesByProfesor = new Map<string, any[]>()
+    ;(asignaciones || []).forEach((a: any) => {
+      const list = asignacionesByProfesor.get(a.profesor_id) || []
+      list.push(a)
+      asignacionesByProfesor.set(a.profesor_id, list)
+    })
+
+    const result = (profesBase || []).map((p: any) => {
+      const asigns = asignacionesByProfesor.get(p.id) || []
+      const cursosProf = asigns
+        .map((a: any) => cursoById.get(a.curso_id))
+        .filter(Boolean)
+      return {
+        id: p.id,
+        usuario_id: p.usuario_id,
+        codigo_profesor: p.codigo_profesor || null,
+        carrera_id: p.carrera_id,
+        carrera_nombre: carreraNombre,
+        nombre: p.usuarios?.nombre || '',
+        apellido: p.usuarios?.apellido || '',
+        email: p.usuarios?.email || '',
+        activo: p.activo,
+        cursos: cursosProf
+      }
+    })
+
+    console.log(`✅ Respuesta profesores por carrera ${careerId}:`, { profesores: result.length })
+    res.json(result)
+  } catch (error) {
+    console.error('❌ Error en /teachers/by-career:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// GET /teachers/careers - Obtener carreras disponibles (para coordinadores)
+router.get('/careers', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+
+    // Verificar que el usuario sea coordinador
+    if (!user.roles?.includes('coordinador') && user.tipo_usuario !== 'coordinador') {
+      return res.status(403).json({ error: 'Acceso denegado. Solo coordinadores pueden ver esta información.' })
+    }
+
+    // Obtener carreras
+    const { data: carreras, error } = await SupabaseDB.supabaseAdmin
+      .from('carreras')
+      .select('id, nombre, codigo, activa')
+      .eq('activa', true)
+      .order('nombre')
+
+    if (error) {
+      console.error('Error obteniendo carreras:', error)
+      return res.status(500).json({ error: 'Error obteniendo carreras', details: error })
+    }
+
+    console.log(`✅ Carreras obtenidas:`, carreras?.length)
+    res.json(carreras || [])
+
+  } catch (error) {
+    console.error('Error en /teachers/careers:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
 export default router

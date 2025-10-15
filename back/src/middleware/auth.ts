@@ -1,12 +1,15 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { SupabaseDB } from '../config/supabase-only'
+import { RoleService } from '../services/roleService'
 
 interface AuthRequest extends Request {
   user?: {
     id: string
     email: string
     tipo_usuario: string
+    roles?: string[]
+    permisos?: string[]
   }
 }
 
@@ -28,10 +31,16 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       return res.status(401).json({ error: 'Usuario no válido o inactivo' })
     }
 
+    // Obtener roles múltiples del usuario
+    const roles = await RoleService.obtenerRolesUsuario(user.id)
+    const permisos = await RoleService.obtenerPermisosUsuario(user.id)
+
     req.user = {
       id: user.id,
       email: user.email,
-      tipo_usuario: user.tipo_usuario
+      tipo_usuario: user.tipo_usuario,
+      roles: roles,
+      permisos: permisos
     }
     
     next()
@@ -46,7 +55,29 @@ export const requireRole = (roles: string[]) => {
       return res.status(401).json({ error: 'No autenticado' })
     }
 
-    if (!roles.includes(req.user.tipo_usuario)) {
+    // Verificar si el usuario tiene alguno de los roles requeridos
+    const tieneRol = req.user.roles?.some(rol => roles.includes(rol)) || 
+                    roles.includes(req.user.tipo_usuario)
+
+    if (!tieneRol) {
+      return res.status(403).json({ error: 'Permisos insuficientes' })
+    }
+
+    next()
+  }
+}
+
+export const requirePermission = (permiso: string) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'No autenticado' })
+    }
+
+    // Verificar si el usuario tiene el permiso requerido
+    const tienePermiso = req.user.permisos?.includes('all') || 
+                        req.user.permisos?.includes(permiso)
+
+    if (!tienePermiso) {
       return res.status(403).json({ error: 'Permisos insuficientes' })
     }
 

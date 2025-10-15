@@ -18,6 +18,7 @@ import {
   Star,
   BookOpen,
   Clock,
+  Users,
   Mail,
   BarChart3,
   User as UserIcon,
@@ -48,11 +49,11 @@ interface SectionCardProps {
 
 const SectionCard = ({ title, icon: Icon, children, className = '' }: SectionCardProps) => {
   return (
-    <Card className={`bg-white shadow-md border border-gray-200 p-8 ${className}`}>
-      <CardHeader className="pb-6">
-        <div className="flex items-center gap-3">
-          <Icon className="h-6 w-6 text-gray-700" />
-          <CardTitle className="text-2xl text-gray-900">{title}</CardTitle>
+    <Card className={`bg-white shadow-md border border-gray-200 p-6 ${className}`}>
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-2">
+          <Icon className="h-5 w-5 text-gray-700" />
+          <CardTitle className="text-xl text-gray-900">{title}</CardTitle>
         </div>
       </CardHeader>
       <CardContent>
@@ -68,6 +69,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
   const [teacherStats, setTeacherStats] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
+  
   
   // Cargar user desde backend/localStorage si existe
   const storedUser = ((): User | null => {
@@ -94,6 +96,9 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
     navigate('/evaluations');
   };
 
+  const handleViewStudents = () => {
+    navigate('/students');
+  };
 
   const toggleCalendar = () => {
     setShowCalendar(!showCalendar);
@@ -135,6 +140,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
     loadTeacherStats();
   }, [currentUser.id]);
 
+
   // Datos específicos para profesores (usar datos reales si están disponibles)
   const profesorData = {
     stats: {
@@ -172,7 +178,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
           description: 'Ver análisis detallado',
           onClick: handleViewReports,
           variant: 'default' as const,
-          className: 'bg-red-600 hover:bg-red-700 text-white w-[300px] md:w-[250px] lg:w-[250px]'
+          className: 'bg-red-600 hover:bg-red-700 text-white'
         },
         {
           icon: Eye,
@@ -180,7 +186,15 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
           description: 'Revisar evaluaciones recibidas',
           onClick: handleViewEvaluations,
           variant: 'outline' as const,
-          className: 'border-gray-300 text-gray-600 hover:bg-gray-50'
+          className: 'border-red-300 text-red-600 hover:bg-red-50'
+        },
+        {
+          icon: Users,
+          label: 'Mis Estudiantes',
+          description: 'Gestionar estudiantes',
+          onClick: handleViewStudents,
+          variant: 'outline' as const,
+          className: 'border-red-300 text-red-600 hover:bg-red-50'
         },
       {
         icon: CalendarIcon,
@@ -239,8 +253,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
           </motion.div>
 
           {/* Stats Cards - Específicas para profesores */}
-          <div className="flex justify-center">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-8xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Calificación Promedio */}
             <motion.div
               variants={cardVariants}
@@ -248,12 +261,12 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
               animate="visible"
               transition={{ delay: 0.2 }}
             >
-              <Card className="bg-white shadow-md border border-gray-200 p-10 w-[300px] md:w-[450px] lg:w-[450px]">
-                <CardHeader className="flex flex-row items-center justify-between pb-6">
-                  <CardTitle className="text-xl font-medium text-gray-900 text-left">
+              <Card className="bg-white shadow-md border border-gray-200 p-6">
+                <CardHeader className="flex flex-row items-center justify-between pb-4">
+                  <CardTitle className="text-lg font-medium text-gray-900 text-left">
                     Calificación Promedio
                   </CardTitle>
-                  <Star className="h-8 w-8 text-yellow-600 ml-4" />
+                  <Star className="h-6 w-6 text-yellow-600 ml-4" />
                 </CardHeader>
                 <CardContent>
                   {loadingStats ? (
@@ -265,11 +278,11 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                       Error
                     </div>
                   ) : (
-                    <div className="text-4xl font-bold text-yellow-600">
+                    <div className="text-3xl font-bold text-yellow-600">
                       {profesorData.stats.averageRating}/5.0
                     </div>
                   )}
-                  <p className="text-base text-gray-500 mt-3 text-left">
+                  <p className="text-sm text-gray-500 mt-2 text-left">
                     {loadingStats ? 'Cargando datos...' : 'Calificación promedio'}
                   </p>
                 </CardContent>
@@ -283,28 +296,28 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
               animate="visible"
               transition={{ delay: 0.3 }}
             >
-              <Card className="bg-white shadow-md border border-gray-200 p-10 w-[400px] md:w-[450px] lg:w-[450px]">
-                <CardHeader className="flex flex-row items-center justify-between pb-6">
-                  <CardTitle className="text-xl font-medium text-gray-900 text-left">
+              <Card className="bg-white shadow-md border border-gray-200 p-6">
+                <CardHeader className="flex flex-row items-center justify-between pb-4">
+                  <CardTitle className="text-lg font-medium text-gray-900 text-left">
                     Total Evaluaciones
                   </CardTitle>
-                  <ClipboardCheck className="h-8 w-8 text-green-600 ml-4" />
+                  <ClipboardCheck className="h-6 w-6 text-green-600 ml-4" />
                 </CardHeader>
                 <CardContent>
                   {loadingStats ? (
-                    <div className="text-4xl font-bold text-gray-400">
+                    <div className="text-3xl font-bold text-gray-400">
                       Cargando...
                     </div>
                   ) : statsError ? (
-                    <div className="text-xl font-medium text-red-600">
+                    <div className="text-lg font-medium text-red-600">
                       Error
                     </div>
                   ) : (
-                    <div className="text-4xl font-bold text-green-600">
+                    <div className="text-3xl font-bold text-green-600">
                       {profesorData.stats.totalEvaluations}
                     </div>
                   )}
-                  <p className="text-base text-gray-500 mt-3 text-left">
+                  <p className="text-sm text-gray-500 mt-2 text-left">
                     {loadingStats ? 'Cargando datos...' : 'Evaluaciones recibidas'}
                   </p>
                 </CardContent>
@@ -318,34 +331,68 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
               animate="visible"
               transition={{ delay: 0.4 }}
             >
-              <Card className="bg-white shadow-md border border-gray-200 p-10 w-[400px] md:w-[450px] lg:w-[450px]">
-                <CardHeader className="flex flex-row items-center justify-between pb-6">
-                  <CardTitle className="text-xl font-medium text-gray-900 text-left">
+              <Card className="bg-white shadow-md border border-gray-200 p-6">
+                <CardHeader className="flex flex-row items-center justify-between pb-4">
+                  <CardTitle className="text-lg font-medium text-gray-900 text-left">
                     Cursos Impartidos
                   </CardTitle>
-                  <BookOpen className="h-8 w-8 text-blue-600 ml-4" />
+                  <BookOpen className="h-6 w-6 text-blue-600 ml-4" />
                 </CardHeader>
                 <CardContent>
                   {loadingStats ? (
-                    <div className="text-4xl font-bold text-gray-400">
+                    <div className="text-3xl font-bold text-gray-400">
                       Cargando...
                     </div>
                   ) : statsError ? (
-                    <div className="text-xl font-medium text-red-600">
+                    <div className="text-lg font-medium text-red-600">
                       Error
                     </div>
                   ) : (
-                    <div className="text-4xl font-bold text-blue-600">
+                    <div className="text-3xl font-bold text-blue-600">
                       {profesorData.stats.coursesTeaching}
                     </div>
                   )}
-                  <p className="text-base text-gray-500 mt-3 text-left">
+                  <p className="text-sm text-gray-500 mt-2 text-left">
                     {loadingStats ? 'Cargando datos...' : 'Cursos evaluados'}
                   </p>
                 </CardContent>
               </Card>
             </motion.div>
-            </div>
+
+            {/* Estudiantes Evaluados */}
+            <motion.div
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              transition={{ delay: 0.5 }}
+            >
+              <Card className="bg-white shadow-md border border-gray-200 p-6">
+                <CardHeader className="flex flex-row items-center justify-between pb-4">
+                  <CardTitle className="text-lg font-medium text-gray-900 text-left">
+                    Estudiantes Evaluados
+                  </CardTitle>
+                  <Users className="h-6 w-6 text-purple-600 ml-4" />
+                </CardHeader>
+                <CardContent>
+                  {loadingStats ? (
+                    <div className="text-3xl font-bold text-gray-400">
+                      Cargando...
+                    </div>
+                  ) : statsError ? (
+                    <div className="text-lg font-medium text-red-600">
+                      Error
+                    </div>
+                  ) : (
+                    <div className="text-3xl font-bold text-purple-600">
+                      {profesorData.stats.studentsEvaluated}
+                    </div>
+                  )}
+                  <p className="text-sm text-gray-500 mt-2 text-left">
+                    {loadingStats ? 'Cargando datos...' : 'Estudiantes únicos'}
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -357,39 +404,37 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
               >
-                <Card className="bg-white shadow-md border border-gray-200 p-8">
-                  <CardHeader className="pb-6">
-                    <div className="flex items-center gap-3">
-                      <Target className="h-6 w-6 text-gray-700" />
-                      <CardTitle className="text-3xl text-gray-900">Acciones Rápidas</CardTitle>
+                <Card className="bg-white shadow-md border border-gray-200 p-6">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-gray-700" />
+                      <CardTitle className="text-2xl text-gray-900">Acciones Rápidas</CardTitle>
                     </div>
-                    <CardDescription className="text-lg">
+                    <CardDescription className="text-base">
                       Herramientas para gestionar tu actividad docente
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex justify-center">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl">
-                        {profesorData.quickActions.map((action, index) => (
-                          <motion.div key={index} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                            <Button
-                              onClick={action.onClick}
-                              variant={action.variant}
-                              className={`w-full h-auto py-8 flex flex-col items-center justify-center gap-4 ${action.className}`}
-                            >
-                              <action.icon className="h-10 w-10" />
-                              <div className="text-center">
-                                <div className="font-medium text-xl">
-                                  {action.label}
-                                </div>
-                                <div className="text-base opacity-80">
-                                  {action.description}
-                                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      {profesorData.quickActions.map((action, index) => (
+                        <motion.div key={index} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                          <Button
+                            onClick={action.onClick}
+                            variant={action.variant}
+                            className={`w-full h-auto py-5 flex flex-col items-center gap-3 ${action.className}`}
+                          >
+                            <action.icon className="h-8 w-8" />
+                            <div className="text-center">
+                              <div className="font-medium text-lg">
+                                {action.label}
                               </div>
-                            </Button>
-                          </motion.div>
-                        ))}
-                      </div>
+                              <div className="text-sm opacity-80">
+                                {action.description}
+                              </div>
+                            </div>
+                          </Button>
+                        </motion.div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -401,28 +446,28 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.7 }}
               >
-                <Card className="bg-white shadow-md border border-gray-200 p-8">
-                  <CardHeader className="pb-6">
-                    <div className="flex items-center gap-3">
-                      <BarChart3 className="h-6 w-6 text-gray-700" />
-                      <CardTitle className="text-3xl text-gray-900">Evaluaciones Recientes</CardTitle>
+                <Card className="bg-white shadow-md border border-gray-200 p-6">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-gray-700" />
+                      <CardTitle className="text-2xl text-gray-900">Evaluaciones Recientes</CardTitle>
                     </div>
-                    <CardDescription className="text-lg">
+                    <CardDescription className="text-base">
                       Estado de tus evaluaciones por curso
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                       {loadingStats ? (
-                        <div className="text-center py-12 text-gray-500 text-lg">
+                        <div className="text-center py-8 text-gray-500">
                           Cargando evaluaciones...
                         </div>
                       ) : statsError ? (
-                        <div className="text-center py-12 text-red-500 text-lg">
+                        <div className="text-center py-8 text-red-500">
                           Error al cargar las evaluaciones
                         </div>
                       ) : profesorData.recentEvaluations.length === 0 ? (
-                        <div className="text-center py-12 text-gray-500 text-lg">
+                        <div className="text-center py-8 text-gray-500">
                           No hay evaluaciones disponibles
                         </div>
                       ) : (
@@ -432,14 +477,14 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.8 + index * 0.1 }}
-                          className="flex items-center justify-between p-6 bg-gray-50 rounded-lg border border-gray-200"
+                          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
                         >
                           <div className="flex-1">
-                            <div className="flex items-center justify-between mb-3">
-                              <p className="font-medium text-xl text-gray-900">{evaluation.course}</p>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="font-medium text-lg text-gray-900">{evaluation.course}</p>
                               <Badge 
                                 variant="outline" 
-                                className={`text-base py-2 px-3 ${
+                                className={`text-sm py-1 ${
                                   evaluation.status === 'completed' 
                                     ? 'bg-green-50 text-green-700 border-green-200' 
                                     : 'bg-yellow-50 text-yellow-700 border-yellow-200'
@@ -448,7 +493,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                                 {evaluation.status === 'completed' ? 'Completada' : 'En Progreso'}
                               </Badge>
                             </div>
-                            <div className="grid grid-cols-3 gap-4 text-base">
+                            <div className="grid grid-cols-3 gap-4 text-sm">
                               <div>
                                 <span className="text-gray-500">Estudiantes:</span>
                                 <span className="ml-1 font-medium">{evaluation.students}</span>
@@ -476,21 +521,21 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
             <div className="space-y-8">
               {/* Notificaciones */}
               <SectionCard title="Notificaciones" icon={Bell}>
-                <div className="space-y-5">
+                <div className="space-y-4">
                   {profesorData.notifications.map((notification, index) => (
                     <motion.div
                       key={notification.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.9 + index * 0.1 }}
-                      className={`p-5 rounded-lg border transition-colors ${
+                      className={`p-4 rounded-lg border transition-colors ${
                         notification.urgent 
                           ? 'bg-red-50 border-red-200' 
                           : 'bg-gray-50 border-gray-200'
                       }`}
                     >
-                      <p className="text-lg font-medium text-gray-900">{notification.text}</p>
-                      <p className="text-base text-gray-500 mt-2">{notification.time}</p>
+                      <p className="text-base font-medium text-gray-900">{notification.text}</p>
+                      <p className="text-sm text-gray-500 mt-2">{notification.time}</p>
                     </motion.div>
                   ))}
                 </div>
@@ -498,29 +543,29 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
 
               {/* Próximas Fechas Límite */}
               <SectionCard title="Próximas Fechas Límite" icon={Clock}>
-                <div className="space-y-5">
+                <div className="space-y-4">
                   {profesorData.upcomingDeadlines.map((deadline, index) => (
                     <motion.div
                       key={deadline.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 1.0 + index * 0.1 }}
-                      className={`p-5 rounded-lg border transition-colors ${
+                      className={`p-4 rounded-lg border transition-colors ${
                         deadline.urgent 
                           ? 'bg-red-50 border-red-200' 
                           : 'bg-gray-50 border-gray-200'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="font-medium text-lg text-gray-900">{deadline.course}</p>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-medium text-gray-900">{deadline.course}</p>
                         {deadline.urgent && (
-                          <Badge variant="outline" className="text-sm bg-red-100 text-red-700 border-red-200 py-1 px-2">
+                          <Badge variant="outline" className="text-xs bg-red-100 text-red-700 border-red-200">
                             Urgente
                           </Badge>
                         )}
                       </div>
-                      <p className="text-base text-gray-600 mb-2">{deadline.task}</p>
-                      <p className="text-base text-gray-500">{deadline.deadline}</p>
+                      <p className="text-sm text-gray-600 mb-1">{deadline.task}</p>
+                      <p className="text-sm text-gray-500">{deadline.deadline}</p>
                     </motion.div>
                   ))}
                 </div>
@@ -528,30 +573,31 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
 
               {/* Información del Profesor */}
               <SectionCard title="Información del Profesor" icon={UserIcon}>
-                <div className="space-y-5">
+                <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <div>
-                      <p className="font-medium text-lg text-gray-900">{currentUser.name}</p>
-                      <p className="text-base text-gray-600">Profesor</p>
+                      <p className="font-medium text-gray-900">{currentUser.name}</p>
+                      <p className="text-sm text-gray-600">Profesor</p>
                     </div>
                   </div>
                   
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Mail className="h-5 w-5 text-gray-500" />
-                      <p className="text-base text-gray-600">{currentUser.email}</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-gray-500" />
+                      <p className="text-sm text-gray-600">{currentUser.email}</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <BookOpen className="h-5 w-5 text-gray-500" />
-                      <p className="text-base text-gray-600">Facultad de Ingeniería</p>
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-gray-500" />
+                      <p className="text-sm text-gray-600">Facultad de Ingeniería</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Award className="h-5 w-5 text-gray-500" />
-                      <p className="text-base text-gray-600">Semestre {profesorData.stats.currentSemester}</p>
+                    <div className="flex items-center gap-2">
+                      <Award className="h-4 w-4 text-gray-500" />
+                      <p className="text-sm text-gray-600">Semestre {profesorData.stats.currentSemester}</p>
                     </div>
                   </div>
                 </div>
               </SectionCard>
+
             </div>
           </div>
         </main>

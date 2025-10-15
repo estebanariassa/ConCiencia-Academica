@@ -14,10 +14,10 @@ app.use(cors())
 app.use(express.json())
 
 // Rutas
-app.use('/auth', authRoutes)
-app.use('/evaluaciones', evaluacionesRoutes)
-app.use('/resultados', resultadosRoutes)
-app.use('/teachers', teachersRoutes)
+app.use('/api/auth', authRoutes)
+app.use('/api/evaluaciones', evaluacionesRoutes)
+app.use('/api/resultados', resultadosRoutes)
+app.use('/api/teachers', teachersRoutes)
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true })

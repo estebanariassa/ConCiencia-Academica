@@ -82,19 +82,19 @@ export interface Evaluacion {
 export const evaluacionesApi = {
   // Obtener evaluaciones del estudiante
   getEvaluaciones: async (): Promise<Evaluacion[]> => {
-    const response = await apiClient.get('/evaluaciones')
+    const response = await apiClient.get('/api/evaluaciones')
     return response.data
   },
 
   // Crear nueva evaluación
   createEvaluacion: async (data: EvaluacionData): Promise<{ message: string; evaluacion: Evaluacion }> => {
-    const response = await apiClient.post('/evaluaciones', data)
+    const response = await apiClient.post('/api/evaluaciones', data)
     return response.data
   },
 
   // Obtener preguntas de evaluación
   getPreguntas: async (): Promise<PreguntaEvaluacion[]> => {
-    const response = await apiClient.get('/evaluaciones/preguntas')
+    const response = await apiClient.get('/api/evaluaciones/preguntas')
     return response.data
   }
 }
