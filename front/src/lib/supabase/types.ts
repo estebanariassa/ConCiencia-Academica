@@ -39,6 +39,44 @@ export interface Database {
           fecha_evaluacion?: string;
         };
       };
+      preguntas_evaluacion: {
+        Row: {
+          id: number;
+          categoria_id: number;
+          texto_pregunta: string;
+          descripcion: string | null;
+          tipo_pregunta: string;
+          opciones: any | null;
+          obligatoria: boolean;
+          orden: number;
+          activa: boolean;
+          id_carrera: number | null;
+        };
+        Insert: {
+          id?: number;
+          categoria_id: number;
+          texto_pregunta: string;
+          descripcion?: string | null;
+          tipo_pregunta: string;
+          opciones?: any | null;
+          obligatoria?: boolean;
+          orden: number;
+          activa?: boolean;
+          id_carrera?: number | null;
+        };
+        Update: {
+          id?: number;
+          categoria_id?: number;
+          texto_pregunta?: string;
+          descripcion?: string | null;
+          tipo_pregunta?: string;
+          opciones?: any | null;
+          obligatoria?: boolean;
+          orden?: number;
+          activa?: boolean;
+          id_carrera?: number | null;
+        };
+      };
       
     };
   };

@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import authRoutes from './routes/auth-supabase'
 import evaluacionesRoutes from './routes/evaluaciones'
+import evaluationRoutes from './routes/evaluationRoutes'
 import resultadosRoutes from './routes/resultados'
 import teachersRoutes from './routes/teachers'
 
@@ -16,6 +17,7 @@ app.use(express.json())
 // Rutas
 app.use('/api/auth', authRoutes)
 app.use('/api/evaluaciones', evaluacionesRoutes)
+app.use('/api/evaluations', evaluationRoutes)
 app.use('/api/resultados', resultadosRoutes)
 app.use('/api/teachers', teachersRoutes)
 

@@ -25,3 +25,5 @@ console.log('4. Ejecuta el script');
 console.log('\n📁 El archivo SQL está en:', sqlFile);
 
 
+
+

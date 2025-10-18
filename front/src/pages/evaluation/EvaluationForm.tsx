@@ -21,6 +21,8 @@ interface EvaluationQuestion {
   id: string;
   category: string;
   question: string;
+  type: 'rating' | 'texto';
+  options?: any;
 }
 
 export default function EvaluationForm() {
@@ -29,12 +31,12 @@ export default function EvaluationForm() {
   const { teacher, course, group } = location.state || {};
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [ratings, setRatings] = useState<number[]>([]);
+  const [textAnswers, setTextAnswers] = useState<string[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showCommentsSection, setShowCommentsSection] = useState(false);
   const [comments, setComments] = useState('');
   const [questions, setQuestions] = useState<EvaluationQuestion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [studentInfo, setStudentInfo] = useState<any>(null);
 
   // Cargar información del estudiante y preguntas al montar el componente
   useEffect(() => {
@@ -44,7 +46,6 @@ export default function EvaluationForm() {
         
         // Obtener información del estudiante
         const studentData = await fetchStudentInfo();
-        setStudentInfo(studentData);
         console.log('✅ Student info loaded:', studentData);
 
         // Obtener preguntas según el curso (no la carrera del estudiante)
@@ -52,7 +53,8 @@ export default function EvaluationForm() {
           const questionsData = await fetchEvaluationQuestions(String(course.id));
           setQuestions(questionsData.questions);
           setRatings(Array(questionsData.questions.length).fill(0));
-          console.log('✅ Questions loaded for course:', questionsData.courseName, 'Code:', questionsData.courseCode, 'Count:', questionsData.questions.length);
+          setTextAnswers(Array(questionsData.questions.length).fill(''));
+          console.log('✅ Questions loaded for course:', questionsData.courseName, 'Code:', questionsData.courseCode, 'Career ID:', questionsData.carreraId, 'Count:', questionsData.questions.length);
         } else {
           throw new Error('No course ID available');
         }
@@ -62,19 +64,20 @@ export default function EvaluationForm() {
         console.error('❌ Error loading student info or questions:', error);
         // Fallback a preguntas por defecto
         const defaultQuestions: EvaluationQuestion[] = [
-          { id: '1', category: 'Claridad Expositiva', question: 'El profesor explica claramente los conceptos del curso' },
-          { id: '2', category: 'Dominio del Tema', question: 'El profesor demuestra amplio conocimiento de la materia' },
-          { id: '3', category: 'Disponibilidad', question: 'El profesor está disponible para resolver dudas' },
-          { id: '4', category: 'Material de Clase', question: 'El material proporcionado es adecuado y útil' },
-          { id: '5', category: 'Evaluación Justa', question: 'Las evaluaciones reflejan adecuadamente los contenidos' },
-          { id: '6', category: 'Motivación', question: 'El profesor motiva a los estudiantes a participar' },
-          { id: '7', category: 'Organización', question: 'Las clases están bien organizadas y estructuradas' },
-          { id: '8', category: 'Retroalimentación', question: 'Proporciona retroalimentación útil sobre el progreso' },
-          { id: '9', category: 'Respeto', question: 'Muestra respeto por las opiniones de los estudiantes' },
-          { id: '10', category: 'Innovación', question: 'Utiliza métodos innovadores en la enseñanza' }
+          { id: '1', category: 'Claridad Expositiva', question: 'El profesor explica claramente los conceptos del curso', type: 'rating' },
+          { id: '2', category: 'Dominio del Tema', question: 'El profesor demuestra amplio conocimiento de la materia', type: 'rating' },
+          { id: '3', category: 'Disponibilidad', question: 'El profesor está disponible para resolver dudas', type: 'rating' },
+          { id: '4', category: 'Material de Clase', question: 'El material proporcionado es adecuado y útil', type: 'rating' },
+          { id: '5', category: 'Evaluación Justa', question: 'Las evaluaciones reflejan adecuadamente los contenidos', type: 'rating' },
+          { id: '6', category: 'Motivación', question: 'El profesor motiva a los estudiantes a participar', type: 'rating' },
+          { id: '7', category: 'Organización', question: 'Las clases están bien organizadas y estructuradas', type: 'rating' },
+          { id: '8', category: 'Retroalimentación', question: 'Proporciona retroalimentación útil sobre el progreso', type: 'rating' },
+          { id: '9', category: 'Respeto', question: 'Muestra respeto por las opiniones de los estudiantes', type: 'rating' },
+          { id: '10', category: 'Innovación', question: 'Utiliza métodos innovadores en la enseñanza', type: 'rating' }
         ];
         setQuestions(defaultQuestions);
         setRatings(Array(defaultQuestions.length).fill(0));
+        setTextAnswers(Array(defaultQuestions.length).fill(''));
         setLoading(false);
       }
     };
@@ -90,9 +93,23 @@ export default function EvaluationForm() {
     setRatings(newRatings);
   };
 
+  const handleTextAnswerChange = (text: string) => {
+    const newTextAnswers = [...textAnswers];
+    newTextAnswers[currentQuestion] = text;
+    setTextAnswers(newTextAnswers);
+  };
+
   const handleNext = () => {
-    if (ratings[currentQuestion] === 0) {
+    const currentQ = questions[currentQuestion];
+    
+    // Validar según el tipo de pregunta
+    if (currentQ.type === 'rating' && ratings[currentQuestion] === 0) {
       alert('Por favor selecciona una calificación antes de continuar');
+      return;
+    }
+    
+    if (currentQ.type === 'texto' && textAnswers[currentQuestion].trim() === '') {
+      alert('Por favor escribe una respuesta antes de continuar');
       return;
     }
 
@@ -125,12 +142,27 @@ export default function EvaluationForm() {
         return
       }
 
-      const answers = questions.map((q, idx) => ({
-        questionId: q.id,
-        rating: ratings[idx],
-      }))
-      const total = ratings.reduce((a, b) => a + b, 0)
-      const overallRating = Number((total / ratings.length).toFixed(2))
+      const answers = questions.map((q, idx) => {
+        if (q.type === 'rating') {
+          return {
+            questionId: q.id,
+            rating: ratings[idx],
+            textAnswer: null
+          };
+        } else {
+          return {
+            questionId: q.id,
+            rating: null,
+            textAnswer: textAnswers[idx]
+          };
+        }
+      });
+      
+      // Calcular rating promedio solo de las preguntas de rating
+      const ratingQuestions = questions.filter(q => q.type === 'rating');
+      const ratingAnswers = answers.filter(a => a.rating !== null);
+      const total = ratingAnswers.reduce((a, b) => a + (b.rating || 0), 0);
+      const overallRating = ratingQuestions.length > 0 ? Number((total / ratingQuestions.length).toFixed(2)) : 0;
 
       console.log('📤 Enviando evaluación:', {
         teacherId: String(teacher.id),
@@ -312,32 +344,68 @@ export default function EvaluationForm() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-8">
-                    <LikertScale
-                      value={ratings[currentQuestion]}
-                      onChange={handleRatingSelect}
-                      options={5}
-                      leftLabel="En desacuerdo"
-                      rightLabel="De acuerdo"
-                    />
+                    {questions[currentQuestion].type === 'rating' ? (
+                      <>
+                        <LikertScale
+                          value={ratings[currentQuestion]}
+                          onChange={handleRatingSelect}
+                          options={5}
+                          leftLabel="En desacuerdo"
+                          rightLabel="De acuerdo"
+                        />
 
-                    {ratings[currentQuestion] > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`text-center p-6 rounded-2xl text-xl font-semibold border-2 ${
-                          ratings[currentQuestion] >= 4
-                            ? 'bg-green-50 text-green-800 border-green-200'
-                            : ratings[currentQuestion] >= 3
-                            ? 'bg-blue-50 text-blue-800 border-blue-200'
-                            : 'bg-red-50 text-red-800 border-red-200'
-                        }`}
-                      >
-                        Has calificado: {ratings[currentQuestion]}/5
-                        <br />
-                        <span className="text-lg font-medium">
-                          {ratingLabels[ratings[currentQuestion] - 1]}
-                        </span>
-                      </motion.div>
+                        {ratings[currentQuestion] > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`text-center p-6 rounded-2xl text-xl font-semibold border-2 ${
+                              ratings[currentQuestion] >= 4
+                                ? 'bg-green-50 text-green-800 border-green-200'
+                                : ratings[currentQuestion] >= 3
+                                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                : 'bg-red-50 text-red-800 border-red-200'
+                            }`}
+                          >
+                            Has calificado: {ratings[currentQuestion]}/5
+                            <br />
+                            <span className="text-lg font-medium">
+                              {ratingLabels[ratings[currentQuestion] - 1]}
+                            </span>
+                          </motion.div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <p className="text-blue-800 text-sm font-medium">
+                            💬 Esta es una pregunta abierta. Escribe tu respuesta en el campo de texto.
+                          </p>
+                        </div>
+                        
+                        <textarea
+                          value={textAnswers[currentQuestion]}
+                          onChange={(e) => handleTextAnswerChange(e.target.value)}
+                          placeholder={questions[currentQuestion].options?.placeholder || "Escribe tu respuesta aquí..."}
+                          className="w-full h-32 p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-lg"
+                          maxLength={500}
+                        />
+                        
+                        <div className="text-right text-sm text-gray-500">
+                          {textAnswers[currentQuestion].length}/500 caracteres
+                        </div>
+                        
+                        {textAnswers[currentQuestion].trim() && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-green-50 border border-green-200 rounded-lg p-4"
+                          >
+                            <p className="text-green-800 text-sm font-medium">
+                              ✅ Respuesta guardada ({textAnswers[currentQuestion].length} caracteres)
+                            </p>
+                          </motion.div>
+                        )}
+                      </div>
                     )}
                   </div>
 

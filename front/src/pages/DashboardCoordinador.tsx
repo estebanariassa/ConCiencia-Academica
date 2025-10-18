@@ -26,7 +26,6 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { fetchProfessorsByCareer, fetchCareers } from '../api/teachers';
 
 // Importar el componente Calendar externo
 import Calendar from '../components/Calendar';
@@ -66,12 +65,6 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
   const navigate = useNavigate();
   const [showCalendar, setShowCalendar] = useState(false);
   
-  // Estados para coordinadores
-  const [careers, setCareers] = useState<any[]>([]);
-  const [selectedCareer, setSelectedCareer] = useState<string>('');
-  const [professorsByCareer, setProfessorsByCareer] = useState<any[]>([]);
-  const [loadingCareers, setLoadingCareers] = useState(false);
-  const [loadingProfessors, setLoadingProfessors] = useState(false);
   
   // Cargar user desde backend/localStorage si existe
   const storedUser = ((): User | null => {
@@ -100,98 +93,21 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
     return '¡Buenas noches';
   };
 
-  // Cargar carreras y seleccionar por defecto la carrera del coordinador (si existe)
-  useEffect(() => {
-    const loadCareers = async () => {
-      try {
-        setLoadingCareers(true);
-        const careersData = await fetchCareers();
-        setCareers(careersData);
-
-        // Intentar leer carrera_id del usuario almacenado
-        let coordinatorCareerId: string | null = null
-        try {
-          const raw = localStorage.getItem('user')
-          if (raw) {
-            const parsed = JSON.parse(raw)
-            coordinatorCareerId = String(
-              parsed?.carrera_id ?? parsed?.coordinador?.carrera_id ?? parsed?.profesor?.carrera_id ?? ''
-            ) || null
-          }
-        } catch {}
-
-        if (coordinatorCareerId && careersData.some((c: any) => String(c.id) === coordinatorCareerId)) {
-          setSelectedCareer(coordinatorCareerId)
-        } else if (careersData.length > 0) {
-          setSelectedCareer(careersData[0].id.toString());
-        }
-      } catch (error) {
-        console.error('Error loading careers:', error);
-      } finally {
-        setLoadingCareers(false);
-      }
-    };
-
-    loadCareers();
-  }, []);
-
-  // Cargar profesores cuando se selecciona una carrera
-  useEffect(() => {
-    const loadProfessors = async () => {
-      if (!selectedCareer) return;
-      
-      try {
-        setLoadingProfessors(true);
-        const professorsData = await fetchProfessorsByCareer(selectedCareer);
-
-        // Helper para obtener carrera_id de múltiples formas
-        const getCareerId = (c: any) => {
-          if (!c) return undefined;
-          return (
-            c.carrera_id ??
-            c.carreraId ??
-            c.career_id ??
-            c.careerId ??
-            c.carrera?.id ??
-            c.career?.id
-          );
-        };
-
-        // Filtrar cursos por carrera seleccionada, pero NO ocultar profesores sin cursos
-        const normalized = (Array.isArray(professorsData) ? professorsData : []).map((p: any) => {
-          const cursos = Array.isArray(p.cursos) ? p.cursos.filter((c: any) => String(getCareerId(c)) === String(selectedCareer)) : [];
-          return { ...p, cursos };
-        });
-
-        setProfessorsByCareer(normalized);
-      } catch (error) {
-        console.error('Error loading professors:', error);
-      } finally {
-        setLoadingProfessors(false);
-      }
-    };
-
-    loadProfessors();
-  }, [selectedCareer]);
 
   // Datos específicos para coordinadores
   const coordinadorData = {
     stats: {
-      totalCarreras: careers.length,
-      totalProfesores: professorsByCareer.length,
-      totalCursos: professorsByCareer.reduce((acc, prof) => acc + prof.cursos.length, 0),
-      promedioEvaluaciones: 4.2 // TODO: Calcular desde la base de datos
+      totalCarreras: 0,
+      totalProfesores: 0,
+      totalCursos: 0,
+      promedioEvaluaciones: 4.2
     },
     quickActions: [
       {
         icon: Users,
         label: 'Gestionar Profesores',
         description: 'Ver y administrar profesores',
-        onClick: () => {
-          const fallbackCareer = (careers && careers.length > 0) ? String(careers[0].id) : ''
-          const cid = selectedCareer || fallbackCareer
-          navigate(`/profesores/gestionar?careerId=${cid}`)
-        },
+        onClick: () => navigate('/profesores/gestionar'),
         variant: 'default' as const,
         className: 'bg-red-600 hover:bg-red-700 text-white'
       },
@@ -381,7 +297,7 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-yellow-600">
-                    {coordinadorData.stats.promedioEvaluaciones}/5.0
+                    {coordinadorData.stats.promedioEvaluaciones}
                   </div>
                   <p className="text-sm text-gray-500 mt-2 text-left">Promedio general de la carrera</p>
                   {/* Mini gráfica con datos quemados */}
@@ -449,88 +365,6 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                 </Card>
               </motion.div>
 
-              {/* Profesores por Carrera */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-              >
-                <Card className="bg-white shadow-md border border-gray-200 p-6">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-gray-700" />
-                      <CardTitle className="text-2xl text-gray-900">Profesores por Carrera</CardTitle>
-                    </div>
-                    <CardDescription className="text-base">
-                      Gestiona y supervisa los profesores de cada carrera
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {/* Selector de carrera */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Seleccionar Carrera:
-                        </label>
-                        <select
-                          value={selectedCareer}
-                          onChange={(e) => setSelectedCareer(e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                          disabled={loadingCareers}
-                        >
-                          {loadingCareers ? (
-                            <option>Cargando carreras...</option>
-                          ) : (
-                            careers.map((career) => (
-                              <option key={career.id} value={career.id}>
-                                {career.nombre}
-                              </option>
-                            ))
-                          )}
-                        </select>
-                      </div>
-
-                      {/* Lista de profesores */}
-                      <div className="max-h-96 overflow-y-auto">
-                        {loadingProfessors ? (
-                          <div className="text-center py-8 text-gray-500">Cargando profesores...</div>
-                        ) : professorsByCareer.length === 0 ? (
-                          <div className="text-center py-8 text-gray-500">No hay profesores en esta carrera</div>
-                        ) : (
-                          <div className="space-y-3">
-                            {professorsByCareer.map((prof: any, index: number) => (
-                              <motion.div
-                                key={prof.usuario_id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.05 * index }}
-                                className="p-4 rounded-lg border cursor-pointer transition-all duration-200 border-gray-200 hover:border-red-300 hover:bg-gray-50"
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-1">
-                                    <h3 className="font-medium text-gray-900">{prof.nombre} {prof.apellido}</h3>
-                                    <p className="text-sm text-gray-600">{prof.email}</p>
-                                    <div className="flex flex-wrap gap-1 mt-2">
-                                      {prof.cursos.map((c: any) => (
-                                        <Badge key={c.id} variant="outline" className="text-xs bg-white">
-                                          {c.codigo || c.nombre}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                    {prof.cursos.length} curso{prof.cursos.length !== 1 ? 's' : ''}
-                                  </Badge>
-                                </div>
-                              </motion.div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
             </div>
 
             {/* Columna lateral */}

@@ -756,21 +756,36 @@ router.post('/evaluations', authenticateToken, async (req: any, res) => {
 
     // Guardar las respuestas individuales si existen
     if (answers && answers.length > 0) {
-      const respuestasData = answers.map((answer: any) => ({
-        evaluacion_id: evaluacion.id,
-        pregunta_id: answer.questionId,
-        calificacion: answer.rating
-      }))
+      const respuestasData = answers.map((answer: any) => {
+        const responseData: any = {
+          evaluacion_id: evaluacion.id,
+          pregunta_id: answer.questionId
+        };
 
-      const { error: respuestasError } = await SupabaseDB.supabaseAdmin
-        .from('respuestas_evaluacion')
-        .insert(respuestasData)
+        // Manejar respuestas de rating
+        if (answer.rating !== null && answer.rating !== undefined) {
+          responseData.calificacion = answer.rating;
+        }
 
-      if (respuestasError) {
-        console.error('❌ Backend: Error saving answers:', respuestasError);
-        // No fallar la operación completa si solo fallan las respuestas individuales
-      } else {
-        console.log('✅ Backend: Answers saved successfully');
+        // Manejar respuestas de texto
+        if (answer.textAnswer !== null && answer.textAnswer !== undefined && answer.textAnswer.trim() !== '') {
+          responseData.respuesta_texto = answer.textAnswer.trim();
+        }
+
+        return responseData;
+      }).filter((response: any) => response.calificacion !== undefined || response.respuesta_texto !== undefined);
+
+      if (respuestasData.length > 0) {
+        const { error: respuestasError } = await SupabaseDB.supabaseAdmin
+          .from('respuestas_evaluacion')
+          .insert(respuestasData)
+
+        if (respuestasError) {
+          console.error('❌ Backend: Error saving answers:', respuestasError);
+          // No fallar la operación completa si solo fallan las respuestas individuales
+        } else {
+          console.log('✅ Backend: Answers saved successfully:', respuestasData.length, 'responses');
+        }
       }
     }
 
@@ -818,33 +833,40 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
     const codigoCurso = curso.codigo || '';
     const prefijo = codigoCurso.split('-')[0] || '';
     
-    let carreraId = '1'; // Default a Sistemas
+    let carreraId: string | null = '1'; // Default a Sistemas
     
     switch (prefijo.toUpperCase()) {
       case 'SIS':
         carreraId = '1'; // Ingeniería de Sistemas
         break;
+      case 'CIV':
+        carreraId = '2'; // Ingeniería Civil
+        break;
+      case 'AMB':
+        carreraId = '3'; // Ingeniería Ambiental
+        break;
+      case 'ENE':
+        carreraId = '4'; // Ingeniería de Energías
+        break;
       case 'TEL':
         carreraId = '5'; // Ingeniería en Telecomunicaciones
-        break;
-      case 'IND':
-        carreraId = '2'; // Ingeniería Industrial
-        break;
-      case 'CIV':
-        carreraId = '3'; // Ingeniería Civil
         break;
       case 'FIN':
         carreraId = '6'; // Ingeniería Financiera
         break;
+      case 'IND':
+        carreraId = '7'; // Ingeniería Industrial
+        break;
       default:
-        carreraId = '1'; // Default a Sistemas
+        // Para cursos que no tienen prefijo específico, usar preguntas generales (tronco común)
+        carreraId = null;
         break;
     }
 
     console.log('🔍 Backend: Course code:', codigoCurso, '-> Career ID:', carreraId);
 
     // Obtener preguntas específicas de la base de datos para esta carrera
-    const { data: preguntasDB, error: preguntasError } = await SupabaseDB.supabaseAdmin
+    let query = SupabaseDB.supabaseAdmin
       .from('preguntas_evaluacion')
       .select(`
         id,
@@ -854,9 +876,16 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
         orden,
         categoria:categorias_pregunta(nombre)
       `)
-      .eq('carrera_id', parseInt(carreraId))
       .eq('activa', true)
-      .order('orden', { ascending: true })
+      .order('orden', { ascending: true });
+
+    if (carreraId) {
+      query = query.eq('id_carrera', parseInt(carreraId));
+    } else {
+      query = query.is('id_carrera', null);
+    }
+
+    const { data: preguntasDB, error: preguntasError } = await query;
 
     if (preguntasError) {
       console.error('❌ Backend: Error obteniendo preguntas de la DB:', preguntasError);
@@ -866,7 +895,7 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
     // Si no hay preguntas específicas para esta carrera, obtener preguntas generales (sin carrera_id)
     let questions = preguntasDB || [];
     
-    if (questions.length === 0) {
+    if (questions.length === 0 && carreraId) {
       console.log('⚠️ Backend: No hay preguntas específicas para carrera', carreraId, ', obteniendo preguntas generales...');
       
       const { data: preguntasGenerales, error: preguntasGeneralesError } = await SupabaseDB.supabaseAdmin
@@ -879,7 +908,7 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
           orden,
           categoria:categorias_pregunta(nombre)
         `)
-        .is('carrera_id', null)
+        .is('id_carrera', null)
         .eq('activa', true)
         .order('orden', { ascending: true })
 
@@ -906,7 +935,7 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
       courseId: parseInt(courseId),
       courseCode: curso.codigo,
       courseName: curso.nombre,
-      carreraId: parseInt(carreraId),
+      carreraId: carreraId ? parseInt(carreraId) : null,
       questions: questionsFormatted
     })
 
@@ -1003,34 +1032,53 @@ router.get('/by-career/:careerId', authenticateToken, async (req: any, res) => {
     }
 
     console.log(`🔎 Profesores base encontrados para carrera ${careerId}:`, profesBase?.length || 0)
+    console.log('🔍 Profesores encontrados:', profesBase?.map((p: any) => ({
+      id: p.id,
+      nombre: p.usuarios?.nombre,
+      apellido: p.usuarios?.apellido,
+      carrera_id: p.carrera_id
+    })))
 
     const profesorIds = (profesBase || []).map((p: any) => p.id)
+    console.log('🔍 IDs de profesores para buscar asignaciones:', profesorIds)
 
     // 2) Intentar traer asignaciones y cursos de estos profesores (si existen) para enriquecer la respuesta
     let asignaciones: any[] = []
     try {
+      console.log('🔍 Buscando asignaciones en tabla asignaciones_profesor...')
       const resp = await SupabaseDB.supabaseAdmin
         .from('asignaciones_profesor')
         .select('id, profesor_id, curso_id, activo')
         .in('profesor_id', profesorIds.length ? profesorIds : ['00000000-0000-0000-0000-000000000000'])
         .eq('activo', true)
       asignaciones = resp.data || []
+      console.log('🔍 Respuesta de asignaciones_profesor:', resp)
+      console.log('🔍 Error de asignaciones_profesor:', resp.error)
     } catch (e) {
+      console.error('❌ Error en consulta de asignaciones_profesor:', e)
       // Si falla, continuar sin cursos
       asignaciones = []
     }
 
     console.log('🔎 Asignaciones cargadas:', asignaciones?.length || 0)
+    console.log('🔎 Asignaciones encontradas:', asignaciones?.map(a => ({ profesor_id: a.profesor_id, curso_id: a.curso_id })))
 
     const cursoIds = Array.from(new Set((asignaciones || []).map((a: any) => a.curso_id).filter(Boolean)))
+    console.log('🔍 IDs de cursos extraídos de asignaciones:', cursoIds)
+    
     let cursos: any[] = []
     if (cursoIds.length > 0) {
+      console.log('🔍 Buscando cursos en tabla cursos...')
       const { data: cursosData, error: cursosErr } = await SupabaseDB.supabaseAdmin
         .from('cursos')
         .select('id, nombre, codigo, carrera_id')
         .in('id', cursoIds)
-        .eq('carrera_id', careerId)
+      console.log('🔍 Respuesta de cursos:', { data: cursosData, error: cursosErr })
       if (!cursosErr) cursos = cursosData || []
+      console.log('🔎 Cursos encontrados (sin filtrar por carrera):', cursos?.length || 0)
+      console.log('🔎 Cursos encontrados:', cursos?.map(c => ({ id: c.id, nombre: c.nombre, carrera_id: c.carrera_id })))
+    } else {
+      console.log('⚠️ No hay cursoIds para buscar cursos')
     }
     console.log('🔎 Cursos filtrados por carrera cargados:', cursos?.length || 0)
     const cursoById = new Map((cursos || []).map((c: any) => [c.id, c]))
@@ -1055,9 +1103,24 @@ router.get('/by-career/:careerId', authenticateToken, async (req: any, res) => {
 
     const result = (profesBase || []).map((p: any) => {
       const asigns = asignacionesByProfesor.get(p.id) || []
+      console.log(`🔍 DEBUG: Profesor ${p.id} (${p.usuarios?.nombre}) - asignaciones:`, asigns)
+      
       const cursosProf = asigns
-        .map((a: any) => cursoById.get(a.curso_id))
+        .map((a: any) => {
+          const curso = cursoById.get(a.curso_id)
+          console.log(`🔍 DEBUG: curso_id: ${a.curso_id}, curso encontrado:`, curso)
+          if (curso) {
+            return {
+              ...curso,
+              // TODO: Agregar calificación promedio cuando se implemente la funcionalidad
+              calificacion_promedio: null
+            }
+          }
+          return null
+        })
         .filter(Boolean)
+      
+      console.log(`🔍 DEBUG: cursosProf final para ${p.usuarios?.nombre}:`, cursosProf)
       return {
         id: p.id,
         usuario_id: p.usuario_id,
@@ -1076,6 +1139,74 @@ router.get('/by-career/:careerId', authenticateToken, async (req: any, res) => {
     res.json(result)
   } catch (error) {
     console.error('❌ Error en /teachers/by-career:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// Endpoint para obtener calificación promedio de un profesor en un curso específico
+router.get('/course-rating/:professorId/:courseId', async (req, res) => {
+  try {
+    const { professorId, courseId } = req.params
+    
+    console.log(`🔍 Obteniendo calificación promedio para profesor ${professorId} en curso ${courseId}`)
+    
+    // Buscar evaluaciones del profesor en el curso específico
+    const { data: evaluaciones, error: evalError } = await SupabaseDB.supabaseAdmin
+      .from('evaluaciones')
+      .select(`
+        id,
+        respuestas_evaluacion (
+          pregunta_id,
+          respuesta,
+          preguntas (
+            tipo_pregunta
+          )
+        )
+      `)
+      .eq('profesor_id', professorId)
+      .eq('curso_id', courseId)
+      .eq('estado', 'completada')
+    
+    if (evalError) {
+      console.error('❌ Error obteniendo evaluaciones:', evalError)
+      return res.status(500).json({ error: 'Error obteniendo evaluaciones' })
+    }
+    
+    console.log(`🔍 Evaluaciones encontradas: ${evaluaciones?.length || 0}`)
+    
+    if (!evaluaciones || evaluaciones.length === 0) {
+      return res.json({
+        promedio: null,
+        total_respuestas: 0,
+        mensaje: 'No hay evaluaciones completadas para este curso'
+      })
+    }
+    
+    // Calcular promedio de respuestas numéricas (Likert scale)
+    let sumaTotal = 0
+    let cantidadRespuestas = 0
+    
+    evaluaciones.forEach(evaluacion => {
+      evaluacion.respuestas_evaluacion?.forEach((respuesta: any) => {
+        if (respuesta.preguntas?.tipo_pregunta === 'likert' && !isNaN(parseInt(respuesta.respuesta))) {
+          sumaTotal += parseInt(respuesta.respuesta)
+          cantidadRespuestas++
+        }
+      })
+    })
+    
+    const promedio = cantidadRespuestas > 0 ? (sumaTotal / cantidadRespuestas).toFixed(2) : null
+    
+    console.log(`✅ Calificación promedio calculada: ${promedio} (${cantidadRespuestas} respuestas)`)
+    
+    res.json({
+      promedio: promedio ? parseFloat(promedio) : null,
+      total_respuestas: cantidadRespuestas,
+      total_evaluaciones: evaluaciones.length
+    })
+    
+  } catch (error) {
+    console.error('❌ Error en /teachers/course-rating:', error)
     res.status(500).json({ error: 'Error interno del servidor' })
   }
 })

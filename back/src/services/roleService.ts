@@ -221,21 +221,27 @@ export class RoleService {
    */
   static async obtenerCoordinadorPorUsuario(usuarioId: string): Promise<CoordinadorInfo | null> {
     try {
+      console.log('🔍 Buscando coordinador para usuario:', usuarioId)
+      
+      // Usar directamente la tabla coordinadores en lugar de la vista
       const { data, error } = await supabaseAdmin
-        .from('vista_coordinadores_completa')
+        .from('coordinadores')
         .select('*')
-        .eq('id', usuarioId)
-        .eq('coordinador_activo', true)
+        .eq('usuario_id', usuarioId)
+        .eq('activo', true)
         .single();
 
+      console.log('🔍 Query coordinador - data:', data)
+      console.log('🔍 Query coordinador - error:', error)
+
       if (error && error.code !== 'PGRST116') {
-        console.error('Error obteniendo coordinador:', error);
+        console.error('❌ Error obteniendo coordinador:', error);
         return null;
       }
 
       return data || null;
     } catch (error) {
-      console.error('Error en obtenerCoordinadorPorUsuario:', error);
+      console.error('❌ Error en obtenerCoordinadorPorUsuario:', error);
       return null;
     }
   }

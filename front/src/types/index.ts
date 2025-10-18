@@ -49,6 +49,7 @@ export interface EvaluationQuestion {
   options?: string[];
   required: boolean;
   order: number;
+  carreraId?: number;
 }
 
 export interface Notification {

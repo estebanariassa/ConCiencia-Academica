@@ -75,7 +75,7 @@ export async function submitEvaluation(evaluationData: {
   teacherId: string;
   courseId: string;
   groupId?: string;
-  answers: Array<{ questionId: string; rating: number }>;
+  answers: Array<{ questionId: string; rating: number | null; textAnswer: string | null }>;
   overallRating: number;
   comments?: string;
 }): Promise<any> {
@@ -132,11 +132,25 @@ export async function fetchStudentInfo(): Promise<any> {
 // Función para obtener profesores por carrera (para coordinadores)
 export async function fetchProfessorsByCareer(careerId: string): Promise<any[]> {
   try {
+    console.log('🌐 fetchProfessorsByCareer: Iniciando llamada a /api/teachers/by-career/' + careerId)
     const response = await apiClient.get(`/api/teachers/by-career/${careerId}`)
+    console.log('🌐 fetchProfessorsByCareer: Respuesta recibida:', response.data)
     return response.data
   } catch (error) {
-    console.error('Error fetching professors by career:', error)
+    console.error('❌ fetchProfessorsByCareer: Error:', error)
     throw new Error('Error al cargar los profesores de la carrera')
+  }
+}
+
+export async function fetchCourseRating(professorId: string, courseId: string): Promise<any> {
+  try {
+    console.log(`🌐 fetchCourseRating: Obteniendo calificación para profesor ${professorId} en curso ${courseId}`)
+    const response = await apiClient.get(`/api/teachers/course-rating/${professorId}/${courseId}`)
+    console.log('🌐 fetchCourseRating: Respuesta recibida:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('❌ fetchCourseRating: Error:', error)
+    throw new Error('Error al cargar la calificación del curso')
   }
 }
 

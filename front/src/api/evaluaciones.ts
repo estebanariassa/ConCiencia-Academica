@@ -23,6 +23,7 @@ export interface PreguntaEvaluacion {
   obligatoria: boolean
   orden: number
   activa: boolean
+  id_carrera?: number
   categoria: {
     id: number
     nombre: string

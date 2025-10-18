@@ -188,14 +188,19 @@ router.post('/login', async (req, res) => {
     let coordinadorInfo: any = null
     try {
       if (roles.includes('coordinador')) {
+        console.log('🔍 Usuario es coordinador, buscando info...')
         const { RoleService } = await import('../services/roleService')
         const info = await RoleService.obtenerCoordinadorPorUsuario(user.id)
+        console.log('🔍 Info coordinador obtenida:', info)
         if (info) {
           coordinadorInfo = { carrera_id: info.carrera_id ?? null }
+          console.log('🔍 coordinadorInfo asignado:', coordinadorInfo)
+        } else {
+          console.log('❌ No se encontró info del coordinador para usuario:', user.id)
         }
       }
     } catch (e) {
-      console.warn('No fue posible obtener info del coordinador:', e)
+      console.warn('❌ Error obteniendo info del coordinador:', e)
     }
     
     console.log(`📍 Dashboard asignado: ${dashboard}`)
