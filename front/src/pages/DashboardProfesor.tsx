@@ -27,7 +27,7 @@ import {
   Eye
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { fetchTeacherStats } from '../api/teachers';
+import { fetchTeacherStats, fetchTeacherCourses } from '../api/teachers';
 
 // Importar el componente Calendar externo
 import Calendar from '../components/Calendar';
@@ -67,6 +67,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
   const navigate = useNavigate();
   const [showCalendar, setShowCalendar] = useState(false);
   const [teacherStats, setTeacherStats] = useState<any>(null);
+  const [teacherCourses, setTeacherCourses] = useState<any[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   
@@ -115,7 +116,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
 
   // Cargar estadísticas del profesor
   useEffect(() => {
-    const loadTeacherStats = async () => {
+    const loadTeacherData = async () => {
       if (!currentUser.id) {
         setLoadingStats(false);
         return;
@@ -124,20 +125,40 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
       try {
         setLoadingStats(true);
         setStatsError(null);
-        console.log('🔍 Loading teacher stats for user ID:', currentUser.id);
+        console.log('🔍 Loading teacher data for user ID:', currentUser.id);
         
-        const stats = await fetchTeacherStats(currentUser.id);
-        console.log('✅ Teacher stats loaded:', stats);
-        setTeacherStats(stats);
+        // Cargar estadísticas y cursos en paralelo
+        const [stats, courses] = await Promise.allSettled([
+          fetchTeacherStats(currentUser.id),
+          fetchTeacherCourses(currentUser.id)
+        ]);
+        
+        // Manejar estadísticas
+        if (stats.status === 'fulfilled') {
+          console.log('✅ Teacher stats loaded:', stats.value);
+          setTeacherStats(stats.value);
+        } else {
+          console.error('❌ Error loading teacher stats:', stats.reason);
+          setTeacherStats(null);
+        }
+        
+        // Manejar cursos
+        if (courses.status === 'fulfilled') {
+          console.log('✅ Teacher courses loaded:', courses.value);
+          setTeacherCourses(courses.value || []);
+        } else {
+          console.error('❌ Error loading teacher courses:', courses.reason);
+          setTeacherCourses([]); // Si hay error, mostrar 0 cursos
+        }
       } catch (error) {
-        console.error('❌ Error loading teacher stats:', error);
-        setStatsError('Error al cargar las estadísticas');
+        console.error('❌ Error loading teacher data:', error);
+        setStatsError('Error al cargar los datos del profesor');
       } finally {
         setLoadingStats(false);
       }
     };
 
-    loadTeacherStats();
+    loadTeacherData();
   }, [currentUser.id]);
 
 
@@ -146,9 +167,8 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
     stats: {
       averageRating: teacherStats?.calificacionPromedio || 0,
       totalEvaluations: teacherStats?.totalEvaluaciones || 0,
-      coursesTeaching: teacherStats?.totalCursos || 0,
+      coursesTeaching: teacherCourses?.length || 0, // Usar cursos reales de asignaciones_profesor
       pendingReviews: 0, // TODO: Implementar lógica para evaluaciones pendientes
-      studentsEvaluated: teacherStats?.totalEstudiantes || 0,
       currentSemester: '2025-1'
     },
     recentEvaluations: teacherStats?.evaluacionesPorCurso?.map((curso: any) => ({
@@ -253,7 +273,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
           </motion.div>
 
           {/* Stats Cards - Específicas para profesores */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Calificación Promedio */}
             <motion.div
               variants={cardVariants}
@@ -273,13 +293,9 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                     <div className="text-3xl font-bold text-gray-400">
                       Cargando...
                     </div>
-                  ) : statsError ? (
-                    <div className="text-lg font-medium text-red-600">
-                      Error
-                    </div>
                   ) : (
                     <div className="text-3xl font-bold text-yellow-600">
-                      {profesorData.stats.averageRating}/5.0
+                      {profesorData.stats.averageRating > 0 ? `${profesorData.stats.averageRating}/5.0` : '0.0/5.0'}
                     </div>
                   )}
                   <p className="text-sm text-gray-500 mt-2 text-left">
@@ -308,13 +324,9 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                     <div className="text-3xl font-bold text-gray-400">
                       Cargando...
                     </div>
-                  ) : statsError ? (
-                    <div className="text-lg font-medium text-red-600">
-                      Error
-                    </div>
                   ) : (
                     <div className="text-3xl font-bold text-green-600">
-                      {profesorData.stats.totalEvaluations}
+                      {profesorData.stats.totalEvaluations || 0}
                     </div>
                   )}
                   <p className="text-sm text-gray-500 mt-2 text-left">
@@ -343,56 +355,18 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                     <div className="text-3xl font-bold text-gray-400">
                       Cargando...
                     </div>
-                  ) : statsError ? (
-                    <div className="text-lg font-medium text-red-600">
-                      Error
-                    </div>
                   ) : (
                     <div className="text-3xl font-bold text-blue-600">
                       {profesorData.stats.coursesTeaching}
                     </div>
                   )}
                   <p className="text-sm text-gray-500 mt-2 text-left">
-                    {loadingStats ? 'Cargando datos...' : 'Cursos evaluados'}
+                    {loadingStats ? 'Cargando datos...' : 'Cursos impartidos'}
                   </p>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* Estudiantes Evaluados */}
-            <motion.div
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              transition={{ delay: 0.5 }}
-            >
-              <Card className="bg-white shadow-md border border-gray-200 p-6">
-                <CardHeader className="flex flex-row items-center justify-between pb-4">
-                  <CardTitle className="text-lg font-medium text-gray-900 text-left">
-                    Estudiantes Evaluados
-                  </CardTitle>
-                  <Users className="h-6 w-6 text-purple-600 ml-4" />
-                </CardHeader>
-                <CardContent>
-                  {loadingStats ? (
-                    <div className="text-3xl font-bold text-gray-400">
-                      Cargando...
-                    </div>
-                  ) : statsError ? (
-                    <div className="text-lg font-medium text-red-600">
-                      Error
-                    </div>
-                  ) : (
-                    <div className="text-3xl font-bold text-purple-600">
-                      {profesorData.stats.studentsEvaluated}
-                    </div>
-                  )}
-                  <p className="text-sm text-gray-500 mt-2 text-left">
-                    {loadingStats ? 'Cargando datos...' : 'Estudiantes únicos'}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

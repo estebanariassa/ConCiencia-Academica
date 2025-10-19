@@ -6,6 +6,7 @@ import evaluacionesRoutes from './routes/evaluaciones'
 import evaluationRoutes from './routes/evaluationRoutes'
 import resultadosRoutes from './routes/resultados'
 import teachersRoutes from './routes/teachers'
+import courseRoutes from './routes/courseRoutes'
 
 dotenv.config()
 
@@ -20,6 +21,7 @@ app.use('/api/evaluaciones', evaluacionesRoutes)
 app.use('/api/evaluations', evaluationRoutes)
 app.use('/api/resultados', resultadosRoutes)
 app.use('/api/teachers', teachersRoutes)
+app.use('/api/courses', courseRoutes)
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true })

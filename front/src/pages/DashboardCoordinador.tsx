@@ -26,6 +26,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { fetchCoordinatorStats } from '../api/teachers';
 
 // Importar el componente Calendar externo
 import Calendar from '../components/Calendar';
@@ -64,6 +65,13 @@ const SectionCard = ({ title, icon: Icon, children, className = '' }: SectionCar
 export default function DashboardCoordinador({ user }: DashboardCoordinadorProps) {
   const navigate = useNavigate();
   const [showCalendar, setShowCalendar] = useState(false);
+  const [stats, setStats] = useState({
+    totalProfesores: 0,
+    totalCursos: 0,
+    totalCarreras: 0,
+    promedioEvaluaciones: 4.2
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
   
   
   // Cargar user desde backend/localStorage si existe
@@ -86,6 +94,27 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
 
   const currentUser = user ?? storedUser ?? { id: '', name: 'Coordinador', type: 'coordinator', email: '', roles: [] };
 
+  // Cargar estadísticas del coordinador
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        setLoadingStats(true);
+        const coordinatorStats = await fetchCoordinatorStats();
+        setStats(prevStats => ({
+          ...prevStats,
+          ...coordinatorStats
+        }));
+      } catch (error) {
+        console.error('Error cargando estadísticas del coordinador:', error);
+        // Mantener valores por defecto en caso de error
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    loadStats();
+  }, []);
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return '¡Buenos días';
@@ -96,12 +125,7 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
 
   // Datos específicos para coordinadores
   const coordinadorData = {
-    stats: {
-      totalCarreras: 0,
-      totalProfesores: 0,
-      totalCursos: 0,
-      promedioEvaluaciones: 4.2
-    },
+    stats: stats,
     quickActions: [
       {
         icon: Users,
@@ -149,15 +173,6 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
     ]
   };
 
-  // Datos quemados para gráfica de tendencia de evaluaciones (promedio mensual)
-  const evaluationTrendData: { mes: string; valor: number }[] = [
-    { mes: 'Ene', valor: 4.1 },
-    { mes: 'Feb', valor: 4.3 },
-    { mes: 'Mar', valor: 4.0 },
-    { mes: 'Abr', valor: 4.2 },
-    { mes: 'May', valor: 4.4 },
-    { mes: 'Jun', valor: 4.3 }
-  ];
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -222,10 +237,14 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-blue-600">
-                    {coordinadorData.stats.totalCarreras}
+                    {loadingStats ? (
+                      <div className="animate-pulse bg-blue-200 h-8 w-16 rounded"></div>
+                    ) : (
+                      coordinadorData.stats.totalCarreras
+                    )}
                   </div>
                   <p className="text-sm text-gray-500 mt-2 text-left">
-                    Carreras disponibles
+                    Encuestas activas (siempre 1)
                   </p>
                 </CardContent>
               </Card>
@@ -247,10 +266,14 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-green-600">
-                    {coordinadorData.stats.totalProfesores}
+                    {loadingStats ? (
+                      <div className="animate-pulse bg-green-200 h-8 w-16 rounded"></div>
+                    ) : (
+                      coordinadorData.stats.totalProfesores
+                    )}
                   </div>
                   <p className="text-sm text-gray-500 mt-2 text-left">
-                    Profesores en la carrera seleccionada
+                    Profesores de mi carrera
                   </p>
                 </CardContent>
               </Card>
@@ -272,10 +295,14 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-purple-600">
-                    {coordinadorData.stats.totalCursos}
+                    {loadingStats ? (
+                      <div className="animate-pulse bg-purple-200 h-8 w-16 rounded"></div>
+                    ) : (
+                      coordinadorData.stats.totalCursos
+                    )}
                   </div>
                   <p className="text-sm text-gray-500 mt-2 text-left">
-                    Cursos en la carrera seleccionada
+                    Cursos de mi carrera
                   </p>
                 </CardContent>
               </Card>
@@ -300,21 +327,6 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                     {coordinadorData.stats.promedioEvaluaciones}
                   </div>
                   <p className="text-sm text-gray-500 mt-2 text-left">Promedio general de la carrera</p>
-                  {/* Mini gráfica con datos quemados */}
-                  <div className="mt-4 space-y-2">
-                    {evaluationTrendData.map((d) => (
-                      <div key={d.mes} className="flex items-center gap-2">
-                        <span className="w-10 text-xs text-gray-600">{d.mes}</span>
-                        <div className="flex-1 h-2 bg-yellow-100 rounded">
-                          <div
-                            className="h-2 bg-yellow-500 rounded"
-                            style={{ width: `${(d.valor / 5) * 100}%` }}
-                          />
-                        </div>
-                        <span className="w-8 text-xs text-gray-700 text-right">{d.valor.toFixed(1)}</span>
-                      </div>
-                    ))}
-                  </div>
                 </CardContent>
               </Card>
             </motion.div>

@@ -1242,4 +1242,93 @@ router.get('/careers', authenticateToken, async (req: any, res) => {
   }
 })
 
+// GET /teachers/:teacherId/courses - Obtener cursos de un profesor específico
+router.get('/:teacherId/courses', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    const { teacherId } = req.params
+
+    console.log('🔍 [/teachers/:teacherId/courses] Request received', { userId: user?.id, teacherId })
+
+    // Verificar que el usuario sea el mismo profesor o un coordinador
+    const isOwnProfile = user.id === teacherId
+    const isCoordinator = user.roles?.includes('coordinador') || user.tipo_usuario === 'coordinador'
+    
+    if (!isOwnProfile && !isCoordinator) {
+      return res.status(403).json({ error: 'Acceso denegado. Solo puedes ver tus propios cursos.' })
+    }
+
+    // Primero obtener el profesor_id desde el usuario_id
+    const { data: profesor, error: profesorError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id')
+      .eq('usuario_id', teacherId)
+      .eq('activo', true)
+      .single()
+
+    if (profesorError) {
+      console.error('Error obteniendo profesor por usuario_id:', profesorError)
+      return res.status(500).json({ error: 'Error obteniendo información del profesor', details: profesorError })
+    }
+
+    if (!profesor) {
+      console.log('⚠️ No se encontró profesor activo para usuario_id:', teacherId)
+      return res.json([]) // Retornar array vacío si no es profesor
+    }
+
+    console.log('🔍 Profesor encontrado:', profesor.id)
+
+    // Obtener asignaciones del profesor con información de cursos
+    const { data: asignaciones, error: asignError } = await SupabaseDB.supabaseAdmin
+      .from('asignaciones_profesor')
+      .select(`
+        id,
+        profesor_id,
+        curso_id,
+        activa,
+        cursos:cursos(
+          id,
+          nombre,
+          codigo,
+          creditos,
+          descripcion,
+          activo,
+          carrera_id,
+          carreras:carreras(
+            id,
+            nombre,
+            codigo
+          )
+        )
+      `)
+      .eq('profesor_id', profesor.id)
+      .eq('activa', true)
+
+    if (asignError) {
+      console.error('Error consultando asignaciones del profesor:', asignError)
+      return res.status(500).json({ error: 'Error obteniendo cursos del profesor', details: asignError })
+    }
+
+    // Filtrar solo cursos activos y formatear respuesta
+    const cursos = (asignaciones || [])
+      .filter((asig: any) => asig.cursos && asig.cursos.activo)
+      .map((asig: any) => ({
+        id: asig.cursos.id,
+        nombre: asig.cursos.nombre,
+        codigo: asig.cursos.codigo,
+        creditos: asig.cursos.creditos,
+        descripcion: asig.cursos.descripcion,
+        carrera_id: asig.cursos.carrera_id,
+        carrera: asig.cursos.carreras
+      }))
+
+    console.log(`✅ Cursos encontrados para profesor ${profesor.id} (usuario ${teacherId}):`, cursos.length)
+    res.json(cursos)
+
+  } catch (error) {
+    console.error('❌ Error en /teachers/:teacherId/courses:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
 export default router

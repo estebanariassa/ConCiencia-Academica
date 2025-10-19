@@ -4,7 +4,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { submitEvaluation, fetchStudentInfo, fetchEvaluationQuestions } from '../../api/teachers';
 import { CardHeader, CardContent, CardTitle, CardDescription } from '../../components/Card';
 import { HiOutlineCalendar } from "react-icons/hi";
-import { FaRegBuilding } from "react-icons/fa"
+import { FaRegBuilding } from "react-icons/fa";
+import { FaBook, FaUsers, FaCommentDots, FaCheckCircle } from "react-icons/fa";
 
 import Card from '../../components/Card';
 import Button from '../../components/Button';
@@ -285,8 +286,9 @@ export default function EvaluationForm() {
                             <h2 className="text-xl font-semibold text-gray-900">{teacher?.name}</h2>
                             <p className="text-md text-gray-600">{course?.name} - {course?.code}</p>
                             {course && (
-                              <p className="text-sm text-blue-600 font-medium">
-                                📚 Evaluación para: {course.code} - {course.name}
+                              <p className="text-sm text-red-600 font-medium flex items-center gap-2">
+                                <FaBook className="text-red-600" />
+                                Evaluación para: {course.code} - {course.name}
                               </p>
                             )}
                           </div>
@@ -314,8 +316,9 @@ export default function EvaluationForm() {
                             </span>
                           )}
                           {group.cup && (
-                            <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                              👥 {group.cup} cupos
+                            <span className="flex items-center gap-2 text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                              <FaUsers className="text-gray-600" />
+                              {group.cup} cupos
                             </span>
                           )}
                         </div>
@@ -376,9 +379,10 @@ export default function EvaluationForm() {
                       </>
                     ) : (
                       <div className="space-y-4">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                          <p className="text-blue-800 text-sm font-medium">
-                            💬 Esta es una pregunta abierta. Escribe tu respuesta en el campo de texto.
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <p className="text-red-800 text-sm font-medium flex items-center gap-2">
+                            <FaCommentDots className="text-red-600" />
+                            Esta es una pregunta abierta. Escribe tu respuesta en el campo de texto.
                           </p>
                         </div>
                         
@@ -398,10 +402,11 @@ export default function EvaluationForm() {
                           <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="bg-green-50 border border-green-200 rounded-lg p-4"
+                            className="bg-red-50 border border-red-200 rounded-lg p-4"
                           >
-                            <p className="text-green-800 text-sm font-medium">
-                              ✅ Respuesta guardada ({textAnswers[currentQuestion].length} caracteres)
+                            <p className="text-red-800 text-sm font-medium flex items-center gap-2">
+                              <FaCheckCircle className="text-green-600" />
+                              Respuesta guardada 
                             </p>
                           </motion.div>
                         )}

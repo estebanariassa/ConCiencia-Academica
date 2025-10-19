@@ -8,26 +8,19 @@ import {
 } from '../components/Card';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import Badge from '../components/Badge';
 import Header from '../components/Header';
-import { authApi } from '../api/auth';
 import { User } from '../types';
 import { 
-  Settings, 
   Calendar as CalendarIcon, 
   ClipboardCheck, 
   Bell, 
   Star,
   BookOpen,
-  Clock,
-  TrendingUp,
   Users,
   Mail,
   Phone,
   MapPin,
   BarChart3,
-  UserCog,
-  AlertCircle,
   User as UserIcon
 } from 'lucide-react';
 import { useState } from 'react';
@@ -40,8 +33,6 @@ const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
 
 interface DashboardProps {
   user: User;
-  onStartEvaluation: () => void;
-  onViewReports: () => void;
 }
 
 // Componente reutilizable para las cards
@@ -68,7 +59,7 @@ const SectionCard = ({ title, icon: Icon, children, className = '' }: SectionCar
   );
 };
 
-export default function Dashboard({ user, onStartEvaluation, onViewReports }: DashboardProps) {
+export default function Dashboard({ user }: DashboardProps) {
   const navigate = useNavigate();
   const [showCalendar, setShowCalendar] = useState(false);
   // Cargar user desde backend/localStorage si existe
@@ -156,10 +147,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             coursesTeaching: 4,
             pendingReviews: 5
           },
-          upcomingEvaluations: [
-            { id: 1, course: 'Matemáticas I', period: 'Semestre 2025-1', deadline: '2025-01-25' },
-            { id: 2, course: 'Física II', period: 'Semestre 2025-1', deadline: '2025-01-28' }
-          ],
           notifications: [
             { id: 1, text: '15 estudiantes han completado tu evaluación', time: '2 horas', urgent: false },
             { id: 2, text: 'Recordatorio: Cierre de evaluaciones este viernes', time: '1 día', urgent: true },
@@ -265,18 +252,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
     visible: { opacity: 1, y: 0 }
   };
 
-  // Función para obtener el subtítulo de la evaluación según el tipo de usuario
-  const getEvaluationSubtitle = (evaluation: any) => {
-    switch (currentUser.type) {
-      case 'student':
-        return evaluation.teacher;
-      case 'teacher':
-      case 'coordinator':
-        return evaluation.period;
-      default:
-        return '';
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -502,34 +477,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
                       </div>
                     </div>
 
-                    {/* Evaluaciones Próximas */}
-                    <div className="pt-6 border-t border-gray-200">
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">Evaluaciones Próximas</h3>
-                      <div className="space-y-5">
-                        {userData.upcomingEvaluations.map((evaluation, index) => (
-                          <motion.div
-                            key={evaluation.id}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.8 + index * 0.1 }}
-                            className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
-                          >
-                            <div>
-                              <p className="font-medium text-lg text-gray-900">{evaluation.course}</p>
-                              <p className="text-sm text-gray-600">
-                                {getEvaluationSubtitle(evaluation)}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-sm bg-white py-1">
-                                <Clock className="h-4 w-4 mr-1" />
-                                {evaluation.deadline}
-                              </Badge>
-                            </div>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
