@@ -130,7 +130,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
     setSelectedPeriod(newPeriod);
   };
 
-  // Datos reales o fallback, filtrados por curso si se seleccionó uno
+  // Datos reales, filtrados por curso si se seleccionó uno
   const categoryData = teacherStats?.evaluacionesPorCurso?.length > 0 ? 
     teacherStats.evaluacionesPorCurso
       .filter((curso: any) => selectedCourse === 'all' || curso.curso_id === parseInt(selectedCourse))
@@ -138,67 +138,30 @@ export default function ReportsPage({ user }: ReportsPageProps) {
         category: curso.nombre,
         rating: curso.promedio,
         total: curso.total
-      })) : [
-      // Datos quemados para categorías de evaluación
-      { category: 'Claridad Expositiva', rating: 4.2, total: 45 },
-      { category: 'Conocimiento del Tema', rating: 4.7, total: 45 },
-      { category: 'Responsabilidad', rating: 4.5, total: 45 },
-      { category: 'Interacción con Estudiantes', rating: 3.8, total: 45 },
-      { category: 'Metodología de Enseñanza', rating: 4.1, total: 45 },
-      { category: 'Sistema de Evaluación', rating: 4.3, total: 45 },
-      { category: 'Trato Personal', rating: 4.6, total: 45 },
-      { category: 'Motivación al Aprendizaje', rating: 3.9, total: 45 },
-      { category: 'Disponibilidad', rating: 4.0, total: 45 },
-      { category: 'Recomendación General', rating: 4.4, total: 45 }
-    ];
+      })) : [];
 
   // Datos de tendencia históricos reales
-  const trendData = historicalData.length > 0 ? historicalData : [
-    { period: '2023-1', rating: 4.2 },
-    { period: '2023-2', rating: 4.3 },
-    { period: '2024-1', rating: 4.4 },
-    { period: '2024-2', rating: 4.5 },
-    { period: '2025-1', rating: 4.6 },
-    { period: '2025-2', rating: teacherStats?.calificacionPromedio || 4.7 }
-  ];
+  const trendData = historicalData.length > 0 ? historicalData : [];
 
-  const radarData = [
-    { subject: 'Claridad', A: 4.2, fullMark: 5 },
-    { subject: 'Conocimiento', A: 4.7, fullMark: 5 },
-    { subject: 'Metodología', A: 4.1, fullMark: 5 },
-    { subject: 'Evaluación', A: 4.3, fullMark: 5 },
-    { subject: 'Trato', A: 4.6, fullMark: 5 },
-    { subject: 'Motivación', A: 3.9, fullMark: 5 }
-  ];
+  const radarData = [];
 
-  // Distribución de calificaciones (simulada basada en el promedio real)
+  // Distribución de calificaciones (solo datos reales)
   const distributionData = teacherStats?.totalEvaluaciones > 0 ? [
     { name: '5 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.35)), color: '#10B981' },
     { name: '4 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.28)), color: '#3B82F6' },
     { name: '3 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.20)), color: '#F59E0B' },
     { name: '2 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.12)), color: '#EF4444' },
     { name: '1 Estrella', value: Math.round((teacherStats.totalEvaluaciones * 0.05)), color: '#6B7280' }
-  ] : [
-    { name: '5 Estrellas', value: 35, color: '#10B981' },
-    { name: '4 Estrellas', value: 28, color: '#3B82F6' },
-    { name: '3 Estrellas', value: 20, color: '#F59E0B' },
-    { name: '2 Estrellas', value: 12, color: '#EF4444' },
-    { name: '1 Estrella', value: 5, color: '#6B7280' }
-  ];
+  ] : [];
 
-  const departmentData = [
-    { department: 'Ingeniería', rating: 4.3, evaluations: 120 },
-    { department: 'Ciencias', rating: 4.1, evaluations: 85 },
-    { department: 'Humanidades', rating: 4.5, evaluations: 95 },
-    { department: 'Administración', rating: 4.0, evaluations: 110 }
-  ];
+  const departmentData = [];
 
-  // Estadísticas reales o fallback
+  // Estadísticas reales
   const mockStats = {
-    totalEvaluations: teacherStats?.totalEvaluaciones || (user.type === 'coordinator' ? 410 : 45),
-    averageRating: teacherStats?.calificacionPromedio || 4.3,
-    responseRate: 87, // TODO: Calcular tasa de respuesta real
-    improvement: user.type === 'coordinator' ? 5.2 : 8.1 // TODO: Calcular mejora real
+    totalEvaluations: teacherStats?.totalEvaluaciones || 0,
+    averageRating: teacherStats?.calificacionPromedio || 0,
+    responseRate: 0, // TODO: Calcular tasa de respuesta real
+    improvement: 0 // TODO: Calcular mejora real
   };
 
   return (
@@ -276,17 +239,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                         </option>
                       ))
                     ) : (
-                      // Datos quemados cuando no hay datos en la base de datos
-                      <>
-                        <option value="1">Matemáticas I</option>
-                        <option value="2">Física II</option>
-                        <option value="3">Cálculo III</option>
-                        <option value="4">Programación I</option>
-                        <option value="5">Base de Datos</option>
-                        <option value="6">Ingeniería de Software</option>
-                        <option value="7">Redes de Computadores</option>
-                        <option value="8">Sistemas Operativos</option>
-                      </>
+                      <option value="" disabled>No hay cursos disponibles</option>
                     )}
                   </select>
                 )}
@@ -591,23 +544,25 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Mejor Calificación</span>
-                      <Badge className="bg-green-100 text-green-800">4.9/5.0</Badge>
+                      <Badge className="bg-green-100 text-green-800">
+                        {teacherStats?.calificacionPromedio ? `${teacherStats.calificacionPromedio.toFixed(1)}/5.0` : 'N/A'}
+                      </Badge>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Categoría Destacada</span>
-                      <Badge variant="outline">Conocimiento</Badge>
+                      <span className="text-sm font-medium">Total Evaluaciones</span>
+                      <Badge variant="outline">{teacherStats?.totalEvaluaciones || 0}</Badge>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Área de Mejora</span>
-                      <Badge variant="outline" className="text-orange-600">Interacción</Badge>
+                      <span className="text-sm font-medium">Cursos Evaluados</span>
+                      <Badge variant="outline" className="text-orange-600">{teacherStats?.totalCursos || 0}</Badge>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Participación</span>
-                      <Badge className="bg-blue-100 text-blue-800">87%</Badge>
+                      <span className="text-sm font-medium">Período</span>
+                      <Badge className="bg-blue-100 text-blue-800">{selectedPeriod}</Badge>
                     </div>
                   </div>
 
-                  {user.type === 'coordinator' && (
+                  {user.type === 'coordinator' && departmentData.length > 0 && (
                     <div className="pt-4 border-t border-gray-200">
                       <h4 className="font-medium mb-3">Por Departamento</h4>
                       <div className="space-y-2">

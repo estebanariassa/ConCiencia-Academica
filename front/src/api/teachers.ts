@@ -320,6 +320,42 @@ export async function debugUserInfo(): Promise<any> {
   }
 }
 
+// Función de debug para verificar asignaciones de profesores
+export async function debugAssignments(careerId: string): Promise<any> {
+  try {
+    console.log('🌐 Debug: Fetching assignments for career:', careerId);
+    const response = await apiClient.get(`/api/teachers/debug-assignments/${careerId}`)
+    console.log('🌐 Debug assignments response:', response.data);
+    return response.data
+  } catch (error) {
+    console.error('❌ Debug: Error fetching assignments:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    throw new Error('Error al obtener información de debug de asignaciones')
+  }
+}
+
+// Función de debug para verificar grupos de un curso
+export async function debugGroups(profesorId: string, courseId: string): Promise<any> {
+  try {
+    console.log('🌐 Debug: Fetching groups for profesor:', profesorId, 'course:', courseId);
+    const response = await apiClient.get(`/api/teachers/debug-groups/${profesorId}/${courseId}`)
+    console.log('🌐 Debug groups response:', response.data);
+    return response.data
+  } catch (error) {
+    console.error('❌ Debug: Error fetching groups:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    throw new Error('Error al obtener información de debug de grupos')
+  }
+}
+
 // Función de debug para verificar autenticación
 export async function debugAuth(): Promise<any> {
   try {

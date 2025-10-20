@@ -7,6 +7,7 @@ import evaluationRoutes from './routes/evaluationRoutes'
 import resultadosRoutes from './routes/resultados'
 import teachersRoutes from './routes/teachers'
 import courseRoutes from './routes/courseRoutes'
+import passwordResetRoutes from './routes/passwordReset'
 
 dotenv.config()
 
@@ -22,6 +23,7 @@ app.use('/api/evaluations', evaluationRoutes)
 app.use('/api/resultados', resultadosRoutes)
 app.use('/api/teachers', teachersRoutes)
 app.use('/api/courses', courseRoutes)
+app.use('/api/auth', passwordResetRoutes)
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true })

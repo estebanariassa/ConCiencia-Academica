@@ -217,9 +217,9 @@ export default function Login() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-lg relative z-10" 
+        className="w-full max-w-md sm:max-w-lg relative z-10" 
       >
-        <Card className="bg-white shadow-x p-8"> 
+        <Card className="bg-white shadow-xl p-4 sm:p-8"> 
           {/* Header con logo de la universidad */}
           <div className="text-center mb-8">
             <motion.div
@@ -232,11 +232,11 @@ export default function Login() {
               <img 
                 src={logoUniversidad} 
                 alt="Logo Universidad de Medellín" 
-                className="h-[140px] w-[150px] object-contain"
+                className="h-20 w-20 sm:h-[140px] sm:w-[150px] object-contain"
               />
             </motion.div>
-            <h1 className="text-2xl font-bold text-gray-800">ConCiencia Academica</h1>
-            <p className="text-gray-600 mt-2 text-sm">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">ConCiencia Academica</h1>
+            <p className="text-gray-600 mt-2 text-xs sm:text-sm">
               Accede con tus credenciales institucionales
             </p>
           </div>
@@ -382,9 +382,12 @@ export default function Login() {
 
           {/* Enlace de olvidé contraseña */}
           <div className="text-center mt-4">
-            <a href="#" className="text-sm text-red-600 hover:text-red-800 transition-colors">
+            <button 
+              onClick={() => navigate('/forgot-password')}
+              className="text-sm text-red-600 hover:text-red-800 transition-colors"
+            >
               ¿Olvidaste tu contraseña?
-            </a>
+            </button>
           </div>
 
           {/* Línea divisoria */}

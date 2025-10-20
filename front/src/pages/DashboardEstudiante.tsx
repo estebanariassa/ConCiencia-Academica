@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { evaluacionesApi, Evaluacion } from '../api/evaluaciones'
@@ -26,7 +26,7 @@ import {
 const fondo = new URL('../assets/fondo.webp', import.meta.url).href
 
 export default function DashboardEstudiante() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const [evaluaciones, setEvaluaciones] = useState<Evaluacion[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -78,9 +78,50 @@ export default function DashboardEstudiante() {
           }}
         />
 
-        <main className="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
+        <main className="max-w-7xl mx-auto p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
+          {/* Welcome Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="bg-gradient-to-r from-red-600 to-red-700 text-white shadow-lg border-0">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                      <User className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl sm:text-2xl font-bold">
+                        ¡Hola, {user?.nombre}!
+                      </h1>
+                      <p className="text-red-100 mt-1 text-sm sm:text-base">
+                        Bienvenido a tu panel de estudiante
+                      </p>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-2">
+                        <Badge className="bg-white bg-opacity-20 text-white border-white border-opacity-30 text-xs">
+                          {user?.tipo_usuario === 'estudiante' ? 'Estudiante' : 'Usuario'}
+                        </Badge>
+                        <span className="text-red-100 text-xs sm:text-sm">
+                          {user?.email}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-center sm:text-right">
+                    <div className="text-2xl sm:text-3xl font-bold">
+                      {evaluaciones.length > 0 ? Math.round((evaluacionesCompletadas.length / evaluaciones.length) * 100) : 0}%
+                    </div>
+                    <p className="text-red-100 text-xs sm:text-sm">Progreso General</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -161,16 +202,16 @@ export default function DashboardEstudiante() {
             transition={{ delay: 0.5 }}
           >
             <Card className="bg-white shadow-md border border-gray-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                   <FileText className="h-5 w-5" />
                   Mis Evaluaciones
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-sm sm:text-base">
                   Historial de evaluaciones realizadas
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6">
                 {loading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto"></div>
@@ -192,29 +233,31 @@ export default function DashboardEstudiante() {
                         key={evaluacion.id}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                        className="p-3 sm:p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="font-medium text-gray-900">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                              <h3 className="font-medium text-gray-900 text-sm sm:text-base">
                                 {evaluacion.grupo.curso.nombre}
                               </h3>
-                              <Badge variant="outline" className="text-xs">
-                                {evaluacion.grupo.curso.codigo}
-                              </Badge>
-                              {evaluacion.completada ? (
-                                <Badge className="bg-green-100 text-green-800">
-                                  Completada
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {evaluacion.grupo.curso.codigo}
                                 </Badge>
-                              ) : (
-                                <Badge className="bg-orange-100 text-orange-800">
-                                  Pendiente
-                                </Badge>
-                              )}
+                                {evaluacion.completada ? (
+                                  <Badge className="bg-green-100 text-green-800 text-xs">
+                                    Completada
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-orange-100 text-orange-800 text-xs">
+                                    Pendiente
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                             
-                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
                               <div className="flex items-center gap-1">
                                 <User className="h-4 w-4" />
                                 <span>
@@ -237,7 +280,7 @@ export default function DashboardEstudiante() {
                           {!evaluacion.completada && (
                             <Button 
                               size="sm"
-                              className="bg-red-600 hover:bg-red-700"
+                              className="bg-red-600 hover:bg-red-700 w-full sm:w-auto text-xs sm:text-sm"
                             >
                               Evaluar
                             </Button>

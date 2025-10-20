@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import Button from './Button';
 import UserMenu from './UserMenu';
-import { Bell, ArrowLeft } from 'lucide-react';
+import NotificationDropdown from './NotificationDropdown';
+import { ArrowLeft } from 'lucide-react';
 import { User } from '../types';
 
 // Importar imágenes
@@ -38,17 +39,17 @@ export default function Header({
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="bg-white border-b border-gray-200 px-4 lg:px-4 py-8 lg:py-1"
+        className="bg-white border-b border-gray-200 px-3 sm:px-4 lg:px-4 py-4 sm:py-6 lg:py-1"
       >
         <div className="w-full">
           {/* Primera fila: logo a la izquierda, usuario a la derecha */}
           <div className="flex items-center justify-between w-full">
             {/* Logo y nombre de la universidad - Reducido para móviles */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <motion.img
                 src={logoUniversidad}
                 alt="Logo Universidad de Medellín"
-                className="h-[120px] w-auto object-contain cursor-pointer select-none"
+                className="h-16 w-16 sm:h-20 sm:w-20 lg:h-[120px] lg:w-auto object-contain cursor-pointer select-none"
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={handleLogoClick}
@@ -56,9 +57,9 @@ export default function Header({
                 aria-label="Ir al inicio"
                 title="Ir al inicio"
               />
-              <div className="hidden md:block">
-                <h1 className="text-lg lg:text-xl font-semibold text-gray-900">ConCiencia Academica</h1>
-                <p className="text-sm lg:text-base text-gray-600">Universidad de Medellín</p>
+              <div className="hidden sm:block">
+                <h1 className="text-sm sm:text-lg lg:text-xl font-semibold text-gray-900">ConCiencia Academica</h1>
+                <p className="text-xs sm:text-sm lg:text-base text-gray-600">Universidad de Medellín</p>
               </div>
             </div>
             
@@ -73,13 +74,10 @@ export default function Header({
             )}
             
             {/* Elementos del usuario (campana y menú de usuario) */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               {user && (
                 <>
-                  <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-4 w-4" />
-                    <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-600 rounded-full"></span>
-                  </Button>
+                  <NotificationDropdown />
                   <UserMenu />
                 </>
               )}

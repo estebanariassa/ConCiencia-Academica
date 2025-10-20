@@ -14,7 +14,6 @@ import { User } from '../types';
 import { 
   Calendar as CalendarIcon, 
   ClipboardCheck, 
-  Bell, 
   Star,
   BookOpen,
   Clock,
@@ -180,12 +179,6 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
       { id: 2, course: 'Física II', task: 'Cierre de período de evaluación', deadline: '2025-01-28', urgent: false },
       { id: 3, course: 'Cálculo III', task: 'Envío de reportes', deadline: '2025-02-01', urgent: false }
     ],
-    notifications: [
-      { id: 1, text: '15 estudiantes han completado tu evaluación de Matemáticas I', time: '2 horas', urgent: false },
-      { id: 2, text: 'Recordatorio: Cierre de evaluaciones este viernes', time: '1 día', urgent: true },
-      { id: 3, text: 'Nuevo mensaje de un estudiante en Física II', time: '3 días', urgent: false },
-      { id: 4, text: 'Reporte de evaluaciones disponible para descarga', time: '5 días', urgent: false }
-    ],
     quickActions: [
         {
           icon: BarChart3,
@@ -201,7 +194,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
           description: 'Ver la encuesta de mi carrera',
           onClick: handleViewSurvey,
           variant: 'outline' as const,
-          className: 'border-gray-300'
+          className: 'border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400'
         },
         {
           icon: CalendarIcon,
@@ -209,7 +202,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
           description: 'Fechas importantes',
           onClick: toggleCalendar,
           variant: 'outline' as const,
-          className: 'border-gray-300'
+          className: 'border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400'
         }
     ]
   };
@@ -514,27 +507,6 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
 
             {/* Columna lateral */}
             <div className="space-y-8">
-              {/* Notificaciones */}
-              <SectionCard title="Notificaciones" icon={Bell}>
-                <div className="space-y-4">
-                  {profesorData.notifications.map((notification, index) => (
-                    <motion.div
-                      key={notification.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.9 + index * 0.1 }}
-                      className={`p-4 rounded-lg border transition-colors ${
-                        notification.urgent 
-                          ? 'bg-red-50 border-red-200' 
-                          : 'bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      <p className="text-base font-medium text-gray-900">{notification.text}</p>
-                      <p className="text-sm text-gray-500 mt-2">{notification.time}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </SectionCard>
 
               {/* Próximas Fechas Límite */}
               <SectionCard title="Próximas Fechas Límite" icon={Clock}>

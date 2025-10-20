@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
@@ -151,23 +151,24 @@ export default function Evaluacion() {
 
       <div className="relative z-10">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 py-4">
-          <div className="max-w-4xl mx-auto px-4 lg:px-6">
+        <div className="bg-white border-b border-gray-200 py-3 sm:py-4">
+          <div className="max-w-4xl mx-auto px-3 sm:px-4 lg:px-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   onClick={() => navigate('/dashboard')}
+                  className="text-xs sm:text-sm"
                 >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Volver
+                  <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Volver</span>
                 </Button>
                 <div>
-                  <h1 className="text-xl font-semibold text-gray-900">
+                  <h1 className="text-lg sm:text-xl font-semibold text-gray-900">
                     Evaluación Docente
                   </h1>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-xs sm:text-sm text-gray-600">
                     Pregunta {currentQuestion + 1} de {preguntas.length}
                   </p>
                 </div>
@@ -177,8 +178,8 @@ export default function Evaluacion() {
         </div>
 
         {/* Progress Bar */}
-        <div className="bg-white border-b border-gray-200 py-3">
-          <div className="max-w-4xl mx-auto px-4 lg:px-6">
+        <div className="bg-white border-b border-gray-200 py-2 sm:py-3">
+          <div className="max-w-4xl mx-auto px-3 sm:px-4 lg:px-6">
             <ProgressBar 
               current={currentQuestion + 1} 
               total={preguntas.length} 
@@ -187,7 +188,7 @@ export default function Evaluacion() {
           </div>
         </div>
 
-        <main className="max-w-4xl mx-auto p-4 lg:p-6">
+        <main className="max-w-4xl mx-auto p-3 sm:p-4 lg:p-6">
           {currentPregunta && (
             <motion.div
               key={currentQuestion}
@@ -196,16 +197,16 @@ export default function Evaluacion() {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <Card className="bg-white shadow-lg border border-gray-200 p-6">
-                <CardHeader className="pb-6">
-                  <CardTitle className="text-2xl font-bold text-gray-900">
+              <Card className="bg-white shadow-lg border border-gray-200 p-4 sm:p-6">
+                <CardHeader className="pb-4 sm:pb-6">
+                  <CardTitle className="text-lg sm:text-2xl font-bold text-gray-900">
                     {currentPregunta.categoria.nombre}
                   </CardTitle>
-                  <CardDescription className="text-xl text-gray-700 mt-2">
+                  <CardDescription className="text-base sm:text-xl text-gray-700 mt-2">
                     {currentPregunta.texto_pregunta}
                   </CardDescription>
                   {currentPregunta.descripcion && (
-                    <p className="text-gray-600 mt-2">
+                    <p className="text-sm sm:text-base text-gray-600 mt-2">
                       {currentPregunta.descripcion}
                     </p>
                   )}

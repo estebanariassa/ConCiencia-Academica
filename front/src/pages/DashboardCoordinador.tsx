@@ -13,7 +13,6 @@ import Header from '../components/Header';
 import { User } from '../types';
 import { 
   Calendar as CalendarIcon, 
-  Bell, 
   BookOpen,
   Clock,
   Users,
@@ -157,14 +156,8 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
         description: 'Fechas importantes',
         onClick: () => setShowCalendar(true),
         variant: 'outline' as const,
-        className: 'border-gray-300'
+        className: 'border-red-300 text-red-600 hover:bg-red-50'
       }
-    ],
-    notifications: [
-      { id: 1, text: 'Nueva evaluación disponible para revisión', time: '2 horas', urgent: false },
-      { id: 2, text: 'Recordatorio: Reunión de coordinadores mañana', time: '1 día', urgent: true },
-      { id: 3, text: 'Reporte mensual de evaluaciones listo', time: '3 días', urgent: false },
-      { id: 4, text: 'Solicitud de nuevo curso pendiente de aprobación', time: '5 días', urgent: false }
     ],
     upcomingDeadlines: [
       { id: 1, task: 'Revisión de evaluaciones del período', deadline: '2025-01-25', urgent: true },
@@ -381,27 +374,6 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
 
             {/* Columna lateral */}
             <div className="space-y-8">
-              {/* Notificaciones */}
-              <SectionCard title="Notificaciones" icon={Bell}>
-                <div className="space-y-4">
-                  {coordinadorData.notifications.map((notification, index) => (
-                    <motion.div
-                      key={notification.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.8 + index * 0.1 }}
-                      className={`p-4 rounded-lg border transition-colors ${
-                        notification.urgent 
-                          ? 'bg-red-50 border-red-200' 
-                          : 'bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      <p className="text-base font-medium text-gray-900">{notification.text}</p>
-                      <p className="text-sm text-gray-500 mt-2">{notification.time}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </SectionCard>
 
               {/* Próximas Fechas Límite */}
               <SectionCard title="Próximas Fechas Límite" icon={Clock}>

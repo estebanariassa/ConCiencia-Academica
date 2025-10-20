@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { fetchProfessorsByCareer, fetchCourseRating } from '../api/teachers'
+import { fetchProfessorsByCareer, fetchCourseGroups, debugAssignments, debugGroups } from '../api/teachers'
 import Header from '../components/Header'
 import Card, { CardHeader, CardContent, CardDescription, CardTitle } from '../components/Card'
 import Button from '../components/Button'
 import Badge from '../components/Badge'
 import { motion } from 'framer-motion'
-import { Search, ArrowLeft, ChevronRight, GraduationCap, BookOpen, User as UserIcon } from 'lucide-react'
+import { Search, ArrowLeft, ChevronRight, GraduationCap, BookOpen, User as UserIcon, Clock } from 'lucide-react'
 
 export default function ManageProfessors() {
   const navigate = useNavigate()
@@ -23,9 +23,10 @@ export default function ManageProfessors() {
   const [professors, setProfessors] = useState<any[]>([])
   const [selectedProfessor, setSelectedProfessor] = useState<any | null>(null)
   const [selectedCourse, setSelectedCourse] = useState<any | null>(null)
-  const [courseRating, setCourseRating] = useState<any>(null)
-  const [loadingRating, setLoadingRating] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [courseGroups, setCourseGroups] = useState<any[]>([])
+  const [loadingGroups, setLoadingGroups] = useState<boolean>(false)
+  const [selectedGroup, setSelectedGroup] = useState<any>(null)
 
   // Cargar profesores reales por carrera: primero `careerId` por query, sino del coordinador guardado
   useEffect(() => {
@@ -79,6 +80,16 @@ export default function ManageProfessors() {
         
         console.log('🔍 Cargando profesores para carrera:', cid)
         console.log('🔍 Usuario coordinador:', storedUser?.coordinador)
+        console.log('🔍 Usuario completo:', storedUser)
+        
+        // Debug: Verificar asignaciones
+        try {
+          console.log('🔍 [DEBUG] Llamando a debugAssignments...')
+          const debugData = await debugAssignments(String(cid))
+          console.log('🔍 [DEBUG] Datos de debug:', debugData)
+        } catch (debugError) {
+          console.error('❌ [DEBUG] Error en debugAssignments:', debugError)
+        }
         
         let data
         try {
@@ -98,22 +109,57 @@ export default function ManageProfessors() {
           name: `${p.nombre ?? p.usuario?.nombre ?? ''} ${p.apellido ?? p.usuario?.apellido ?? ''}`.trim() || 'Sin nombre',
           department: p.carrera_nombre || p.cursos?.[0]?.carrera_nombre || 'Sin departamento',
           email: p.email ?? p.usuario?.email ?? '',
-          courses: (p.cursos || []).map((c: any) => ({
-            id: c.id,
-            code: c.codigo,
-            name: c.nombre,
-            schedule: 'Por definir',
-            carrera_id: c.carrera_id
-          }))
+          courses: (p.cursos || [])
+            .filter((c: any) => {
+              // Incluir cursos de la carrera del coordinador Y cursos de tronco común (id_carrera = 8)
+              const isCoordinatorCareer = c.carrera_id === parseInt(cid || '0')
+              const isCommonTrunk = c.carrera_id === 8
+              return isCoordinatorCareer || isCommonTrunk
+            })
+            .map((c: any) => ({
+              id: c.id,
+              code: c.codigo,
+              name: c.nombre,
+              schedule: 'Por definir',
+              carrera_id: c.carrera_id,
+              carrera_nombre: c.carrera_nombre || (c.carrera_id === 8 ? 'Tronco Común' : 'Carrera Específica')
+            }))
+            // Eliminar duplicados por ID
+            .filter((course: any, index: number, self: any[]) => 
+              index === self.findIndex((c: any) => c.id === course.id)
+            )
         }))
         console.log('✅ Profesores normalizados:', normalized)
         console.log('✅ Cantidad de profesores normalizados:', normalized.length)
         
+        // Debug: Verificar si hay profesores sin cursos
+        const profesoresSinCursos = normalized.filter(p => p.courses.length === 0)
+        if (profesoresSinCursos.length > 0) {
+          console.warn('⚠️ Profesores sin cursos encontrados:', profesoresSinCursos.map(p => p.name))
+        }
+        
         // Log detallado de cursos por profesor
         normalized.forEach((prof, index) => {
           console.log(`📚 Profesor ${index + 1}: ${prof.name}`)
-          console.log(`📚 Cursos:`, prof.courses)
+          console.log(`📚 Cursos originales del backend:`, prof.courses)
           console.log(`📚 Cantidad de cursos:`, prof.courses.length)
+          
+          // Log de cursos por tipo
+          const carreraSpecific = prof.courses.filter((c: any) => c.carrera_id === parseInt(cid || '0'))
+          const commonTrunk = prof.courses.filter((c: any) => c.carrera_id === 8)
+          console.log(`📚 Cursos de carrera específica (${cid}):`, carreraSpecific.length)
+          console.log(`📚 Cursos de tronco común (8):`, commonTrunk.length)
+          
+          // Log detallado de cada curso
+          prof.courses.forEach((course: any, courseIndex: number) => {
+            console.log(`📚   Curso ${courseIndex + 1}:`, {
+              id: course.id,
+              name: course.name,
+              code: course.code,
+              carrera_id: course.carrera_id,
+              carrera_nombre: course.carrera_nombre
+            })
+          })
         })
         setProfessors(normalized)
       } catch (e) {
@@ -141,34 +187,59 @@ export default function ManageProfessors() {
   const backToDashboard = () => navigate('/dashboard-coordinador')
 
   const handleProfessorSelection = (professor: any) => {
+    console.log('🔍 Profesor seleccionado:', professor)
+    console.log('🔍 Cursos del profesor:', professor.courses)
+    console.log('🔍 Cantidad de cursos:', professor.courses?.length || 0)
     setSelectedProfessor(professor)
     setSelectedCourse(null) // Limpiar selección de curso
+    setCourseGroups([]) // Limpiar grupos
+    setSelectedGroup(null) // Limpiar grupo seleccionado
   }
 
   const handleCourseSelection = async (course: any) => {
     setSelectedCourse(course)
-    setCourseRating(null)
+    setCourseGroups([]) // Limpiar grupos
+    setSelectedGroup(null) // Limpiar grupo seleccionado
     
     if (selectedProfessor && course) {
-      setLoadingRating(true)
+      setLoadingGroups(true)
+      
       try {
-        console.log(`🔍 Cargando calificación para profesor ${selectedProfessor.id} en curso ${course.id}`)
-        const rating = await fetchCourseRating(selectedProfessor.id, course.id)
-        setCourseRating(rating)
-        console.log('✅ Calificación cargada:', rating)
+        // Cargar grupos del curso
+        console.log('📡 Cargando grupos para curso:', course.id)
+        
+        // Debug: Verificar grupos
+        try {
+          console.log('🔍 [DEBUG] Llamando a debugGroups...')
+          const debugGroupsData = await debugGroups(selectedProfessor.id, course.id)
+          console.log('🔍 [DEBUG] Datos de debug de grupos:', debugGroupsData)
+        } catch (debugGroupsError) {
+          console.error('❌ [DEBUG] Error en debugGroups:', debugGroupsError)
+        }
+        
+        const groups = await fetchCourseGroups(selectedProfessor.id, course.id)
+        console.log('🔍 Grupos recibidos del API:', groups)
+        console.log('🔍 Tipo de grupos:', typeof groups, 'Es array:', Array.isArray(groups), 'Longitud:', groups?.length)
+        setCourseGroups(groups || [])
+        console.log('✅ Grupos cargados y establecidos:', groups)
       } catch (error) {
-        console.error('❌ Error cargando calificación:', error)
-        setCourseRating({ promedio: null, total_respuestas: 0, mensaje: 'Error al cargar calificación' })
+        console.error('❌ Error cargando grupos:', error)
+        setCourseGroups([])
       } finally {
-        setLoadingRating(false)
+        setLoadingGroups(false)
       }
     }
   }
 
+  const handleGroupSelection = (group: any) => {
+    console.log('🔍 Group selected:', group)
+    setSelectedGroup(group)
+  }
+
   const viewSurveyResults = () => {
-    if (selectedCourse && selectedProfessor) {
-      // Navegar a página de resultados de encuestas
-      navigate(`/reports/survey-results?courseId=${selectedCourse.id}&professorId=${selectedProfessor.id}`)
+    if (selectedCourse && selectedProfessor && selectedGroup) {
+      // Navegar a página de resultados de encuestas con grupo específico
+      navigate(`/reports/survey-results?courseId=${selectedCourse.id}&professorId=${selectedProfessor.id}&groupId=${selectedGroup.id}`)
     }
   }
 
@@ -235,7 +306,18 @@ export default function ManageProfessors() {
                             <p className="text-sm text-gray-600">{p.department}</p>
                             <div className="flex flex-wrap gap-1 mt-2">
                               {p.courses.map((c:any)=> (
-                                <Badge key={c.id} variant="outline" className="text-xs bg-white">{c.code}</Badge>
+                                <Badge 
+                                  key={c.id} 
+                                  variant="outline" 
+                                  className={`text-xs ${
+                                    c.carrera_id === 8 
+                                      ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                                      : 'bg-white text-gray-700'
+                                  }`}
+                                >
+                                  {c.code}
+                                  {c.carrera_id === 8 && ' (TC)'}
+                                </Badge>
                               ))}
                             </div>
                           </div>
@@ -274,79 +356,159 @@ export default function ManageProfessors() {
                       </div>
 
                       <div className="space-y-2">
-                        <h4 className="font-medium text-gray-900">Cursos del Semestre</h4>
-                        {selectedProfessor.courses.length > 0 ? (
-                          selectedProfessor.courses.map((c:any)=> (
-                            <div 
-                              key={c.id} 
-                              className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
-                                selectedCourse?.id === c.id 
-                                  ? 'border-red-500 bg-red-50 shadow-md' 
-                                  : 'bg-white hover:bg-gray-50 border-gray-200'
-                              }`}
-                              onClick={() => handleCourseSelection(c)}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <BookOpen className="h-4 w-4 text-gray-600" />
-                                  <span className="font-medium text-gray-900">{c.name} ({c.code})</span>
-                                </div>
-                                <span className="text-sm text-gray-600">{c.schedule}</span>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-center py-4 text-gray-500">
-                            <p>No hay cursos asignados</p>
-                          </div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Curso ({selectedProfessor.courses?.length || 0} disponibles)
+                        </label>
+                        <div className="relative">
+                          <select 
+                            value={selectedCourse?.id || ''} 
+                            onChange={(e) => {
+                              console.log('🔍 Select onChange triggered with value:', e.target.value);
+                              const course = selectedProfessor.courses.find((c: any) => String(c.id) === String(e.target.value));
+                              if (course) {
+                                handleCourseSelection(course);
+                              }
+                            }}
+                            className="w-full p-2 border border-gray-300 rounded-lg bg-white outline-none transition-colors focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                          >
+                            <option value="">Selecciona un curso</option>
+                            {selectedProfessor.courses?.length > 0 ? (
+                              selectedProfessor.courses.map((c: any) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name} ({c.code}){c.carrera_id === 8 ? ' - Tronco Común' : ''}
+                                </option>
+                              ))
+                            ) : (
+                              <option value="" disabled>No hay cursos disponibles</option>
+                            )}
+                          </select>
+                        </div>
+                        {selectedProfessor.courses?.length === 0 && (
+                          <p className="text-sm text-red-600 mt-1">
+                            Este profesor no tiene cursos asignados para este semestre
+                          </p>
                         )}
                       </div>
 
              {selectedCourse && (
-               <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                 <h4 className="font-medium text-blue-900 mb-2">Curso Seleccionado</h4>
-                 <p className="text-sm text-blue-800 mb-3">
-                   {selectedCourse.name} ({selectedCourse.code})
-                 </p>
-                 
-                 {/* Calificación Promedio */}
-                 <div className="mb-4 p-3 bg-white rounded-lg border border-blue-100">
-                   <h5 className="font-medium text-blue-900 mb-2">Calificación Promedio</h5>
-                   {loadingRating ? (
-                     <div className="flex items-center gap-2">
-                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                       <span className="text-sm text-blue-700">Cargando calificación...</span>
+               <motion.div
+                 initial={{ opacity: 0, y: 10 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 className="space-y-4"
+               >
+                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                   <h4 className="font-medium text-gray-900">Información del Curso</h4>
+                   <div className="space-y-2">
+                     <div className="flex items-center gap-2 text-sm">
+                       <BookOpen className="h-4 w-4 text-gray-600" />
+                       <span className="font-medium text-gray-900">{selectedCourse.name}</span>
                      </div>
-                   ) : courseRating ? (
-                     <div className="space-y-2">
-                       {courseRating.promedio ? (
-                         <div className="flex items-center gap-2">
-                           <span className="text-2xl font-bold text-green-600">
-                             {courseRating.promedio.toFixed(1)}
-                           </span>
-                           <span className="text-sm text-gray-600">/ 5.0</span>
-                           <span className="text-sm text-gray-600">
-                             ({courseRating.total_respuestas} respuestas)
-                           </span>
-                         </div>
-                       ) : (
-                         <div className="text-sm text-gray-600">
-                           {courseRating.mensaje || 'No hay evaluaciones disponibles'}
-                         </div>
-                       )}
+                     <div className="flex items-center gap-2 text-sm text-gray-600">
+                       <span className="font-medium">Código:</span>
+                       <span>{selectedCourse.code}</span>
                      </div>
-                   ) : (
-                     <div className="text-sm text-gray-600">Selecciona un curso para ver la calificación</div>
-                   )}
+                     <div className="flex items-center gap-2 text-sm text-gray-600">
+                       <Clock className="h-4 w-4" />
+                       <span>{selectedCourse.schedule}</span>
+                     </div>
+                     {selectedCourse.carrera_id === 8 && (
+                       <div className="flex items-center gap-2 text-sm">
+                         <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                           Tronco Común
+                         </Badge>
+                       </div>
+                     )}
+                   </div>
+                 </div>
+
+                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                   <h4 className="font-medium text-blue-900 mb-2">Curso Seleccionado</h4>
+                   <p className="text-sm text-blue-800 mb-3">
+                     {selectedCourse.name} ({selectedCourse.code})
+                   </p>
                  </div>
                  
-                 <Button 
-                   onClick={viewSurveyResults}
-                   className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+
+                 {/* Sección de Grupos */}
+                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                   <h4 className="font-medium text-gray-900">Grupos Disponibles</h4>
+                   {loadingGroups ? (
+                     <div className="text-center text-gray-500">Cargando grupos...</div>
+                   ) : courseGroups.length > 0 ? (
+                     <div className="space-y-2">
+                       {courseGroups.map((group: any) => (
+                         <div 
+                           key={group.id} 
+                           className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                             selectedGroup?.id === group.id
+                               ? 'border-red-500 bg-red-50 shadow-md'
+                               : 'border-gray-200 bg-white hover:border-red-300 hover:bg-gray-50'
+                           }`}
+                           onClick={() => handleGroupSelection(group)}
+                         >
+                           <div className="flex items-center justify-between">
+                             <div>
+                               <span className="font-medium text-gray-900">Grupo {group.numero_grupo}</span>
+                               {group.horario && (
+                                 <p className="text-sm text-gray-600">{group.horario}</p>
+                               )}
+                               {group.aula && (
+                                 <p className="text-sm text-gray-600">Aula: {group.aula}</p>
+                               )}
+                             </div>
+                             <div className="flex items-center gap-2">
+                               {group.cup && (
+                                 <Badge variant="outline" className="text-xs">
+                                   {group.cup} cupos
+                                 </Badge>
+                               )}
+                               {selectedGroup?.id === group.id && (
+                                 <div className="text-red-600">
+                                   <ChevronRight className="h-4 w-4" />
+                                 </div>
+                               )}
+                             </div>
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   ) : (
+                     <div className="text-center text-gray-500">No hay grupos disponibles</div>
+                   )}
+                 </div>
+
+                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                   <h4 className="font-medium text-gray-900">Información del Profesor</h4>
+                   <div className="flex items-start gap-3">
+                     <div>
+                       <p className="font-medium text-gray-900">{selectedProfessor.name}</p>
+                       <p className="text-sm text-gray-600">{selectedProfessor.department}</p>
+                       <p className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                         <UserIcon className="h-3 w-3" />
+                         {selectedProfessor.email}
+                       </p>
+                     </div>
+                   </div>
+                 </div>
+                 
+                 <motion.div
+                   whileHover={{ scale: selectedGroup ? 1.02 : 1 }}
+                   whileTap={{ scale: selectedGroup ? 0.98 : 1 }}
                  >
-                   Ver Resultados de Encuestas
-                 </Button>
-               </div>
+                   <Button 
+                     onClick={viewSurveyResults}
+                     disabled={!selectedGroup}
+                     className={`w-full py-3 ${
+                       selectedGroup 
+                         ? 'bg-red-600 hover:bg-red-700 text-white' 
+                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                     }`}
+                   >
+                     {selectedGroup ? 'Ver Resultados de Encuestas' : 'Selecciona un grupo'}
+                     <ChevronRight className="h-4 w-4 ml-2" />
+                   </Button>
+                 </motion.div>
+               </motion.div>
              )}
                     </>
                   ) : (

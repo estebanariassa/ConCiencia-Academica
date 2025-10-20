@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard'
 import DashboardProfesor from './pages/DashboardProfesor'
 import DashboardCoordinador from './pages/DashboardCoordinador'
@@ -45,6 +46,12 @@ function App() {
           path="/login" 
           element={
             user ? <Navigate to="/dashboard" replace /> : <Login />
+          } 
+        />
+        <Route 
+          path="/forgot-password" 
+          element={
+            user ? <Navigate to="/dashboard" replace /> : <ForgotPassword />
           } 
         />
         <Route 
@@ -112,15 +119,15 @@ function App() {
           } 
         />
         <Route 
-          path="/reports/survey-results" 
-          element={
-            <SurveyResults />
-          } 
-        />
-        <Route 
           path="/survey" 
           element={
             <SurveyViewWrapper />
+          } 
+        />
+        <Route 
+          path="/reports/survey-results" 
+          element={
+            <SurveyResultsWrapper />
           } 
         />
       </Routes>
@@ -287,6 +294,24 @@ function SurveyViewWrapper() {
   }
   
   return <SurveyView user={user} />
+}
+
+function SurveyResultsWrapper() {
+  const { user: authUser } = useAuth()
+  
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // Convertir el usuario del AuthContext al formato esperado
+  const user: User = {
+    id: authUser.id,
+    name: `${authUser.nombre} ${authUser.apellido}`.trim(),
+    type: (authUser.tipo_usuario as any) ?? 'teacher',
+    email: authUser.email,
+  }
+  
+  return <SurveyResults user={user} />
 }
 
 export default App

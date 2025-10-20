@@ -18,10 +18,10 @@ export default function LikertScale({
 }: LikertScaleProps) {
   // Función para calcular el tamaño basado en la posición (más pequeño a la izquierda, más grande a la derecha)
   const getCircleSize = (option: number, totalOptions: number) => {
-    // Tamaño base para la opción más pequeña (izquierda)
-    const baseSize = 48;
+    // Tamaño base para móviles y desktop
+    const baseSize = window.innerWidth < 640 ? 36 : 48; // sm breakpoint
     // Incremento por cada paso a la derecha
-    const increment = 10;
+    const increment = window.innerWidth < 640 ? 6 : 10;
     // El tamaño será baseSize + (option - 1) * increment
     return baseSize + (option - 1) * increment;
   };
@@ -60,7 +60,7 @@ export default function LikertScale({
   return (
     <div className="space-y-6 w-full">
       {/* Scale with sized circles */}
-      <div className="flex justify-between items-center w-full px-2">
+      <div className="flex justify-between items-center w-full px-1 sm:px-2">
         {Array.from({ length: options }, (_, i) => i + 1).map((option) => {
           const isSelected = value === option;
           const size = getCircleSize(option, options);
@@ -99,7 +99,7 @@ export default function LikertScale({
               </div>
               
               {/* Number */}
-              <span className={`text-sm font-medium mt-2 ${
+              <span className={`text-xs sm:text-sm font-medium mt-1 sm:mt-2 ${
                 isSelected ? 'font-bold text-gray-800' : 'text-gray-600'
               }`}>
                 {option}
@@ -110,9 +110,9 @@ export default function LikertScale({
       </div>
 
       {/* Labels */}
-      <div className="flex justify-between items-center px-2 mt-4">
-        <span className="text-xl font-semibold text-gray-800">{leftLabel}</span>
-        <span className="text-xl font-semibold text-gray-800">{rightLabel}</span>
+      <div className="flex justify-between items-center px-1 sm:px-2 mt-3 sm:mt-4">
+        <span className="text-sm sm:text-xl font-semibold text-gray-800">{leftLabel}</span>
+        <span className="text-sm sm:text-xl font-semibold text-gray-800">{rightLabel}</span>
       </div>
     </div>
   );

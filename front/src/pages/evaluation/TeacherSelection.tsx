@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -19,7 +19,6 @@ import {
   ChevronRight, 
   GraduationCap, 
   Clock,
-  MapPin,
   BookOpen,
   User as UserIcon
 } from 'lucide-react';  
@@ -29,11 +28,10 @@ const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
 
 interface TeacherSelectionProps {
   onTeacherCourseSelected: (teacher: Teacher, course: Course) => void;
-  onBack: () => void;
   user: User;
 }
 
-export default function TeacherSelection({ onTeacherCourseSelected, onBack, user }: TeacherSelectionProps) {
+export default function TeacherSelection({ onTeacherCourseSelected, user }: TeacherSelectionProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -179,17 +177,18 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
           subtitle="Selecciona el profesor y curso a evaluar"
         />
 
-        <main className="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
+        <main className="max-w-7xl mx-auto p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
           {/* Botón de volver independiente - Posicionado en la esquina superior izquierda */}
           <div className="flex justify-start">
             <Button 
               variant="ghost" 
-              size="lg" 
+              size="sm"
               onClick={handleBackToDashboard}
-              className="ml-2 text-lg py-2 px-4 bg-white bg-opacity-90 rounded-lg shadow-md hover:bg-gray-100 transition-colors"
+              className="text-sm sm:text-base py-2 px-3 sm:px-4 bg-white bg-opacity-90 rounded-lg shadow-md hover:bg-gray-100 transition-colors"
             >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Volver al Dashboard
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Volver al Dashboard</span>
+              <span className="sm:hidden">Volver</span>
             </Button>
           </div>
 
@@ -199,17 +198,17 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card className="bg-white shadow-md border border-gray-200 p-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-900">
-                  <Search className="h-5 w-5" />
+            <Card className="bg-white shadow-md border border-gray-200 p-3 sm:p-4 lg:p-6">
+              <CardHeader className="pb-3 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-gray-900 text-base sm:text-lg">
+                  <Search className="h-4 w-4 sm:h-5 sm:w-5" />
                   Buscar Profesor
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Busca por nombre del profesor, departamento o nombre del curso
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-0">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
                   <input
@@ -217,28 +216,28 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                     placeholder="Buscar profesor o curso..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white outline-none transition-colors focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 border border-gray-300 rounded-lg bg-white outline-none transition-colors focus:border-red-500 focus:ring-1 focus:ring-red-500 text-sm sm:text-base"
                   />
                 </div>
               </CardContent>
             </Card>
           </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Teachers List */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <Card className="bg-white shadow-md border border-gray-200 p-6">
-                <CardHeader>
-                  <CardTitle className="text-gray-900">Profesores Disponibles</CardTitle>
-                  <CardDescription>
+              <Card className="bg-white shadow-md border border-gray-200 p-3 sm:p-4 lg:p-6">
+                <CardHeader className="pb-3 sm:pb-4">
+                  <CardTitle className="text-gray-900 text-base sm:text-lg">Profesores Disponibles</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
                     {filteredTeachers.length} profesor(es) encontrado(s)
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3 max-h-96 overflow-y-auto">
+                <CardContent className="space-y-2 sm:space-y-3 max-h-80 sm:max-h-96 overflow-y-auto pt-0">
                   {loading && (
                     <div className="text-center text-gray-500">Cargando docentes...</div>
                   )}
@@ -254,19 +253,19 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3 + index * 0.1 }}
-                      className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
+                      className={`p-3 sm:p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
                         selectedTeacher?.id === teacher.id
                           ? 'border-red-500 bg-red-50 shadow-md'
                           : 'border-gray-200 hover:border-red-300 hover:bg-gray-50'
                       }`}
                       onClick={() => handleTeacherSelect(teacher)}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">{teacher.name}</h3>
-                          <p className="text-sm text-gray-600">{teacher.department}</p>
+                      <div className="flex items-start gap-2 sm:gap-3">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-gray-900 text-sm sm:text-base truncate">{teacher.name}</h3>
+                          <p className="text-xs sm:text-sm text-gray-600 truncate">{teacher.department}</p>
                           <div className="flex flex-wrap gap-1 mt-2">
                             {teacher.courses.map(course => (
                               <Badge key={course.id} variant="outline" className="text-xs bg-white">
@@ -297,22 +296,22 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <Card className={`bg-white shadow-md border border-gray-200 p-6 ${selectedTeacher ? '' : 'opacity-50'}`}>
-                <CardHeader>
-                  <CardTitle className="text-gray-900">Seleccionar Curso</CardTitle>
-                  <CardDescription>
+              <Card className={`bg-white shadow-md border border-gray-200 p-3 sm:p-4 lg:p-6 ${selectedTeacher ? '' : 'opacity-50'}`}>
+                <CardHeader className="pb-3 sm:pb-4">
+                  <CardTitle className="text-gray-900 text-base sm:text-lg">Seleccionar Curso</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
                     {selectedTeacher 
                       ? `Cursos impartidos por ${selectedTeacher.name}`
                       : 'Primero selecciona un profesor'
                     }
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3 sm:space-y-4 pt-0">
                   {selectedTeacher ? (
                     <>
                       {console.log('🔍 Rendering course selection for teacher:', selectedTeacher.name, 'with courses:', selectedTeacher.courses)}
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">Curso</label>
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700">Curso</label>
                         <div className="relative">
                           <select 
                             value={selectedCourse?.id || ''} 
@@ -320,7 +319,7 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                               console.log('🔍 Select onChange triggered with value:', e.target.value);
                               handleCourseSelect(e.target.value);
                             }}
-                            className="w-full p-2 border border-gray-300 rounded-lg bg-white outline-none transition-colors focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                            className="w-full p-2.5 sm:p-3 border border-gray-300 rounded-lg bg-white outline-none transition-colors focus:border-red-500 focus:ring-1 focus:ring-red-500 text-sm sm:text-base"
                           >
                             <option value="">Selecciona un curso</option>
                             {selectedTeacher.courses.map(course => {
@@ -341,35 +340,35 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                           animate={{ opacity: 1, y: 0 }}
                           className="space-y-4"
                         >
-                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-                            <h4 className="font-medium text-gray-900">Información del Curso</h4>
+                          <div className="p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2 sm:space-y-3">
+                            <h4 className="font-medium text-gray-900 text-sm sm:text-base">Información del Curso</h4>
                             <div className="space-y-2">
-                              <div className="flex items-center gap-2 text-sm">
-                                <BookOpen className="h-4 w-4 text-gray-600" />
-                                <span className="font-medium text-gray-900">{selectedCourse.name}</span>
+                              <div className="flex items-center gap-2 text-xs sm:text-sm">
+                                <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 text-gray-600" />
+                                <span className="font-medium text-gray-900 truncate">{selectedCourse.name}</span>
                               </div>
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
                                 <span className="font-medium">Código:</span>
                                 <span>{selectedCourse.code}</span>
                               </div>
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <Clock className="h-4 w-4" />
-                                <span>{selectedCourse.schedule}</span>
+                              <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                                <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <span className="truncate">{selectedCourse.schedule}</span>
                               </div>
                             </div>
                           </div>
 
                           {/* Sección de Grupos */}
-                          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-                            <h4 className="font-medium text-gray-900">Grupos Disponibles</h4>
+                          <div className="p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-2 sm:space-y-3">
+                            <h4 className="font-medium text-gray-900 text-sm sm:text-base">Grupos Disponibles</h4>
                             {loadingGroups ? (
-                              <div className="text-center text-gray-500">Cargando grupos...</div>
+                              <div className="text-center text-gray-500 text-xs sm:text-sm">Cargando grupos...</div>
                             ) : courseGroups.length > 0 ? (
                               <div className="space-y-2">
                                 {courseGroups.map((group: any) => (
                                   <div 
                                     key={group.id} 
-                                    className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                    className={`p-2.5 sm:p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
                                       selectedGroup?.id === group.id
                                         ? 'border-red-500 bg-red-50 shadow-md'
                                         : 'border-gray-200 bg-white hover:border-red-300 hover:bg-gray-50'
@@ -377,13 +376,13 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                                     onClick={() => handleGroupSelect(group)}
                                   >
                                     <div className="flex items-center justify-between">
-                                      <div>
-                                        <span className="font-medium text-gray-900">Grupo {group.numero_grupo}</span>
+                                      <div className="min-w-0 flex-1">
+                                        <span className="font-medium text-gray-900 text-sm sm:text-base">Grupo {group.numero_grupo}</span>
                                         {group.horario && (
-                                          <p className="text-sm text-gray-600">{group.horario}</p>
+                                          <p className="text-xs sm:text-sm text-gray-600 truncate">{group.horario}</p>
                                         )}
                                         {group.aula && (
-                                          <p className="text-sm text-gray-600">Aula: {group.aula}</p>
+                                          <p className="text-xs sm:text-sm text-gray-600">Aula: {group.aula}</p>
                                         )}
                                       </div>
                                       <div className="flex items-center gap-2">
@@ -428,23 +427,25 @@ export default function TeacherSelection({ onTeacherCourseSelected, onBack, user
                             <Button 
                               onClick={handleContinue}
                               disabled={!selectedGroup}
-                              className={`w-full py-3 ${
+                              className={`w-full py-2.5 sm:py-3 text-sm sm:text-base ${
                                 selectedGroup 
                                   ? 'bg-red-600 hover:bg-red-700 text-white' 
                                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               }`}
                             >
-                              {selectedGroup ? 'Continuar a Evaluación' : 'Selecciona un grupo'}
-                              <ChevronRight className="h-4 w-4 ml-2" />
+                              <span className="truncate">
+                                {selectedGroup ? 'Continuar a Evaluación' : 'Selecciona un grupo'}
+                              </span>
+                              <ChevronRight className="h-4 w-4 ml-2 flex-shrink-0" />
                             </Button>
                           </motion.div>
                         </motion.div>
                       )}
                     </>
                   ) : (
-                    <div className="text-center py-8 text-gray-500">
-                      <GraduationCap className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Selecciona un profesor para ver sus cursos disponibles</p>
+                    <div className="text-center py-6 sm:py-8 text-gray-500">
+                      <GraduationCap className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50" />
+                      <p className="text-xs sm:text-sm">Selecciona un profesor para ver sus cursos disponibles</p>
                     </div>
                   )}
                 </CardContent>

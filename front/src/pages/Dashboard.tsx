@@ -13,7 +13,6 @@ import { User } from '../types';
 import { 
   Calendar as CalendarIcon, 
   ClipboardCheck, 
-  Bell, 
   Star,
   BookOpen,
   Users,
@@ -121,11 +120,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             { id: 1, course: 'Matemáticas I', teacher: 'Dr. Juan Pérez', deadline: '2025-01-25' },
             { id: 2, course: 'Física II', teacher: 'Dra. Ana Martín', deadline: '2025-01-28' }
           ],
-          notifications: [
-            { id: 1, text: 'Nueva evaluación disponible para Matemáticas I', time: '2 horas', urgent: true },
-            { id: 2, text: 'Recordatorio: Evaluación de Física II vence mañana', time: '1 día', urgent: false },
-            { id: 3, text: 'Resultados de evaluación publicados', time: '3 días', urgent: false }
-          ],
           quickActions: [
             {
               icon: ClipboardCheck,
@@ -153,11 +147,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             coursesTeaching: 4,
             pendingReviews: 5
           },
-          notifications: [
-            { id: 1, text: '15 estudiantes han completado tu evaluación', time: '2 horas', urgent: false },
-            { id: 2, text: 'Recordatorio: Cierre de evaluaciones este viernes', time: '1 día', urgent: true },
-            { id: 3, text: 'Nuevo mensaje de un estudiante', time: '3 días', urgent: false }
-          ],
           quickActions: [
             {
               icon: BarChart3,
@@ -189,11 +178,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             { id: 1, course: 'Departamento de Matemáticas', period: 'Ciclo 2025-1', deadline: '2025-01-25' },
             { id: 2, course: 'Departamento de Física', period: 'Ciclo 2025-1', deadline: '2025-01-28' }
           ],
-          notifications: [
-            { id: 1, text: 'Reporte de evaluaciones del departamento listo', time: '2 horas', urgent: false },
-            { id: 2, text: '3 profesores requieren revisión de evaluaciones', time: '1 día', urgent: true },
-            { id: 3, text: 'Reunión de coordinación el próximo lunes', time: '3 días', urgent: false }
-          ],
           quickActions: [
             {
               icon: Users,
@@ -224,10 +208,6 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
           upcomingEvaluations: [
             { id: 1, course: 'Matemáticas I', teacher: 'Dr. Juan Pérez', deadline: '2025-01-25' },
             { id: 2, course: 'Física II', teacher: 'Dra. Ana Martín', deadline: '2025-01-28' }
-          ],
-          notifications: [
-            { id: 1, text: 'Nueva evaluación disponible', time: '2 horas', urgent: true },
-            { id: 2, text: 'Recordatorio: Evaluación pendiente', time: '1 día', urgent: false }
           ],
           quickActions: [
             {
@@ -488,29 +468,8 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               </motion.div>
             </div>
 
-            {/* Columna lateral - Notificaciones e Información de Usuario */}
+            {/* Columna lateral - Información de Usuario */}
             <div className="space-y-8">
-              {/* Notificaciones */}
-              <SectionCard title="Notificaciones" icon={Bell}>
-                <div className="space-y-4">
-                  {userData.notifications.map((notification, index) => (
-                    <motion.div
-                      key={notification.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.9 + index * 0.1 }}
-                      className={`p-4 rounded-lg border transition-colors ${
-                        notification.urgent 
-                          ? 'bg-red-50 border-red-200' 
-                          : 'bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      <p className="text-base font-medium text-gray-900">{notification.text}</p>
-                      <p className="text-sm text-gray-500 mt-2">{notification.time}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </SectionCard>
 
               {/* Información del Usuario */}
               <SectionCard title="Información del Usuario" icon={UserIcon}>
