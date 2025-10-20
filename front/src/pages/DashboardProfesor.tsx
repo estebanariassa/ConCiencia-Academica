@@ -18,13 +18,11 @@ import {
   Star,
   BookOpen,
   Clock,
-  Users,
   Mail,
   BarChart3,
   User as UserIcon,
   Award,
-  Target,
-  Eye
+  Target
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { fetchTeacherStats, fetchTeacherCourses } from '../api/teachers';
@@ -70,6 +68,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
   const [teacherCourses, setTeacherCourses] = useState<any[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('all');
   
   
   // Cargar user desde backend/localStorage si existe
@@ -93,12 +92,8 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
     navigate('/reports');
   };
 
-  const handleViewEvaluations = () => {
-    navigate('/evaluations');
-  };
-
-  const handleViewStudents = () => {
-    navigate('/students');
+  const handleViewSurvey = () => {
+    navigate('/survey');
   };
 
   const toggleCalendar = () => {
@@ -201,29 +196,21 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
           className: 'bg-red-600 hover:bg-red-700 text-white'
         },
         {
-          icon: Eye,
-          label: 'Ver Evaluaciones',
-          description: 'Revisar evaluaciones recibidas',
-          onClick: handleViewEvaluations,
+          icon: ClipboardCheck,
+          label: 'Ver Encuesta',
+          description: 'Ver la encuesta de mi carrera',
+          onClick: handleViewSurvey,
           variant: 'outline' as const,
-          className: 'border-red-300 text-red-600 hover:bg-red-50'
+          className: 'border-gray-300'
         },
         {
-          icon: Users,
-          label: 'Mis Estudiantes',
-          description: 'Gestionar estudiantes',
-          onClick: handleViewStudents,
+          icon: CalendarIcon,
+          label: 'Calendario',
+          description: 'Fechas importantes',
+          onClick: toggleCalendar,
           variant: 'outline' as const,
-          className: 'border-red-300 text-red-600 hover:bg-red-50'
-        },
-      {
-        icon: CalendarIcon,
-        label: 'Calendario',
-        description: 'Fechas importantes',
-        onClick: toggleCalendar,
-        variant: 'outline' as const,
-        className: 'border-gray-300'
-      }
+          className: 'border-gray-300'
+        }
     ]
   };
 
@@ -389,7 +376,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {profesorData.quickActions.map((action, index) => (
                         <motion.div key={index} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                           <Button
@@ -422,11 +409,32 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
               >
                 <Card className="bg-white shadow-md border border-gray-200 p-6">
                   <CardHeader className="pb-4">
-                    <div className="flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-gray-700" />
-                      <CardTitle className="text-2xl text-gray-900">Evaluaciones Recientes</CardTitle>
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5 text-gray-700" />
+                        <CardTitle className="text-2xl text-gray-900">Evaluaciones Recientes</CardTitle>
+                      </div>
+                      {/* Filtro por curso */}
+                      <div className="flex items-center gap-2">
+                        <label htmlFor="course-filter" className="text-sm text-gray-600 whitespace-nowrap">
+                          Filtrar por curso:
+                        </label>
+                        <select
+                          id="course-filter"
+                          value={selectedCourseFilter}
+                          onChange={(e) => setSelectedCourseFilter(e.target.value)}
+                          className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white min-w-[200px]"
+                        >
+                          <option value="all">Todos los cursos</option>
+                          {profesorData.recentEvaluations.map((evaluation: any) => (
+                            <option key={evaluation.id} value={evaluation.id}>
+                              {evaluation.course}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <CardDescription className="text-base">
+                    <CardDescription className="text-base mt-2">
                       Estado de tus evaluaciones por curso
                     </CardDescription>
                   </CardHeader>
@@ -445,45 +453,58 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                           No hay evaluaciones disponibles
                         </div>
                       ) : (
-                        profesorData.recentEvaluations.map((evaluation: any, index: number) => (
-                        <motion.div
-                          key={evaluation.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.8 + index * 0.1 }}
-                          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="font-medium text-lg text-gray-900">{evaluation.course}</p>
-                              <Badge 
-                                variant="outline" 
-                                className={`text-sm py-1 ${
-                                  evaluation.status === 'completed' 
-                                    ? 'bg-green-50 text-green-700 border-green-200' 
-                                    : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                }`}
-                              >
-                                {evaluation.status === 'completed' ? 'Completada' : 'En Progreso'}
-                              </Badge>
-                            </div>
-                            <div className="grid grid-cols-3 gap-4 text-sm">
-                              <div>
-                                <span className="text-gray-500">Estudiantes:</span>
-                                <span className="ml-1 font-medium">{evaluation.students}</span>
+                        (() => {
+                          const filteredEvaluations = profesorData.recentEvaluations
+                            .filter((evaluation: any) => selectedCourseFilter === 'all' || evaluation.id === selectedCourseFilter);
+                          
+                          if (filteredEvaluations.length === 0) {
+                            return (
+                              <div className="text-center py-8 text-gray-500">
+                                No hay evaluaciones para el curso seleccionado
                               </div>
-                              <div>
-                                <span className="text-gray-500">Completadas:</span>
-                                <span className="ml-1 font-medium">{evaluation.completed}</span>
+                            );
+                          }
+                          
+                          return filteredEvaluations.map((evaluation: any, index: number) => (
+                            <motion.div
+                              key={evaluation.id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.8 + index * 0.1 }}
+                              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="font-medium text-lg text-gray-900">{evaluation.course}</p>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-sm py-1 ${
+                                      evaluation.status === 'completed' 
+                                        ? 'bg-green-50 text-green-700 border-green-200' 
+                                        : 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                    }`}
+                                  >
+                                    {evaluation.status === 'completed' ? 'Completada' : 'En Progreso'}
+                                  </Badge>
+                                </div>
+                                <div className="grid grid-cols-3 gap-4 text-sm">
+                                  <div>
+                                    <span className="text-gray-500">Estudiantes:</span>
+                                    <span className="ml-1 font-medium">{evaluation.students}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Completadas:</span>
+                                    <span className="ml-1 font-medium">{evaluation.completed}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Promedio:</span>
+                                    <span className="ml-1 font-medium">{evaluation.average}/5.0</span>
+                                  </div>
+                                </div>
                               </div>
-                              <div>
-                                <span className="text-gray-500">Promedio:</span>
-                                <span className="ml-1 font-medium">{evaluation.average}/5.0</span>
-                              </div>
-                            </div>
-                          </div>
-                        </motion.div>
-                        ))
+                            </motion.div>
+                          ));
+                        })()
                       )}
                     </div>
                   </CardContent>

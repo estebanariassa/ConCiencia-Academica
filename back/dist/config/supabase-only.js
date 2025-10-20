@@ -300,6 +300,48 @@ class SupabaseDB {
             throw error;
         return data;
     }
+    // Preguntas por carrera
+    static async getQuestionsByCareer(carreraId) {
+        let query = exports.supabaseAdmin
+            .from('preguntas_evaluacion')
+            .select(`
+        *,
+        categoria:categorias_pregunta(*)
+      `)
+            .eq('activa', true)
+            .order('orden', { ascending: true });
+        if (carreraId) {
+            // Primero intentar obtener preguntas específicas de la carrera
+            const { data: specificQuestions, error: specificError } = await query
+                .eq('id_carrera', carreraId);
+            if (specificError)
+                throw specificError;
+            // Si hay preguntas específicas, retornarlas
+            if (specificQuestions && specificQuestions.length > 0) {
+                return specificQuestions;
+            }
+            // Si no hay preguntas específicas, obtener preguntas generales
+            const { data: generalQuestions, error: generalError } = await exports.supabaseAdmin
+                .from('preguntas_evaluacion')
+                .select(`
+          *,
+          categoria:categorias_pregunta(*)
+        `)
+                .eq('activa', true)
+                .is('id_carrera', null)
+                .order('orden', { ascending: true });
+            if (generalError)
+                throw generalError;
+            return generalQuestions || [];
+        }
+        else {
+            // Si no se especifica carrera, obtener todas las preguntas activas
+            const { data, error } = await query;
+            if (error)
+                throw error;
+            return data;
+        }
+    }
     // Crear profesor
     static async createProfessor(professorData) {
         const { data, error } = await exports.supabaseAdmin

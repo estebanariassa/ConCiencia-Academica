@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -91,6 +124,36 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Credenciales inválidas' });
         }
         console.log(`✅ Usuario encontrado: ${user.nombre} ${user.apellido} (${user.tipo_usuario})`);
+        // Obtener roles múltiples del usuario
+        const { RoleService } = await Promise.resolve().then(() => __importStar(require('../services/roleService')));
+        const roles = await RoleService.obtenerRolesUsuario(user.id);
+        console.log(`🎭 Roles del usuario: ${roles.join(', ')}`);
+        // Verificar tipo de usuario válido (tanto en tipo_usuario como en roles)
+        const validUserTypes = ['estudiante', 'profesor', 'docente', 'coordinador', 'admin'];
+        const tieneRolValido = validUserTypes.includes(user.tipo_usuario) ||
+            roles.some(rol => validUserTypes.includes(rol));
+        if (!tieneRolValido) {
+            console.log(`❌ Tipo de usuario inválido: ${user.tipo_usuario}, roles: ${roles.join(', ')}`);
+            return res.status(401).json({ error: 'Tipo de usuario no válido' });
+        }
+        // Si el usuario tiene múltiples roles, devolver información para selección
+        if (roles.length > 1) {
+            console.log(`🎭 Usuario con múltiples roles: ${user.nombre} ${user.apellido}, roles: ${roles.join(', ')}`);
+            return res.status(200).json({
+                message: 'Usuario con múltiples roles detectado',
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    nombre: user.nombre,
+                    apellido: user.apellido,
+                    tipo_usuario: user.tipo_usuario,
+                    roles: roles,
+                    multiple_roles: true
+                },
+                available_roles: roles,
+                requires_role_selection: true
+            });
+        }
         // Verificar contraseña
         let isValidPassword = false;
         // Primero intentar con bcrypt (contraseña hasheada)
@@ -123,6 +186,65 @@ router.post('/login', async (req, res) => {
         }
         // Generar JWT
         const token = jsonwebtoken_1.default.sign({ userId: user.id, email: user.email, tipo_usuario: user.tipo_usuario }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        // Determinar el dashboard basado en roles múltiples
+        const dashboard = await RoleService.obtenerDashboardUsuario(user.id);
+        const permisos = await RoleService.obtenerPermisosUsuario(user.id);
+        // Adjuntar información de coordinador (carrera_id) si aplica
+        let coordinadorInfo = null;
+        try {
+            if (roles.includes('coordinador')) {
+                console.log('🔍 Usuario es coordinador, buscando info...');
+                const { RoleService } = await Promise.resolve().then(() => __importStar(require('../services/roleService')));
+                const info = await RoleService.obtenerCoordinadorPorUsuario(user.id);
+                console.log('🔍 Info coordinador obtenida:', info);
+                if (info) {
+                    coordinadorInfo = { carrera_id: info.carrera_id ?? null };
+                    console.log('🔍 coordinadorInfo asignado:', coordinadorInfo);
+                }
+                else {
+                    console.log('❌ No se encontró info del coordinador para usuario:', user.id);
+                }
+            }
+        }
+        catch (e) {
+            console.warn('❌ Error obteniendo info del coordinador:', e);
+        }
+        console.log(`📍 Dashboard asignado: ${dashboard}`);
+        console.log(`🔑 Permisos: ${permisos.join(', ')}`);
+        // Determinar el tipo de usuario para la respuesta
+        let userTypeDisplay = user.tipo_usuario;
+        let userRole = user.tipo_usuario;
+        // Normalizar 'docente' a 'profesor' para compatibilidad
+        if (user.tipo_usuario === 'docente') {
+            userTypeDisplay = 'profesor';
+            userRole = 'profesor';
+        }
+        // Información adicional según los roles del usuario
+        let additionalInfo = {
+            dashboard: dashboard,
+            permissions: permisos,
+            roles: roles,
+            role_description: roles.length > 1 ?
+                `Usuario con múltiples roles: ${roles.join(', ')}` :
+                `Usuario con rol: ${roles[0] || user.tipo_usuario}`
+        };
+        if (coordinadorInfo) {
+            additionalInfo.coordinador = coordinadorInfo;
+        }
+        // Información específica por rol principal
+        if (roles.includes('admin')) {
+            additionalInfo.role_description = 'Administrador del sistema';
+        }
+        else if (roles.includes('coordinador')) {
+            additionalInfo.role_description = 'Coordinador del sistema';
+        }
+        else if (roles.includes('profesor') || roles.includes('docente')) {
+            additionalInfo.role_description = 'Profesor/Docente del sistema';
+        }
+        else if (roles.includes('estudiante')) {
+            additionalInfo.role_description = 'Estudiante del sistema';
+        }
+        console.log(`🎉 Login exitoso para ${userTypeDisplay}: ${user.email}`);
         res.json({
             message: 'Login exitoso',
             token,
@@ -131,7 +253,10 @@ router.post('/login', async (req, res) => {
                 email: user.email,
                 nombre: user.nombre,
                 apellido: user.apellido,
-                tipo_usuario: user.tipo_usuario
+                tipo_usuario: user.tipo_usuario,
+                user_type: userTypeDisplay,
+                user_role: userRole,
+                ...additionalInfo
             }
         });
     }
@@ -140,6 +265,86 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ error: 'Datos inválidos', details: error.errors });
         }
         console.error('Error en login:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+// POST /auth/login-with-role - Login con rol específico
+router.post('/login-with-role', async (req, res) => {
+    try {
+        const { email, password, selectedRole } = req.body;
+        console.log(`🔍 Login con rol específico para: ${email}, rol: ${selectedRole}`);
+        // Buscar usuario
+        const user = await supabase_only_1.SupabaseDB.findUserByEmail(email);
+        if (!user) {
+            console.log(`❌ Usuario no encontrado: ${email}`);
+            return res.status(401).json({ error: 'Credenciales inválidas' });
+        }
+        if (!user.activo) {
+            console.log(`❌ Usuario inactivo: ${email}`);
+            return res.status(401).json({ error: 'Credenciales inválidas' });
+        }
+        // Obtener roles múltiples del usuario
+        const { RoleService } = await Promise.resolve().then(() => __importStar(require('../services/roleService')));
+        const roles = await RoleService.obtenerRolesUsuario(user.id);
+        // Verificar que el usuario tiene el rol seleccionado
+        if (!roles.includes(selectedRole)) {
+            console.log(`❌ Usuario no tiene el rol seleccionado: ${selectedRole}, roles disponibles: ${roles.join(', ')}`);
+            return res.status(401).json({ error: 'Rol no válido para este usuario' });
+        }
+        // Verificar contraseña
+        let isValidPassword = false;
+        // Primero intentar con bcrypt (contraseña hasheada)
+        if (user.password && user.password.startsWith('$2')) {
+            isValidPassword = await bcrypt_1.default.compare(password, user.password);
+        }
+        else {
+            // Fallback para contraseñas en texto plano (solo para desarrollo)
+            isValidPassword = user.password === password;
+        }
+        if (!isValidPassword) {
+            console.log(`❌ Contraseña incorrecta para: ${email}`);
+            return res.status(401).json({ error: 'Credenciales inválidas' });
+        }
+        // Generar token JWT
+        const token = jsonwebtoken_1.default.sign({
+            userId: user.id,
+            email: user.email,
+            selectedRole: selectedRole
+        }, process.env.JWT_SECRET, { expiresIn: '24h' });
+        // Determinar dashboard basado en el rol seleccionado
+        let dashboard = '/dashboard';
+        switch (selectedRole) {
+            case 'estudiante':
+                dashboard = '/dashboard-estudiante';
+                break;
+            case 'profesor':
+            case 'docente':
+                dashboard = '/dashboard-profesor';
+                break;
+            case 'coordinador':
+                dashboard = '/dashboard-coordinador';
+                break;
+            case 'admin':
+                dashboard = '/dashboard-admin';
+                break;
+        }
+        console.log(`✅ Login exitoso con rol ${selectedRole} para: ${user.nombre} ${user.apellido}`);
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                nombre: user.nombre,
+                apellido: user.apellido,
+                tipo_usuario: user.tipo_usuario,
+                roles: roles,
+                selected_role: selectedRole,
+                dashboard: dashboard
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error en login con rol:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
@@ -159,6 +364,47 @@ router.get('/me', async (req, res) => {
         if (!user || !user.activo) {
             return res.status(401).json({ error: 'Usuario no encontrado o inactivo' });
         }
+        // Determinar el tipo de usuario para la respuesta
+        let userTypeDisplay = user.tipo_usuario;
+        let userRole = user.tipo_usuario;
+        // Normalizar 'docente' a 'profesor' para compatibilidad
+        if (user.tipo_usuario === 'docente') {
+            userTypeDisplay = 'profesor';
+            userRole = 'profesor';
+        }
+        // Información adicional según el tipo de usuario
+        let additionalInfo = {};
+        switch (user.tipo_usuario) {
+            case 'estudiante':
+                additionalInfo = {
+                    dashboard: '/dashboard-estudiante',
+                    permissions: ['view_evaluations', 'submit_evaluations'],
+                    role_description: 'Estudiante del sistema'
+                };
+                break;
+            case 'profesor':
+            case 'docente':
+                additionalInfo = {
+                    dashboard: '/dashboard-profesor',
+                    permissions: ['view_evaluations', 'create_evaluations', 'view_reports'],
+                    role_description: 'Profesor/Docente del sistema'
+                };
+                break;
+            case 'coordinador':
+                additionalInfo = {
+                    dashboard: '/dashboard-coordinador',
+                    permissions: ['view_evaluations', 'create_evaluations', 'view_reports', 'manage_users'],
+                    role_description: 'Coordinador académico'
+                };
+                break;
+            case 'admin':
+                additionalInfo = {
+                    dashboard: '/dashboard-admin',
+                    permissions: ['all'],
+                    role_description: 'Administrador del sistema'
+                };
+                break;
+        }
         // Devolver información del usuario (sin la contraseña)
         res.json({
             id: user.id,
@@ -166,8 +412,11 @@ router.get('/me', async (req, res) => {
             nombre: user.nombre,
             apellido: user.apellido,
             tipo_usuario: user.tipo_usuario,
+            user_type: userTypeDisplay,
+            user_role: userRole,
             activo: user.activo,
-            created_at: user.created_at
+            created_at: user.created_at,
+            ...additionalInfo
         });
     }
     catch (error) {

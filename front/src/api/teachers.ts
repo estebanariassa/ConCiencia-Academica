@@ -230,7 +230,9 @@ export async function fetchCoordinatorStats(): Promise<{
     
     // Obtener TODOS los cursos de la carrera (no solo los que tienen profesores)
     console.log('🔍 Obteniendo todos los cursos de la carrera:', carreraId);
-    const { data: todosLosCursos, error: cursosError } = await apiClient.get(`/api/courses/by-career/${carreraId}`);
+    const response = await apiClient.get(`/api/courses/by-career/${carreraId}`);
+    const todosLosCursos = response.data;
+    const cursosError = null; // No hay error handling específico para este endpoint
     
     let totalCursos = 0;
     if (cursosError) {
@@ -261,6 +263,83 @@ export async function fetchCoordinatorStats(): Promise<{
   } catch (error) {
     console.error('❌ Error fetching coordinator stats:', error);
     throw new Error('Error al obtener estadísticas del coordinador');
+  }
+}
+
+// Función para obtener información del profesor actual
+export async function fetchTeacherInfo(): Promise<any> {
+  try {
+    console.log('🌐 Fetching teacher info');
+    const response = await apiClient.get('/api/teachers/teacher-info')
+    console.log('🌐 Teacher info response:', response.data);
+    return response.data
+  } catch (error) {
+    console.error('❌ Error fetching teacher info:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    throw new Error('Error al obtener la información del profesor')
+  }
+}
+
+// Función para obtener la encuesta por carrera
+export async function fetchSurveyByCareer(careerId: string): Promise<any> {
+  try {
+    console.log('🌐 Fetching survey for career:', careerId);
+    const response = await apiClient.get(`/api/teachers/survey-by-career/${careerId}`)
+    console.log('🌐 Survey by career response:', response.data);
+    return response.data
+  } catch (error) {
+    console.error('❌ Error fetching survey by career:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    throw new Error('Error al obtener la encuesta de la carrera')
+  }
+}
+
+// Función de debug para verificar información del usuario
+export async function debugUserInfo(): Promise<any> {
+  try {
+    console.log('🌐 Debug: Fetching user info');
+    const response = await apiClient.get('/api/teachers/debug-user')
+    console.log('🌐 Debug user info response:', response.data);
+    return response.data
+  } catch (error) {
+    console.error('❌ Debug: Error fetching user info:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    throw new Error('Error al obtener información de debug del usuario')
+  }
+}
+
+// Función de debug para verificar autenticación
+export async function debugAuth(): Promise<any> {
+  try {
+    console.log('🌐 Debug Auth: Testing authentication');
+    const response = await apiClient.get('/api/teachers/debug-auth')
+    console.log('🌐 Debug Auth response:', response.data);
+    return response.data
+  } catch (error) {
+    console.error('❌ Debug Auth: Error:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    return {
+      error: true,
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    }
   }
 }
 

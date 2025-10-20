@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { SupabaseDB } from '../config/supabase-only'
 import { authenticateToken } from '../middleware/auth'
+import jwt from 'jsonwebtoken'
 
 const router = Router()
 
@@ -987,9 +988,278 @@ router.get('/student-info', authenticateToken, async (req: any, res) => {
   }
 })
 
+// GET /teachers/teacher-info - Obtener información del profesor actual
+router.get('/teacher-info', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+
+    console.log('🔍 Backend: Getting teacher info for user:', user.id);
+    console.log('🔍 Backend: User type:', user.tipo_usuario);
+
+    // Verificar que el usuario es un profesor o coordinador (que puede ser profesor también)
+    const canAccessAsTeacher = user.tipo_usuario === 'profesor' || 
+                               user.tipo_usuario === 'docente' ||
+                               user.tipo_usuario === 'coordinador';
+    
+    if (!canAccessAsTeacher) {
+      return res.status(403).json({ error: 'Solo los profesores y coordinadores pueden acceder a esta información' })
+    }
+
+    // Obtener información del profesor
+    const { data: profesor, error: profesorError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select(`
+        id,
+        carrera_id,
+        carrera:carreras(id, nombre)
+      `)
+      .eq('usuario_id', user.id)
+      .single()
+
+    if (profesorError || !profesor) {
+      console.log('❌ Backend: Profesor not found:', profesorError);
+      return res.status(404).json({ error: 'Profesor no encontrado' })
+    }
+
+    console.log('✅ Backend: Profesor found:', profesor);
+
+    res.json({
+      profesorId: profesor.id,
+      carreraId: profesor.carrera_id,
+      carrera: profesor.carrera
+    })
+
+  } catch (error) {
+    console.error('❌ Backend: Error getting teacher info:', error)
+    res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
+// GET /teachers/survey-by-career/:careerId - Obtener encuesta por carrera
+router.get('/survey-by-career/:careerId', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    const { careerId } = req.params
+
+    console.log('🔍 Backend: Getting survey for career:', careerId, 'for user:', user.id);
+
+    // Verificar que el usuario es un profesor o coordinador (que puede ser profesor también)
+    const canAccessAsTeacher = user.tipo_usuario === 'profesor' || 
+                               user.tipo_usuario === 'docente' ||
+                               user.tipo_usuario === 'coordinador';
+    
+    if (!canAccessAsTeacher) {
+      return res.status(403).json({ error: 'Solo los profesores y coordinadores pueden acceder a esta información' })
+    }
+
+    // Obtener preguntas de la encuesta para la carrera específica
+    let query = SupabaseDB.supabaseAdmin
+      .from('preguntas_evaluacion')
+      .select(`
+        id,
+        texto_pregunta,
+        tipo_pregunta,
+        opciones,
+        orden,
+        categoria:categorias_pregunta(nombre)
+      `)
+      .eq('activa', true)
+      .order('orden', { ascending: true });
+
+    if (careerId && careerId !== 'null') {
+      query = query.eq('id_carrera', parseInt(careerId));
+    } else {
+      query = query.is('id_carrera', null);
+    }
+
+    const { data: preguntasDB, error: preguntasError } = await query;
+
+    if (preguntasError) {
+      console.error('❌ Backend: Error obteniendo preguntas de la DB:', preguntasError);
+      return res.status(500).json({ error: 'Error obteniendo preguntas de evaluación' })
+    }
+
+    // Si no hay preguntas específicas para esta carrera, obtener preguntas generales
+    let questions = preguntasDB || [];
+    
+    if (questions.length === 0 && careerId && careerId !== 'null') {
+      console.log('⚠️ Backend: No hay preguntas específicas para carrera', careerId, ', obteniendo preguntas generales...');
+      
+      const { data: preguntasGenerales, error: preguntasGeneralesError } = await SupabaseDB.supabaseAdmin
+        .from('preguntas_evaluacion')
+        .select(`
+          id,
+          texto_pregunta,
+          tipo_pregunta,
+          opciones,
+          orden,
+          categoria:categorias_pregunta(nombre)
+        `)
+        .is('id_carrera', null)
+        .eq('activa', true)
+        .order('orden', { ascending: true })
+
+      if (preguntasGeneralesError) {
+        console.error('❌ Backend: Error obteniendo preguntas generales:', preguntasGeneralesError);
+        return res.status(500).json({ error: 'Error obteniendo preguntas de evaluación' })
+      }
+
+      questions = preguntasGenerales || [];
+    }
+
+    // Obtener información de la carrera
+    let carreraInfo = null;
+    if (careerId && careerId !== 'null') {
+      const { data: carreraData, error: carreraError } = await SupabaseDB.supabaseAdmin
+        .from('carreras')
+        .select('id, nombre')
+        .eq('id', careerId)
+        .single()
+
+      if (!carreraError && carreraData) {
+        carreraInfo = carreraData;
+      }
+    }
+
+    // Transformar las preguntas al formato esperado por el frontend
+    const questionsFormatted = questions.map((pregunta: any) => ({
+      id: pregunta.id.toString(),
+      category: pregunta.categoria?.nombre || 'General',
+      question: pregunta.texto_pregunta,
+      type: pregunta.tipo_pregunta,
+      options: pregunta.opciones
+    }))
+
+    console.log('✅ Backend: Survey questions found for career:', careerId, 'Count:', questionsFormatted.length);
+
+    res.json({
+      careerId: careerId ? parseInt(careerId) : null,
+      career: carreraInfo,
+      questions: questionsFormatted
+    })
+
+  } catch (error) {
+    console.error('❌ Backend: Error getting survey by career:', error)
+    res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
 // GET /teachers/test - Endpoint de prueba
 router.get('/test', (req, res) => {
   res.json({ message: 'Teachers endpoint working', timestamp: new Date().toISOString() })
+})
+
+// GET /teachers/debug-user - Endpoint de debug para verificar información del usuario
+router.get('/debug-user', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    console.log('🔍 Debug: User info from token:', user);
+
+    // Buscar información completa del usuario
+    const { data: usuarioCompleto, error: usuarioError } = await SupabaseDB.supabaseAdmin
+      .from('usuarios')
+      .select(`
+        id,
+        nombre,
+        apellido,
+        email,
+        tipo_usuario,
+        activo
+      `)
+      .eq('id', user.id)
+      .single()
+
+    if (usuarioError) {
+      console.log('❌ Debug: Error getting user:', usuarioError);
+      return res.status(500).json({ error: 'Error obteniendo usuario', details: usuarioError })
+    }
+
+    // Buscar si es profesor
+    const { data: profesor, error: profesorError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select(`
+        id,
+        usuario_id,
+        carrera_id,
+        activo,
+        carrera:carreras(id, nombre)
+      `)
+      .eq('usuario_id', user.id)
+      .single()
+
+    console.log('🔍 Debug: Profesor info:', profesor, 'Error:', profesorError);
+
+    res.json({
+      userFromToken: user,
+      usuarioCompleto,
+      profesor: profesor || null,
+      profesorError: profesorError || null
+    })
+
+  } catch (error) {
+    console.error('❌ Debug: Error:', error)
+    res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
+// GET /teachers/debug-auth - Endpoint de debug para verificar autenticación
+router.get('/debug-auth', async (req: any, res) => {
+  try {
+    const authHeader = req.headers['authorization']
+    const token = authHeader && authHeader.split(' ')[1]
+    
+    console.log('🔍 Debug Auth: Auth header:', authHeader);
+    console.log('🔍 Debug Auth: Token:', token ? 'Present' : 'Missing');
+
+    if (!token) {
+      return res.status(401).json({ 
+        error: 'No token provided',
+        authHeader: authHeader,
+        hasToken: false
+      })
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
+      console.log('🔍 Debug Auth: Decoded token:', decoded);
+
+      // Buscar usuario directamente
+      const { data: user, error: userError } = await SupabaseDB.supabaseAdmin
+        .from('usuarios')
+        .select(`
+          id,
+          nombre,
+          apellido,
+          email,
+          tipo_usuario,
+          activo
+        `)
+        .eq('id', decoded.userId)
+        .single()
+
+      console.log('🔍 Debug Auth: User from DB:', user, 'Error:', userError);
+
+      res.json({
+        tokenPresent: true,
+        decodedToken: decoded,
+        userFromDB: user,
+        userError: userError,
+        authHeader: authHeader
+      })
+
+    } catch (jwtError) {
+      console.log('❌ Debug Auth: JWT Error:', jwtError);
+      res.status(401).json({ 
+        error: 'Invalid token',
+        jwtError: jwtError,
+        token: token
+      })
+    }
+
+  } catch (error) {
+    console.error('❌ Debug Auth: Error:', error)
+    res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
 })
 
 // GET /teachers/by-career/:careerId - Obtener profesores por carrera (para coordinadores)

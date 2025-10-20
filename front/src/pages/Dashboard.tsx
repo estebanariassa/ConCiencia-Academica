@@ -33,6 +33,8 @@ const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
 
 interface DashboardProps {
   user: User;
+  onStartEvaluation?: () => void;
+  onViewReports?: () => void;
 }
 
 // Componente reutilizable para las cards
@@ -59,7 +61,7 @@ const SectionCard = ({ title, icon: Icon, children, className = '' }: SectionCar
   );
 };
 
-export default function Dashboard({ user }: DashboardProps) {
+export default function Dashboard({ user, onStartEvaluation, onViewReports }: DashboardProps) {
   const navigate = useNavigate();
   const [showCalendar, setShowCalendar] = useState(false);
   // Cargar user desde backend/localStorage si existe
@@ -85,6 +87,10 @@ export default function Dashboard({ user }: DashboardProps) {
 
   const handleViewReports = () => {
     navigate('/reports');
+  };
+
+  const handleViewSurvey = () => {
+    navigate('/survey');
   };
 
   const toggleCalendar = () => {
@@ -162,10 +168,10 @@ export default function Dashboard({ user }: DashboardProps) {
               className: 'bg-red-600 hover:bg-red-650 text-white'
             },
             {
-              icon: CalendarIcon,
-              label: 'Ver Calendario',
-              description: 'Fechas importantes',
-              onClick: toggleCalendar,
+              icon: ClipboardCheck,
+              label: 'Ver Encuesta',
+              description: 'Ver la encuesta de mi carrera',
+              onClick: handleViewSurvey,
               variant: 'outline' as const,
               className: 'border-gray-300'
             }

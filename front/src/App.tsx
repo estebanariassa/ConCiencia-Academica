@@ -10,6 +10,7 @@ import ReportsPage from './pages/Reports/ReportsPage' // Nueva importación
 import ScheduleSurveys from './pages/ScheduleSurveys'
 import ManageProfessors from './pages/ManageProfessors'
 import SurveyResults from './pages/SurveyResults'
+import SurveyView from './pages/SurveyView'
 import { User, Teacher, Course } from './types'
 import { useAuth } from './context/AuthContext'
 
@@ -116,6 +117,12 @@ function App() {
             <SurveyResults />
           } 
         />
+        <Route 
+          path="/survey" 
+          element={
+            <SurveyViewWrapper />
+          } 
+        />
       </Routes>
     </BrowserRouter>
   )
@@ -188,6 +195,11 @@ function ReportsPageWrapper() {
     email: authUser.email,
   }
   
+  // Si es coordinador pero también es profesor, permitir acceso a funcionalidades de profesor
+  if (authUser.tipo_usuario === 'coordinador') {
+    user.type = 'teacher'; // Permitir que los coordinadores accedan a funcionalidades de profesor
+  }
+  
   return <ReportsPage user={user} />
 }
 
@@ -257,6 +269,24 @@ function DashboardAdminWrapper() {
   }
   
   return <DashboardAdmin user={user} />
+}
+
+function SurveyViewWrapper() {
+  const { user: authUser } = useAuth()
+  
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // Convertir el usuario del AuthContext al formato esperado
+  const user: User = {
+    id: authUser.id,
+    name: `${authUser.nombre} ${authUser.apellido}`.trim(),
+    type: (authUser.tipo_usuario as any) ?? 'teacher',
+    email: authUser.email,
+  }
+  
+  return <SurveyView user={user} />
 }
 
 export default App
