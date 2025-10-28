@@ -65,8 +65,10 @@ export default function DashboardEstudiante() {
           backgroundAttachment: 'fixed'
         }}
       >
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
       </div>
+      
+      {/* Overlay más oscuro para mejor contraste */}
+      <div className="absolute inset-0 bg-black bg-opacity-60 z-0"></div>
 
       <div className="relative z-10">
         <Header 
@@ -183,10 +185,10 @@ export default function DashboardEstudiante() {
               <Card className="bg-white shadow-md border border-gray-200">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Progreso</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                  <TrendingUp className="h-4 w-4 text-red-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-2xl font-bold text-red-600">
                     {evaluaciones.length > 0 ? Math.round((evaluacionesCompletadas.length / evaluaciones.length) * 100) : 0}%
                   </div>
                   <p className="text-xs text-gray-500">Completado</p>

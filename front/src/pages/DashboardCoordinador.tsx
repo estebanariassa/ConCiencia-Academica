@@ -8,13 +8,11 @@ import {
 } from '../components/Card';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import Badge from '../components/Badge';
 import Header from '../components/Header';
 import { User } from '../types';
 import { 
   Calendar as CalendarIcon, 
   BookOpen,
-  Clock,
   Users,
   Mail,
   BarChart3,
@@ -184,9 +182,10 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
           backgroundAttachment: 'fixed'
         }}
       >
-        {/* Overlay oscuro que cubre toda la página */}
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
       </div>
+      
+      {/* Overlay más oscuro para mejor contraste */}
+      <div className="absolute inset-0 bg-black bg-opacity-60 z-0"></div>
       
       {/* Contenido principal */}
       <div className="relative z-10">
@@ -226,12 +225,12 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
                   <CardTitle className="text-lg font-medium text-gray-900 text-left">
                     Encuestas Activas
                   </CardTitle>
-                  <GraduationCap className="h-6 w-6 text-blue-600 ml-4" />
+                  <GraduationCap className="h-6 w-6 text-red-600 ml-4" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-blue-600">
+                  <div className="text-3xl font-bold text-red-600">
                     {loadingStats ? (
-                      <div className="animate-pulse bg-blue-200 h-8 w-16 rounded"></div>
+                      <div className="animate-pulse bg-red-200 h-8 w-16 rounded"></div>
                     ) : (
                       coordinadorData.stats.totalCarreras
                     )}
@@ -374,35 +373,6 @@ export default function DashboardCoordinador({ user }: DashboardCoordinadorProps
 
             {/* Columna lateral */}
             <div className="space-y-8">
-
-              {/* Próximas Fechas Límite */}
-              <SectionCard title="Próximas Fechas Límite" icon={Clock}>
-                <div className="space-y-4">
-                  {coordinadorData.upcomingDeadlines.map((deadline, index) => (
-                    <motion.div
-                      key={deadline.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.9 + index * 0.1 }}
-                      className={`p-4 rounded-lg border transition-colors ${
-                        deadline.urgent 
-                          ? 'bg-red-50 border-red-200' 
-                          : 'bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-medium text-gray-900">{deadline.task}</p>
-                        {deadline.urgent && (
-                          <Badge variant="outline" className="text-xs bg-red-100 text-red-700 border-red-200">
-                            Urgente
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500">{deadline.deadline}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </SectionCard>
 
               {/* Información del Coordinador */}
               <SectionCard title="Información del Coordinador" icon={UserIcon}>

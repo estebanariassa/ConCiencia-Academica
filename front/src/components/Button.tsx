@@ -18,8 +18,8 @@ export default function Button({
   
   const variantClasses = {
     default: 'bg-red-600 text-white hover:bg-red-700',
-    outline: 'border border-gray-300 bg-transparent hover:bg-gray-100',
-    ghost: 'hover:bg-gray-100',
+    outline: 'border border-gray-300 bg-white bg-opacity-90 text-gray-900 hover:bg-gray-100 shadow-md',
+    ghost: 'bg-white bg-opacity-90 text-gray-900 hover:bg-gray-100 shadow-md',
     secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300'
   }
   

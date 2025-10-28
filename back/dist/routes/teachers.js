@@ -34,7 +34,7 @@ router.get('/', auth_1.authenticateToken, async (req, res) => {
                 .from('inscripciones')
                 .select('grupo_id')
                 .eq('estudiante_id', estudiante.id)
-                .eq('activa', true);
+                .eq('activo', true);
             if (inscError) {
                 console.error('Error consultando inscripciones:', inscError);
                 return res.status(500).json({ error: 'DB inscripciones', details: inscError });
@@ -354,27 +354,69 @@ router.get('/:profesorId/courses/:courseId/groups', auth_1.authenticateToken, as
             return res.status(404).json({ error: 'Profesor no encontrado' });
         }
         console.log('✅ Backend: Profesor found:', profesor);
-        // Buscar grupos del curso (sin filtrar por activo ya que la tabla no tiene esa columna)
-        const { data: grupos, error: gruposError } = await supabase_only_1.SupabaseDB.supabaseAdmin
-            .from('grupos')
-            .select('id, numero_grupo, horario, aula')
-            .eq('curso_id', courseId);
-        console.log('🔍 Backend: Query grupos result:', { grupos, gruposError });
-        if (gruposError) {
-            console.error('❌ Backend: Error consultando grupos:', gruposError);
-            return res.status(500).json({ error: 'Error consultando grupos', details: gruposError });
+        // Buscar grupos del curso Y del profesor específico
+        const numericCourseId = Number(courseId);
+        // Buscar primero en asignaciones_profesor (es la fuente que relaciona profesor-curso-grupo)
+        const { data: asigns, error: asignsErr } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('asignaciones_profesor')
+            .select('id, profesor_id, curso_id, grupo_id, activa')
+            .eq('profesor_id', profesorId)
+            .eq('curso_id', isNaN(numericCourseId) ? courseId : numericCourseId)
+            .eq('activo', true);
+        if (asignsErr) {
+            console.error('❌ Backend: Error consultando asignaciones_profesor:', asignsErr);
+            return res.status(500).json({ error: 'Error consultando asignaciones', details: asignsErr });
         }
-        // Para estudiantes, mostrar TODOS los grupos del curso para que puedan elegir
-        // (no filtrar por inscripciones, ya que pueden estar evaluando a cualquier grupo del profesor)
-        let gruposFiltrados = grupos || [];
-        console.log('🔍 Backend: User type:', user?.tipo_usuario);
-        console.log('🔍 Backend: All groups found for course:', grupos);
-        // Por ahora, devolver todos los grupos del curso sin filtrar
-        // Esto permite al estudiante elegir cualquier grupo del profesor para evaluar
-        gruposFiltrados = grupos || [];
-        console.log('🔍 Backend: Final groups to return:', gruposFiltrados);
-        console.log('✅ Backend: Final response:', gruposFiltrados);
-        res.json(gruposFiltrados);
+        let gruposFinal = [];
+        if (Array.isArray(asigns) && asigns.length > 0) {
+            const grupoIds = Array.from(new Set((asigns || []).map((a) => a.grupo_id).filter(Boolean)));
+            console.log('🔍 grupoIds desde asignaciones_profesor:', grupoIds);
+            if (grupoIds.length > 0) {
+                const { data: gruposPorAsign, error: gruposAsignErr } = await supabase_only_1.SupabaseDB.supabaseAdmin
+                    .from('grupos')
+                    .select('id, numero_grupo, horario, aula, curso_id')
+                    .in('id', grupoIds);
+                if (gruposAsignErr) {
+                    console.error('❌ Backend: Error consultando grupos por ids:', gruposAsignErr);
+                    return res.status(500).json({ error: 'Error consultando grupos', details: gruposAsignErr });
+                }
+                gruposFinal = gruposPorAsign || [];
+            }
+        }
+        if (!gruposFinal || gruposFinal.length === 0) {
+            // Intentar también por usuario_id si el esquema de grupos usa usuario_id en profesor_id
+            console.log('⚠️ No hay grupos por profesor_id (profesores.id). Intentando por usuario_id del profesor...');
+            const { data: profRow, error: profErr } = await supabase_only_1.SupabaseDB.supabaseAdmin
+                .from('profesores')
+                .select('usuario_id')
+                .eq('id', profesorId)
+                .single();
+            if (!profErr && profRow?.usuario_id) {
+                const { data: gruposPorUsuario, error: gruposUsuarioErr } = await supabase_only_1.SupabaseDB.supabaseAdmin
+                    .from('grupos')
+                    .select('id, numero_grupo, horario, aula, curso_id, profesor_id')
+                    .eq('curso_id', isNaN(numericCourseId) ? courseId : numericCourseId)
+                    .eq('profesor_id', profRow.usuario_id);
+                if (!gruposUsuarioErr && gruposPorUsuario?.length) {
+                    console.log('✅ Encontrados grupos usando usuario_id del profesor');
+                    gruposFinal = gruposPorUsuario;
+                }
+            }
+        }
+        if (!gruposFinal || gruposFinal.length === 0) {
+            console.log('⚠️ No hay grupos para el profesor en este curso. Buscando grupos del curso en general...');
+            const { data: gruposPorCurso, error: gruposCursoError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+                .from('grupos')
+                .select('id, numero_grupo, horario, aula, curso_id')
+                .eq('curso_id', isNaN(numericCourseId) ? courseId : numericCourseId);
+            if (gruposCursoError) {
+                console.error('❌ Backend: Error consultando grupos por curso:', gruposCursoError);
+                return res.status(500).json({ error: 'Error consultando grupos del curso', details: gruposCursoError });
+            }
+            gruposFinal = gruposPorCurso || [];
+        }
+        console.log('🔍 Backend: Final groups to return:', gruposFinal);
+        res.json(gruposFinal);
     }
     catch (error) {
         console.error('❌ Backend: Error al obtener grupos del curso:', error);
@@ -677,14 +719,18 @@ router.post('/evaluations', auth_1.authenticateToken, async (req, res) => {
                 };
                 // Manejar respuestas de rating
                 if (answer.rating !== null && answer.rating !== undefined) {
-                    responseData.calificacion = answer.rating;
+                    responseData.respuesta_rating = answer.rating;
                 }
                 // Manejar respuestas de texto
                 if (answer.textAnswer !== null && answer.textAnswer !== undefined && answer.textAnswer.trim() !== '') {
                     responseData.respuesta_texto = answer.textAnswer.trim();
                 }
+                // Manejar respuestas de opción múltiple
+                if (answer.selectedOption !== null && answer.selectedOption !== undefined) {
+                    responseData.respuesta_opcion = answer.selectedOption;
+                }
                 return responseData;
-            }).filter((response) => response.calificacion !== undefined || response.respuesta_texto !== undefined);
+            }).filter((response) => response.respuesta_rating !== undefined || response.respuesta_texto !== undefined || response.respuesta_opcion !== undefined);
             if (respuestasData.length > 0) {
                 const { error: respuestasError } = await supabase_only_1.SupabaseDB.supabaseAdmin
                     .from('respuestas_evaluacion')
@@ -775,7 +821,7 @@ router.get('/evaluation-questions/:courseId', auth_1.authenticateToken, async (r
         orden,
         categoria:categorias_pregunta(nombre)
       `)
-            .eq('activa', true)
+            .eq('activo', true)
             .order('orden', { ascending: true });
         if (carreraId) {
             query = query.eq('id_carrera', parseInt(carreraId));
@@ -803,7 +849,7 @@ router.get('/evaluation-questions/:courseId', auth_1.authenticateToken, async (r
           categoria:categorias_pregunta(nombre)
         `)
                 .is('id_carrera', null)
-                .eq('activa', true)
+                .eq('activo', true)
                 .order('orden', { ascending: true });
             if (preguntasGeneralesError) {
                 console.error('❌ Backend: Error obteniendo preguntas generales:', preguntasGeneralesError);
@@ -931,7 +977,7 @@ router.get('/survey-by-career/:careerId', auth_1.authenticateToken, async (req, 
         orden,
         categoria:categorias_pregunta(nombre)
       `)
-            .eq('activa', true)
+            .eq('activo', true)
             .order('orden', { ascending: true });
         if (careerId && careerId !== 'null') {
             query = query.eq('id_carrera', parseInt(careerId));
@@ -959,7 +1005,7 @@ router.get('/survey-by-career/:careerId', auth_1.authenticateToken, async (req, 
           categoria:categorias_pregunta(nombre)
         `)
                 .is('id_carrera', null)
-                .eq('activa', true)
+                .eq('activo', true)
                 .order('orden', { ascending: true });
             if (preguntasGeneralesError) {
                 console.error('❌ Backend: Error obteniendo preguntas generales:', preguntasGeneralesError);
@@ -1032,7 +1078,7 @@ router.get('/debug-user', auth_1.authenticateToken, async (req, res) => {
         id,
         usuario_id,
         carrera_id,
-        activo,
+            activa,
         carrera:carreras(id, nombre)
       `)
             .eq('usuario_id', user.id)
@@ -1109,9 +1155,9 @@ router.get('/by-career/:careerId', auth_1.authenticateToken, async (req, res) =>
         const user = req.user;
         const { careerId } = req.params;
         console.log('🔍 [/teachers/by-career] Request received', { userId: user?.id, careerId });
-        // Verificar que el usuario sea coordinador
-        if (!user.roles?.includes('coordinador') && user.tipo_usuario !== 'coordinador') {
-            return res.status(403).json({ error: 'Acceso denegado. Solo coordinadores pueden ver esta información.' });
+        // Verificar que el usuario sea coordinador o decano
+        if (!user.roles?.includes('coordinador') && !user.roles?.includes('decano') && user.tipo_usuario !== 'coordinador') {
+            return res.status(403).json({ error: 'Acceso denegado. Solo coordinadores y decanos pueden ver esta información.' });
         }
         // 1) Traer profesores activos de la carrera directamente por columna profesores.carrera_id
         const { data: profesBase, error: profesErr } = await supabase_only_1.SupabaseDB.supabaseAdmin
@@ -1146,21 +1192,32 @@ router.get('/by-career/:careerId', auth_1.authenticateToken, async (req, res) =>
         })));
         const profesorIds = (profesBase || []).map((p) => p.id);
         console.log('🔍 IDs de profesores para buscar asignaciones:', profesorIds);
-        // 2) Intentar traer asignaciones y cursos de estos profesores (si existen) para enriquecer la respuesta
+        // 2) Buscar asignaciones por profesor_id en la tabla correcta
         let asignaciones = [];
         try {
-            console.log('🔍 Buscando asignaciones en tabla asignaciones_profesor...');
-            const resp = await supabase_only_1.SupabaseDB.supabaseAdmin
+            console.log('🔍 Buscando asignaciones por profesor_id:', profesorIds);
+            // Intentar primero con asignaciones_profesor
+            let resp = await supabase_only_1.SupabaseDB.supabaseAdmin
                 .from('asignaciones_profesor')
-                .select('id, profesor_id, curso_id, activo')
+                .select('id, profesor_id, curso_id, activa')
                 .in('profesor_id', profesorIds.length ? profesorIds : ['00000000-0000-0000-0000-000000000000'])
                 .eq('activo', true);
-            asignaciones = resp.data || [];
             console.log('🔍 Respuesta de asignaciones_profesor:', resp);
-            console.log('🔍 Error de asignaciones_profesor:', resp.error);
+            if (resp.error || !resp.data || resp.data.length === 0) {
+                console.log('🔍 No hay datos en asignaciones_profesor para estos profesores');
+                asignaciones = [];
+            }
+            else {
+                asignaciones = resp.data.map((item) => ({
+                    ...item,
+                    periodo_academico: null, // asignaciones_profesor no tiene periodo_academico
+                    activa: true
+                }));
+            }
+            console.log('🔍 Error de asignaciones:', resp.error);
         }
         catch (e) {
-            console.error('❌ Error en consulta de asignaciones_profesor:', e);
+            console.error('❌ Error en consulta de asignaciones:', e);
             // Si falla, continuar sin cursos
             asignaciones = [];
         }
@@ -1170,19 +1227,29 @@ router.get('/by-career/:careerId', auth_1.authenticateToken, async (req, res) =>
         console.log('🔍 IDs de cursos extraídos de asignaciones:', cursoIds);
         let cursos = [];
         if (cursoIds.length > 0) {
-            console.log('🔍 Buscando cursos en tabla cursos...');
+            console.log('🔍 Buscando cursos específicos de asignaciones...');
             const { data: cursosData, error: cursosErr } = await supabase_only_1.SupabaseDB.supabaseAdmin
                 .from('cursos')
                 .select('id, nombre, codigo, carrera_id')
                 .in('id', cursoIds);
-            console.log('🔍 Respuesta de cursos:', { data: cursosData, error: cursosErr });
+            console.log('🔍 Respuesta de cursos específicos:', { data: cursosData, error: cursosErr });
             if (!cursosErr)
                 cursos = cursosData || [];
-            console.log('🔎 Cursos encontrados (sin filtrar por carrera):', cursos?.length || 0);
+            console.log('🔎 Cursos encontrados de asignaciones:', cursos?.length || 0);
             console.log('🔎 Cursos encontrados:', cursos?.map(c => ({ id: c.id, nombre: c.nombre, carrera_id: c.carrera_id })));
         }
         else {
-            console.log('⚠️ No hay cursoIds para buscar cursos');
+            console.log('⚠️ No hay cursoIds de asignaciones, cargando TODOS los cursos de la carrera');
+            // Cargar TODOS los cursos de la carrera como fallback
+            const { data: todosLosCursos, error: todosLosCursosErr } = await supabase_only_1.SupabaseDB.supabaseAdmin
+                .from('cursos')
+                .select('id, nombre, codigo, carrera_id')
+                .or(`carrera_id.eq.${careerId},carrera_id.eq.8`); // Carrera específica + tronco común
+            console.log('🔍 Respuesta de TODOS los cursos de la carrera:', { data: todosLosCursos, error: todosLosCursosErr });
+            if (!todosLosCursosErr)
+                cursos = todosLosCursos || [];
+            console.log('🔎 TODOS los cursos de la carrera cargados:', cursos?.length || 0);
+            console.log('🔎 TODOS los cursos:', cursos?.map(c => ({ id: c.id, nombre: c.nombre, carrera_id: c.carrera_id })));
         }
         console.log('🔎 Cursos filtrados por carrera cargados:', cursos?.length || 0);
         const cursoById = new Map((cursos || []).map((c) => [c.id, c]));
@@ -1206,7 +1273,8 @@ router.get('/by-career/:careerId', auth_1.authenticateToken, async (req, res) =>
         const result = (profesBase || []).map((p) => {
             const asigns = asignacionesByProfesor.get(p.id) || [];
             console.log(`🔍 DEBUG: Profesor ${p.id} (${p.usuarios?.nombre}) - asignaciones:`, asigns);
-            const cursosProf = asigns
+            // Obtener cursos de las asignaciones
+            const cursosDeAsignaciones = asigns
                 .map((a) => {
                 const curso = cursoById.get(a.curso_id);
                 console.log(`🔍 DEBUG: curso_id: ${a.curso_id}, curso encontrado:`, curso);
@@ -1220,6 +1288,22 @@ router.get('/by-career/:careerId', auth_1.authenticateToken, async (req, res) =>
                 return null;
             })
                 .filter(Boolean);
+            // Si no hay cursos de asignaciones, mostrar TODOS los cursos de la carrera
+            let cursosProf = cursosDeAsignaciones;
+            if (cursosDeAsignaciones.length === 0) {
+                console.log(`🔍 DEBUG: No hay asignaciones para ${p.usuarios?.nombre}, mostrando todos los cursos de la carrera`);
+                cursosProf = (cursos || [])
+                    .filter((c) => {
+                    // Incluir cursos de la carrera específica Y cursos de tronco común (id_carrera = 8)
+                    const isCoordinatorCareer = c.carrera_id === parseInt(careerId);
+                    const isCommonTrunk = c.carrera_id === 8;
+                    return isCoordinatorCareer || isCommonTrunk;
+                })
+                    .map((c) => ({
+                    ...c,
+                    calificacion_promedio: null
+                }));
+            }
             console.log(`🔍 DEBUG: cursosProf final para ${p.usuarios?.nombre}:`, cursosProf);
             return {
                 id: p.id,
@@ -1239,6 +1323,579 @@ router.get('/by-career/:careerId', auth_1.authenticateToken, async (req, res) =>
     }
     catch (error) {
         console.error('❌ Error en /teachers/by-career:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+// GET /teachers/professor-subjects - Obtener materias específicas de cada profesor
+router.get('/professor-subjects', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        console.log('🔍 [/teachers/professor-subjects] Request received', { userId: user?.id });
+        // Verificar que el usuario sea decano
+        if (!user.roles?.includes('decano')) {
+            return res.status(403).json({ error: 'Acceso denegado. Solo el decano puede ver las materias de los profesores.' });
+        }
+        // Obtener todas las carreras activas (excluyendo tronco común)
+        const { data: carreras, error: carrerasError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('carreras')
+            .select('id, nombre')
+            .eq('activa', true)
+            .not('nombre', 'ilike', '%tronco común%')
+            .not('nombre', 'ilike', '%tronco comun%')
+            .order('nombre');
+        if (carrerasError) {
+            console.error('Error consultando carreras:', carrerasError);
+            return res.status(500).json({ error: 'Error obteniendo carreras', details: carrerasError });
+        }
+        // Obtener profesores de cada carrera con sus materias específicas
+        const profesoresPorCarrera = {};
+        for (const carrera of carreras) {
+            const { data: profesores, error: profesoresError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+                .from('profesores')
+                .select(`
+          id,
+          usuario_id,
+          activo,
+          codigo_profesor,
+          carrera_id,
+          usuarios:usuarios(
+            id,
+            nombre,
+            apellido,
+            email,
+            activo
+          ),
+          asignaciones_profesor:asignaciones_profesor(
+            curso_id,
+            activa,
+            cursos:cursos(
+              id,
+              nombre,
+              codigo,
+              creditos,
+              activo
+            )
+          )
+        `)
+                .eq('activo', true)
+                .eq('usuarios.activo', true)
+                .eq('carrera_id', carrera.id)
+                .eq('asignaciones_profesor.activa', true);
+            if (profesoresError) {
+                console.error(`Error consultando profesores para carrera ${carrera.id}:`, profesoresError);
+                profesoresPorCarrera[carrera.id] = [];
+            }
+            else {
+                // Mapear profesores con sus materias específicas
+                const profesoresConMaterias = (profesores || []).map((p) => ({
+                    id: p.id,
+                    usuario_id: p.usuario_id,
+                    codigo_profesor: p.codigo_profesor || null,
+                    carrera_id: p.carrera_id,
+                    carrera_nombre: carrera.nombre,
+                    nombre: p.usuarios?.nombre || '',
+                    apellido: p.usuarios?.apellido || '',
+                    email: p.usuarios?.email || '',
+                    activo: p.activo,
+                    materias_asignadas: (p.asignaciones_profesor || [])
+                        .filter((asig) => asig.cursos && asig.cursos.activo)
+                        .map((asig) => ({
+                        id: asig.cursos.id,
+                        nombre: asig.cursos.nombre,
+                        codigo: asig.cursos.codigo,
+                        creditos: asig.cursos.creditos
+                    })),
+                    total_materias_asignadas: (p.asignaciones_profesor || [])
+                        .filter((asig) => asig.cursos && asig.cursos.activo).length
+                }));
+                profesoresPorCarrera[carrera.id] = profesoresConMaterias;
+            }
+        }
+        const result = {
+            carreras: carreras.map(c => ({
+                id: c.id,
+                nombre: c.nombre,
+                total_profesores: profesoresPorCarrera[c.id]?.length || 0
+            })),
+            profesores_por_carrera: profesoresPorCarrera,
+            total_profesores: Object.values(profesoresPorCarrera).flat().length
+        };
+        console.log(`✅ Respuesta materias específicas de profesores:`, {
+            carreras: result.carreras.length,
+            total_profesores: result.total_profesores
+        });
+        res.json(result);
+    }
+    catch (error) {
+        console.error('❌ Error en /teachers/professor-subjects:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+// GET /teachers/career-subjects - Obtener materias de cada carrera
+router.get('/career-subjects', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        console.log('🔍 [/teachers/career-subjects] Request received', { userId: user?.id });
+        // Verificar que el usuario sea decano
+        if (!user.roles?.includes('decano')) {
+            return res.status(403).json({ error: 'Acceso denegado. Solo el decano puede ver las materias de las carreras.' });
+        }
+        // Obtener todas las carreras activas (excluyendo tronco común)
+        const { data: carreras, error: carrerasError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('carreras')
+            .select('id, nombre')
+            .eq('activa', true)
+            .not('nombre', 'ilike', '%tronco común%')
+            .not('nombre', 'ilike', '%tronco comun%')
+            .order('nombre');
+        if (carrerasError) {
+            console.error('Error consultando carreras:', carrerasError);
+            return res.status(500).json({ error: 'Error obteniendo carreras', details: carrerasError });
+        }
+        // Obtener materias de cada carrera
+        const materiasPorCarrera = {};
+        for (const carrera of carreras) {
+            const { data: cursos, error: cursosError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+                .from('cursos')
+                .select(`
+          id,
+          nombre,
+          codigo,
+          creditos,
+          descripcion,
+          activo
+        `)
+                .eq('carrera_id', carrera.id)
+                .eq('activo', true)
+                .order('nombre');
+            if (cursosError) {
+                console.error(`Error consultando cursos para carrera ${carrera.id}:`, cursosError);
+                materiasPorCarrera[carrera.id] = [];
+            }
+            else {
+                materiasPorCarrera[carrera.id] = cursos || [];
+            }
+        }
+        const result = {
+            carreras: carreras.map(c => ({
+                id: c.id,
+                nombre: c.nombre,
+                total_materias: materiasPorCarrera[c.id]?.length || 0
+            })),
+            materias_por_carrera: materiasPorCarrera,
+            total_materias: Object.values(materiasPorCarrera).flat().length
+        };
+        console.log(`✅ Respuesta materias por carrera:`, {
+            carreras: result.carreras.length,
+            total_materias: result.total_materias
+        });
+        res.json(result);
+    }
+    catch (error) {
+        console.error('❌ Error en /teachers/career-subjects:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+// GET /teachers/detailed-faculty - Obtener profesores con información detallada (materias, etc.)
+router.get('/detailed-faculty', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        console.log('🔍 [/teachers/detailed-faculty] Request received', { userId: user?.id });
+        // Verificar que el usuario sea decano
+        if (!user.roles?.includes('decano')) {
+            return res.status(403).json({ error: 'Acceso denegado. Solo el decano puede ver todos los profesores de la facultad.' });
+        }
+        // Obtener todas las carreras activas (excluyendo tronco común)
+        const { data: carreras, error: carrerasError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('carreras')
+            .select('id, nombre')
+            .eq('activa', true)
+            .not('nombre', 'ilike', '%tronco común%')
+            .not('nombre', 'ilike', '%tronco comun%')
+            .order('nombre');
+        if (carrerasError) {
+            console.error('Error consultando carreras:', carrerasError);
+            return res.status(500).json({ error: 'Error obteniendo carreras', details: carrerasError });
+        }
+        // Obtener profesores de cada carrera con información detallada
+        const profesoresPorCarrera = {};
+        for (const carrera of carreras) {
+            const { data: profesores, error: profesoresError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+                .from('profesores')
+                .select(`
+          id,
+          usuario_id,
+          activa,
+          codigo_profesor,
+          carrera_id,
+          usuarios:usuarios(
+            id,
+            nombre,
+            apellido,
+            email,
+            activo
+          )
+        `)
+                .eq('activo', true)
+                .eq('usuarios.activo', true)
+                .eq('carrera_id', carrera.id);
+            if (profesoresError) {
+                console.error(`Error consultando profesores para carrera ${carrera.id}:`, profesoresError);
+                profesoresPorCarrera[carrera.id] = [];
+            }
+            else {
+                // Obtener cursos de la carrera
+                const { data: cursosCarrera, error: cursosError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+                    .from('cursos')
+                    .select(`
+            id,
+            nombre,
+            codigo,
+            creditos,
+            activo
+          `)
+                    .eq('carrera_id', carrera.id)
+                    .eq('activo', true);
+                if (cursosError) {
+                    console.warn(`Error obteniendo cursos para carrera ${carrera.id}:`, cursosError);
+                }
+                // Mapear profesores con información de la carrera
+                const profesoresConMaterias = (profesores || []).map((p) => ({
+                    id: p.id,
+                    usuario_id: p.usuario_id,
+                    codigo_profesor: p.codigo_profesor || null,
+                    carrera_id: p.carrera_id,
+                    carrera_nombre: carrera.nombre,
+                    nombre: p.usuarios?.nombre || '',
+                    apellido: p.usuarios?.apellido || '',
+                    email: p.usuarios?.email || '',
+                    activo: p.activo,
+                    materias_carrera: cursosCarrera || [],
+                    total_materias_carrera: cursosCarrera?.length || 0
+                }));
+                profesoresPorCarrera[carrera.id] = profesoresConMaterias;
+            }
+        }
+        const result = {
+            carreras: carreras.map(c => ({
+                id: c.id,
+                nombre: c.nombre,
+                total_profesores: profesoresPorCarrera[c.id]?.length || 0
+            })),
+            profesores_por_carrera: profesoresPorCarrera,
+            total_profesores: Object.values(profesoresPorCarrera).flat().length
+        };
+        console.log(`✅ Respuesta profesores detallados de la facultad:`, {
+            carreras: result.carreras.length,
+            total_profesores: result.total_profesores
+        });
+        res.json(result);
+    }
+    catch (error) {
+        console.error('❌ Error en /teachers/detailed-faculty:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+// GET /teachers/faculty - Obtener TODOS los profesores de la facultad organizados por carrera (solo para decanos)
+router.get('/faculty', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        console.log('🔍 [/teachers/faculty] Request received', { userId: user?.id });
+        // Verificar que el usuario sea decano
+        if (!user.roles?.includes('decano')) {
+            return res.status(403).json({ error: 'Acceso denegado. Solo el decano puede ver todos los profesores de la facultad.' });
+        }
+        // Obtener todas las carreras activas (excluyendo tronco común)
+        const { data: carreras, error: carrerasError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('carreras')
+            .select('id, nombre')
+            .eq('activo', true)
+            .eq('activa', true)
+            .not('nombre', 'ilike', '%tronco común%')
+            .not('nombre', 'ilike', '%tronco comun%')
+            .order('nombre');
+        if (carrerasError) {
+            console.error('Error consultando carreras:', carrerasError);
+            return res.status(500).json({ error: 'Error obteniendo carreras', details: carrerasError });
+        }
+        // Obtener profesores de cada carrera
+        const profesoresPorCarrera = {};
+        for (const carrera of carreras) {
+            const { data: profesores, error: profesoresError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+                .from('profesores')
+                .select(`
+          id,
+          usuario_id,
+          activa,
+          codigo_profesor,
+          carrera_id,
+          usuarios:usuarios(
+            id,
+            nombre,
+            apellido,
+            email,
+            activo
+          )
+        `)
+                .eq('activo', true)
+                .eq('usuarios.activo', true)
+                .eq('carrera_id', carrera.id);
+            if (profesoresError) {
+                console.error(`Error consultando profesores para carrera ${carrera.id}:`, profesoresError);
+                profesoresPorCarrera[carrera.id] = [];
+            }
+            else {
+                profesoresPorCarrera[carrera.id] = (profesores || []).map((p) => ({
+                    id: p.id,
+                    usuario_id: p.usuario_id,
+                    codigo_profesor: p.codigo_profesor || null,
+                    carrera_id: p.carrera_id,
+                    carrera_nombre: carrera.nombre,
+                    departamento: 'Sin departamento', // Campo fijo ya que no existe en la tabla
+                    nombre: p.usuarios?.nombre || '',
+                    apellido: p.usuarios?.apellido || '',
+                    email: p.usuarios?.email || '',
+                    activo: p.activo
+                }));
+            }
+        }
+        const result = {
+            carreras: carreras.map(c => ({
+                id: c.id,
+                nombre: c.nombre,
+                total_profesores: profesoresPorCarrera[c.id]?.length || 0
+            })),
+            profesores_por_carrera: profesoresPorCarrera,
+            total_profesores: Object.values(profesoresPorCarrera).flat().length
+        };
+        console.log(`✅ Respuesta profesores de la facultad:`, {
+            carreras: result.carreras.length,
+            total_profesores: result.total_profesores
+        });
+        res.json(result);
+    }
+    catch (error) {
+        console.error('❌ Error en /teachers/faculty:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+// GET /teachers/all - Obtener TODOS los profesores de la facultad (solo para decanos)
+router.get('/all', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        console.log('🔍 [/teachers/all] Request received', { userId: user?.id });
+        // Verificar que el usuario sea decano
+        if (!user.roles?.includes('decano')) {
+            return res.status(403).json({ error: 'Acceso denegado. Solo el decano puede ver todos los profesores de la facultad.' });
+        }
+        // Obtener TODOS los profesores activos de la facultad
+        const { data: profesBase, error: profesErr } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('profesores')
+            .select(`
+        id,
+        usuario_id,
+            activa,
+        codigo_profesor,
+        carrera_id,
+        departamento,
+        usuarios:usuarios(
+          id,
+          nombre,
+          apellido,
+          email,
+          activo
+        ),
+        carreras:carreras(
+          id,
+          nombre
+        )
+      `)
+            .eq('activo', true)
+            .eq('usuarios.activo', true);
+        if (profesErr) {
+            console.error('Error consultando todos los profesores:', profesErr);
+            return res.status(500).json({ error: 'Error obteniendo profesores', details: profesErr });
+        }
+        console.log(`🔎 Total profesores encontrados en la facultad:`, profesBase?.length || 0);
+        // Obtener todas las carreras para mostrar información completa
+        const { data: carreras, error: carrerasError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('carreras')
+            .select('id, nombre')
+            .eq('activo', true);
+        if (carrerasError) {
+            console.warn('Error obteniendo carreras:', carrerasError);
+        }
+        const carreraById = new Map();
+        (carreras || []).forEach((c) => {
+            carreraById.set(c.id, c);
+        });
+        const result = (profesBase || []).map((p) => {
+            const carrera = carreraById.get(p.carrera_id);
+            return {
+                id: p.id,
+                usuario_id: p.usuario_id,
+                codigo_profesor: p.codigo_profesor || null,
+                carrera_id: p.carrera_id,
+                carrera_nombre: carrera?.nombre || 'Sin carrera asignada',
+                departamento: p.departamento || 'Sin departamento',
+                nombre: p.usuarios?.nombre || '',
+                apellido: p.usuarios?.apellido || '',
+                email: p.usuarios?.email || '',
+                activo: p.activo
+            };
+        });
+        console.log(`✅ Respuesta todos los profesores de la facultad:`, { profesores: result.length });
+        res.json(result);
+    }
+    catch (error) {
+        console.error('❌ Error en /teachers/all:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+// Endpoint de debug para verificar grupos de un curso
+router.get('/debug-groups/:profesorId/:courseId', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        const { profesorId, courseId } = req.params;
+        console.log('🔍 [DEBUG GROUPS] Verificando grupos para profesor:', profesorId, 'curso:', courseId);
+        // 1. Verificar que el profesor existe
+        const { data: profesor, error: profesorError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('profesores')
+            .select('id, usuario_id, carrera_id')
+            .eq('id', profesorId)
+            .eq('activo', true);
+        if (profesorError) {
+            console.error('Error consultando profesor:', profesorError);
+            return res.status(500).json({ error: 'Error consultando profesor' });
+        }
+        console.log('🔍 [DEBUG GROUPS] Profesor encontrado:', profesor);
+        // 2. Verificar que el curso existe
+        const { data: curso, error: cursoError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('cursos')
+            .select('id, nombre, codigo, carrera_id')
+            .eq('id', courseId);
+        if (cursoError) {
+            console.error('Error consultando curso:', cursoError);
+            return res.status(500).json({ error: 'Error consultando curso' });
+        }
+        console.log('🔍 [DEBUG GROUPS] Curso encontrado:', curso);
+        // 3. Verificar asignaciones del profesor para este curso
+        const { data: asignaciones, error: asignacionesError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('asignaciones_profesor')
+            .select('id, profesor_id, curso_id, activo')
+            .eq('profesor_id', profesorId)
+            .eq('curso_id', courseId);
+        if (asignacionesError) {
+            console.error('Error consultando asignaciones:', asignacionesError);
+        }
+        console.log('🔍 [DEBUG GROUPS] Asignaciones del profesor para este curso:', asignaciones);
+        // 4. Traer grupos por curso_id (la tabla grupos no tiene profesor_id)
+        const { data: grupos, error: gruposError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('grupos')
+            .select('id, numero_grupo, horario, aula, curso_id')
+            .eq('curso_id', courseId);
+        if (gruposError) {
+            console.error('Error consultando grupos:', gruposError);
+            return res.status(500).json({ error: 'Error consultando grupos' });
+        }
+        console.log('🔍 [DEBUG GROUPS] Grupos por curso encontrados:', grupos);
+        // 5. Verificar si hay grupos en general (para debug)
+        const { data: todosLosGrupos, error: todosLosGruposError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('grupos')
+            .select('id, numero_grupo, curso_id, profesor_id')
+            .limit(10);
+        if (todosLosGruposError) {
+            console.error('Error consultando todos los grupos:', todosLosGruposError);
+        }
+        console.log('🔍 [DEBUG GROUPS] Muestra de todos los grupos:', todosLosGrupos);
+        res.json({
+            profesor: profesor || null,
+            curso: curso || null,
+            grupos: grupos || [],
+            asignaciones: asignaciones || [],
+            todosLosGrupos: todosLosGrupos || [],
+            summary: {
+                profesorExiste: !!profesor,
+                cursoExiste: !!curso,
+                gruposEncontrados: grupos?.length || 0,
+                asignacionesEncontradas: asignaciones?.length || 0,
+                totalGruposEnDB: todosLosGrupos?.length || 0
+            }
+        });
+    }
+    catch (error) {
+        console.error('❌ Error en debug groups:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+// Endpoint de debug para verificar asignaciones de profesores
+router.get('/debug-assignments/:careerId', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        const { careerId } = req.params;
+        console.log('🔍 [DEBUG] Verificando asignaciones para carrera:', careerId);
+        // 1. Verificar profesores de la carrera
+        const { data: profesores, error: profError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('profesores')
+            .select(`
+        id,
+        usuario_id,
+        carrera_id,
+        usuarios:usuarios(nombre, apellido, email)
+      `)
+            .eq('carrera_id', careerId)
+            .eq('activo', true);
+        if (profError) {
+            console.error('Error consultando profesores:', profError);
+            return res.status(500).json({ error: 'Error consultando profesores' });
+        }
+        console.log('🔍 [DEBUG] Profesores encontrados:', profesores?.length || 0);
+        // 2. Verificar asignaciones por profesor_id
+        const profesorIds = profesores?.map((p) => p.id) || [];
+        console.log('🔍 [DEBUG] IDs de profesores para buscar asignaciones:', profesorIds);
+        const { data: asignaciones, error: asigError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('asignaciones_profesor')
+            .select(`
+        id,
+        profesor_id,
+        curso_id,
+        activa,
+        cursos:cursos(id, nombre, codigo, carrera_id)
+      `)
+            .in('profesor_id', profesorIds.length > 0 ? profesorIds : ['00000000-0000-0000-0000-000000000000']);
+        if (asigError) {
+            console.error('Error consultando asignaciones:', asigError);
+            return res.status(500).json({ error: 'Error consultando asignaciones' });
+        }
+        console.log('🔍 [DEBUG] Asignaciones encontradas:', asignaciones?.length || 0);
+        // 3. Verificar cursos de la carrera
+        const { data: cursos, error: cursosError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('cursos')
+            .select(`
+        id,
+        nombre,
+        codigo,
+        carrera_id
+      `)
+            .eq('carrera_id', careerId);
+        if (cursosError) {
+            console.error('Error consultando cursos:', cursosError);
+            return res.status(500).json({ error: 'Error consultando cursos' });
+        }
+        console.log('🔍 [DEBUG] Cursos de la carrera encontrados:', cursos?.length || 0);
+        res.json({
+            profesores: profesores || [],
+            asignaciones: asignaciones || [],
+            cursos: cursos || [],
+            summary: {
+                totalProfesores: profesores?.length || 0,
+                totalAsignaciones: asignaciones?.length || 0,
+                totalCursos: cursos?.length || 0
+            }
+        });
+    }
+    catch (error) {
+        console.error('❌ Error en debug assignments:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });
@@ -1310,8 +1967,8 @@ router.get('/careers', auth_1.authenticateToken, async (req, res) => {
         // Obtener carreras
         const { data: carreras, error } = await supabase_only_1.SupabaseDB.supabaseAdmin
             .from('carreras')
-            .select('id, nombre, codigo, activa')
-            .eq('activa', true)
+            .select('id, nombre, codigo, activo')
+            .eq('activo', true)
             .order('nombre');
         if (error) {
             console.error('Error obteniendo carreras:', error);
@@ -1360,14 +2017,14 @@ router.get('/:teacherId/courses', auth_1.authenticateToken, async (req, res) => 
         id,
         profesor_id,
         curso_id,
-        activa,
+            activa,
         cursos:cursos(
           id,
           nombre,
           codigo,
           creditos,
           descripcion,
-          activo,
+          activa,
           carrera_id,
           carreras:carreras(
             id,
@@ -1377,7 +2034,7 @@ router.get('/:teacherId/courses', auth_1.authenticateToken, async (req, res) => 
         )
       `)
             .eq('profesor_id', profesor.id)
-            .eq('activa', true);
+            .eq('activo', true);
         if (asignError) {
             console.error('Error consultando asignaciones del profesor:', asignError);
             return res.status(500).json({ error: 'Error obteniendo cursos del profesor', details: asignError });
@@ -1399,6 +2056,236 @@ router.get('/:teacherId/courses', auth_1.authenticateToken, async (req, res) => 
     }
     catch (error) {
         console.error('❌ Error en /teachers/:teacherId/courses:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+// GET /teachers/career-results/all - Obtener resultados para todas las carreras
+router.get('/career-results/all', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        // Verificar que el usuario sea decano
+        if (!user.roles?.includes('decano')) {
+            return res.status(403).json({ error: 'Acceso denegado. Solo decanos pueden acceder a estos resultados.' });
+        }
+        console.log('🔍 Obteniendo resultados para todas las carreras...');
+        // Obtener todas las carreras activas (excluyendo tronco común)
+        const { data: carreras, error: carrerasError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('carreras')
+            .select(`
+        id,
+        nombre,
+        codigo,
+        activo
+      `)
+            .eq('activa', true)
+            .not('nombre', 'ilike', '%tronco común%')
+            .not('nombre', 'ilike', '%tronco comun%')
+            .eq('activo', true);
+        if (carrerasError) {
+            console.error('❌ Error obteniendo carreras:', carrerasError);
+            return res.status(500).json({ error: 'Error obteniendo carreras', details: carrerasError });
+        }
+        // Obtener estadísticas generales de evaluaciones
+        const { data: evaluacionesGenerales, error: evalError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('evaluaciones')
+            .select(`
+        id,
+        calificacion_promedio,
+        fecha_creacion,
+        grupos:grupos(
+          curso_id,
+          cursos:cursos(
+            carrera_id,
+            carreras:carreras(
+              id,
+              nombre
+            )
+          )
+        )
+      `);
+        if (evalError) {
+            console.error('❌ Error obteniendo evaluaciones generales:', evalError);
+            return res.status(500).json({ error: 'Error obteniendo evaluaciones', details: evalError });
+        }
+        // Procesar datos por carrera
+        const resultadosPorCarrera = carreras.map(carrera => {
+            // TODO: Corregir consulta SQL para evitar errores de TypeScript
+            const evaluacionesCarrera = []; // evaluacionesGenerales?.filter(evaluacion => 
+            // evaluacion.grupos?.cursos?.carrera_id === carrera.id
+            // ) || []
+            const calificaciones = evaluacionesCarrera.map(evaluacion => evaluacion.calificacion_promedio).filter(c => c !== null);
+            const promedioCarrera = calificaciones.length > 0
+                ? calificaciones.reduce((sum, cal) => sum + cal, 0) / calificaciones.length
+                : 0;
+            return {
+                carrera_id: carrera.id,
+                carrera_nombre: carrera.nombre,
+                carrera_codigo: carrera.codigo,
+                total_evaluaciones: evaluacionesCarrera.length,
+                calificacion_promedio: promedioCarrera,
+                profesores_evaluados: 0, // TODO: Corregir consulta SQL
+                ultima_evaluacion: evaluacionesCarrera.length > 0
+                    ? Math.max(...evaluacionesCarrera.map(evaluacion => new Date(evaluacion.fecha_creacion).getTime()))
+                    : null
+            };
+        });
+        // Estadísticas generales
+        const totalEvaluaciones = evaluacionesGenerales?.length || 0;
+        const calificacionesGenerales = evaluacionesGenerales?.map(evaluacion => evaluacion.calificacion_promedio).filter(c => c !== null) || [];
+        const promedioGeneral = calificacionesGenerales.length > 0
+            ? calificacionesGenerales.reduce((sum, cal) => sum + cal, 0) / calificacionesGenerales.length
+            : 0;
+        const resultado = {
+            periodo: '2025-2', // TODO: Hacer dinámico
+            estadisticas_generales: {
+                total_carreras: carreras.length,
+                total_evaluaciones: totalEvaluaciones,
+                promedio_general: promedioGeneral,
+                carreras_con_evaluaciones: resultadosPorCarrera.filter(r => r.total_evaluaciones > 0).length
+            },
+            resultados_por_carrera: resultadosPorCarrera,
+            fecha_generacion: new Date().toISOString()
+        };
+        console.log('✅ Resultados globales generados:', resultado.estadisticas_generales);
+        res.json(resultado);
+    }
+    catch (error) {
+        console.error('❌ Error en /teachers/career-results/all:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+// GET /teachers/career-results/:careerId - Obtener resultados para una carrera específica
+router.get('/career-results/:careerId', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const user = req.user;
+        const { careerId } = req.params;
+        // Verificar que el usuario sea decano
+        if (!user.roles?.includes('decano')) {
+            return res.status(403).json({ error: 'Acceso denegado. Solo decanos pueden acceder a estos resultados.' });
+        }
+        console.log(`🔍 Obteniendo resultados para carrera ${careerId}...`);
+        // Obtener información de la carrera
+        const { data: carrera, error: carreraError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('carreras')
+            .select(`
+        id,
+        nombre,
+        codigo,
+            activa,
+        descripcion
+      `)
+            .eq('id', careerId)
+            .single();
+        if (carreraError) {
+            console.error('❌ Error obteniendo carrera:', carreraError);
+            return res.status(404).json({ error: 'Carrera no encontrada', details: carreraError });
+        }
+        // Obtener profesores de la carrera
+        const { data: profesores, error: profesoresError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('profesores')
+            .select(`
+        id,
+        usuario_id,
+        codigo_profesor,
+        activa,
+        carrera_id,
+        usuarios:usuarios(
+          id,
+          nombre,
+          apellido,
+          email
+        )
+      `)
+            .eq('activo', true);
+        if (profesoresError) {
+            console.error('❌ Error obteniendo profesores:', profesoresError);
+            return res.status(500).json({ error: 'Error obteniendo profesores', details: profesoresError });
+        }
+        // Obtener evaluaciones de la carrera
+        const { data: evaluaciones, error: evaluacionesError } = await supabase_only_1.SupabaseDB.supabaseAdmin
+            .from('evaluaciones')
+            .select(`
+        id,
+        calificacion_promedio,
+        fecha_creacion,
+        comentarios,
+        profesor_id,
+        grupos:grupos(
+          curso_id,
+          cursos:cursos(
+            id,
+            nombre,
+            codigo,
+            carrera_id,
+            carreras:carreras(
+              id,
+              nombre
+            )
+          )
+        )
+      `)
+            .eq('grupos.cursos.carrera_id', careerId);
+        if (evaluacionesError) {
+            console.error('❌ Error obteniendo evaluaciones:', evaluacionesError);
+            return res.status(500).json({ error: 'Error obteniendo evaluaciones', details: evaluacionesError });
+        }
+        // Procesar datos por profesor
+        const profesoresConResultados = profesores.map(profesor => {
+            const evaluacionesProfesor = evaluaciones?.filter(evaluacion => evaluacion.profesor_id === profesor.id) || [];
+            const calificaciones = evaluacionesProfesor.map(evaluacion => evaluacion.calificacion_promedio).filter(c => c !== null);
+            const promedioProfesor = calificaciones.length > 0
+                ? calificaciones.reduce((sum, cal) => sum + cal, 0) / calificaciones.length
+                : 0;
+            // TODO: Corregir consulta SQL para evitar errores de TypeScript
+            const cursosEvaluados = []; // evaluacionesProfesor.map(evaluacion => ({
+            // curso_id: evaluacion.grupos?.cursos?.id,
+            // curso_nombre: evaluacion.grupos?.cursos?.nombre,
+            // curso_codigo: evaluacion.grupos?.cursos?.codigo,
+            // calificacion: evaluacion.calificacion_promedio,
+            // fecha_evaluacion: evaluacion.fecha_creacion
+            // }))
+            return {
+                profesor_id: profesor.id,
+                profesor_nombre: 'Profesor', // TODO: Corregir consulta SQL
+                profesor_email: 'email@ejemplo.com', // TODO: Corregir consulta SQL
+                total_evaluaciones: evaluacionesProfesor.length,
+                calificacion_promedio: promedioProfesor,
+                cursos_evaluados: cursosEvaluados,
+                ultima_evaluacion: evaluacionesProfesor.length > 0
+                    ? Math.max(...evaluacionesProfesor.map(evaluacion => new Date(evaluacion.fecha_creacion).getTime()))
+                    : null
+            };
+        });
+        // Estadísticas de la carrera
+        const totalEvaluaciones = evaluaciones?.length || 0;
+        const calificacionesGenerales = evaluaciones?.map(evaluacion => evaluacion.calificacion_promedio).filter(c => c !== null) || [];
+        const promedioGeneral = calificacionesGenerales.length > 0
+            ? calificacionesGenerales.reduce((sum, cal) => sum + cal, 0) / calificacionesGenerales.length
+            : 0;
+        const resultado = {
+            carrera: {
+                id: carrera.id,
+                nombre: carrera.nombre,
+                codigo: carrera.codigo,
+                descripcion: carrera.descripcion,
+                activa: carrera.activa
+            },
+            periodo: '2025-2', // TODO: Hacer dinámico
+            estadisticas_carrera: {
+                total_profesores: profesores.length,
+                profesores_evaluados: profesoresConResultados.filter(p => p.total_evaluaciones > 0).length,
+                total_evaluaciones: totalEvaluaciones,
+                promedio_general: promedioGeneral,
+                cursos_evaluados: 0 // TODO: Corregir consulta SQL
+            },
+            profesores: profesoresConResultados,
+            fecha_generacion: new Date().toISOString()
+        };
+        console.log(`✅ Resultados de carrera ${carrera.nombre} generados:`, resultado.estadisticas_carrera);
+        res.json(resultado);
+    }
+    catch (error) {
+        console.error('❌ Error en /teachers/career-results/:careerId:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 });

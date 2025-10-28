@@ -4,7 +4,12 @@ import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard'
 import DashboardProfesor from './pages/DashboardProfesor'
 import DashboardCoordinador from './pages/DashboardCoordinador'
+import DashboardDecano from './pages/DashboardDecano'
+import CareerSubjectsPage from './pages/CareerSubjectsPage'
+import ProfessorsPage from './pages/ProfessorsPage'
+import CareerResultsPage from './pages/CareerResultsPage'
 import DashboardAdmin from './pages/DashboardAdmin'
+import ProtectedRoute from './components/ProtectedRoute'
 import TeacherSelection from './pages/evaluation/TeacherSelection'
 import EvaluationForm from './pages/evaluation/EvaluationForm'
 import ReportsPage from './pages/Reports/ReportsPage' // Nueva importación
@@ -76,6 +81,38 @@ function App() {
           path="/dashboard-coordinador" 
           element={
             user ? <DashboardCoordinadorWrapper /> : <Navigate to="/login" replace />
+          } 
+        />
+        <Route 
+          path="/dashboard-decano" 
+          element={
+            <ProtectedRoute>
+              <DashboardDecanoWrapper />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/career-subjects" 
+          element={
+            <ProtectedRoute>
+              <CareerSubjectsPageWrapper />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/professors" 
+          element={
+            <ProtectedRoute>
+              <ProfessorsPageWrapper />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/career-results" 
+          element={
+            <ProtectedRoute>
+              <CareerResultsPageWrapper />
+            </ProtectedRoute>
           } 
         />
         <Route 
@@ -258,6 +295,82 @@ function DashboardCoordinadorWrapper() {
   }
   
   return <DashboardCoordinador user={user} />
+}
+
+function DashboardDecanoWrapper() {
+  const { user: authUser } = useAuth()
+  
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // Convertir el usuario del AuthContext al formato esperado
+  const user: User = {
+    id: authUser.id,
+    name: `${authUser.nombre} ${authUser.apellido}`.trim(),
+    type: (authUser.tipo_usuario as any) ?? 'decano',
+    email: authUser.email,
+    roles: authUser.roles || []
+  }
+  
+  return <DashboardDecano user={user} />
+}
+
+function CareerSubjectsPageWrapper() {
+  const { user: authUser } = useAuth()
+  
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // Convertir el usuario del AuthContext al formato esperado
+  const user: User = {
+    id: authUser.id,
+    name: `${authUser.nombre} ${authUser.apellido}`.trim(),
+    type: (authUser.tipo_usuario as any) ?? 'decano',
+    email: authUser.email,
+    roles: authUser.roles || []
+  }
+  
+  return <CareerSubjectsPage user={user} />
+}
+
+function ProfessorsPageWrapper() {
+  const { user: authUser } = useAuth()
+  
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // Convertir el usuario del AuthContext al formato esperado
+  const user: User = {
+    id: authUser.id,
+    name: `${authUser.nombre} ${authUser.apellido}`.trim(),
+    type: (authUser.tipo_usuario as any) ?? 'decano',
+    email: authUser.email,
+    roles: authUser.roles || []
+  }
+  
+  return <ProfessorsPage user={user} />
+}
+
+function CareerResultsPageWrapper() {
+  const { user: authUser } = useAuth()
+  
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // Convertir el usuario del AuthContext al formato esperado
+  const user: User = {
+    id: authUser.id,
+    name: `${authUser.nombre} ${authUser.apellido}`.trim(),
+    type: (authUser.tipo_usuario as any) ?? 'decano',
+    email: authUser.email,
+    roles: authUser.roles || []
+  }
+  
+  return <CareerResultsPage user={user} />
 }
 
 function DashboardAdminWrapper() {

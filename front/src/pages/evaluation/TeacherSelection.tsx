@@ -166,7 +166,7 @@ export default function TeacherSelection({ onTeacherCourseSelected, user }: Teac
         }}
       >
         {/* Overlay oscuro que cubre toda la página */}
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        <div className="absolute inset-0 bg-black bg-opacity-60"></div>
       </div>
       
       <div className="relative z-10">

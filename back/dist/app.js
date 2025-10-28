@@ -13,6 +13,7 @@ const evaluationRoutes_1 = __importDefault(require("./routes/evaluationRoutes"))
 const resultados_1 = __importDefault(require("./routes/resultados"));
 const teachers_1 = __importDefault(require("./routes/teachers"));
 const courseRoutes_1 = __importDefault(require("./routes/courseRoutes"));
+const passwordReset_1 = __importDefault(require("./routes/passwordReset"));
 dotenv_1.default.config();
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)());
@@ -24,6 +25,7 @@ exports.app.use('/api/evaluations', evaluationRoutes_1.default);
 exports.app.use('/api/resultados', resultados_1.default);
 exports.app.use('/api/teachers', teachers_1.default);
 exports.app.use('/api/courses', courseRoutes_1.default);
+exports.app.use('/api/auth', passwordReset_1.default);
 exports.app.get('/health', (_req, res) => {
     res.json({ ok: true });
 });

@@ -54,6 +54,9 @@ export default function ManageProfessors() {
             } else if (!cid && u?.email === 'magonzalez@udemedellin.edu.co') {
               cid = '5' // Mauricio - Telecomunicaciones
               console.log('🔧 TEMPORAL: Asignando carrera_id = 5 para Mauricio (Telecomunicaciones)')
+            } else if (!cid && (u?.email === 'david.coordinador@udemedellin.edu.co' || u?.nombre?.toLowerCase().includes('david'))) {
+              cid = '6' // David - Ingeniería Financiera
+              console.log('🔧 TEMPORAL: Asignando carrera_id = 6 para David (Ingeniería Financiera)')
             } else {
               console.log('🔍 Condición temporal no se cumplió - cid:', cid, 'email:', u?.email)
             }
@@ -251,7 +254,7 @@ export default function ManageProfessors() {
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
       }}>
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        <div className="absolute inset-0 bg-black bg-opacity-60"></div>
       </div>
 
       <div className="relative z-10">

@@ -209,6 +209,8 @@ class RoleService {
             // Prioridad de dashboards
             if (roles.includes('admin'))
                 return '/dashboard-admin';
+            if (roles.includes('decano'))
+                return '/dashboard-decano';
             if (roles.includes('coordinador'))
                 return '/dashboard-coordinador';
             if (roles.includes('profesor') || roles.includes('docente'))
@@ -233,6 +235,16 @@ class RoleService {
                 switch (rol) {
                     case 'admin':
                         permisos.add('all');
+                        break;
+                    case 'decano':
+                        permisos.add('view_evaluations');
+                        permisos.add('create_evaluations');
+                        permisos.add('view_reports');
+                        permisos.add('manage_users');
+                        permisos.add('manage_department');
+                        permisos.add('manage_faculty');
+                        permisos.add('view_all_professors');
+                        permisos.add('view_all_careers');
                         break;
                     case 'coordinador':
                         permisos.add('view_evaluations');
@@ -271,6 +283,84 @@ class RoleService {
         catch (error) {
             console.error('Error en usuarioPuedeAcceder:', error);
             return false;
+        }
+    }
+    /**
+     * Obtener información del decano por usuario
+     */
+    static async obtenerDecanoPorUsuario(usuarioId) {
+        try {
+            const { data, error } = await supabaseClient_1.supabaseAdmin
+                .from('decanos')
+                .select(`
+          id,
+          usuario_id,
+          facultad_id,
+          fecha_nombramiento,
+          activo,
+          observaciones,
+          facultades:facultades!facultad_id(
+            id,
+            nombre,
+            codigo,
+            descripcion
+          )
+        `)
+                .eq('usuario_id', usuarioId)
+                .eq('activo', true)
+                .single();
+            if (error) {
+                console.error('Error obteniendo decano por usuario:', error);
+                return null;
+            }
+            return data;
+        }
+        catch (error) {
+            console.error('Error en obtenerDecanoPorUsuario:', error);
+            return null;
+        }
+    }
+    /**
+     * Obtener decano activo de una facultad
+     */
+    static async obtenerDecanoFacultad(facultadId) {
+        try {
+            const { data, error } = await supabaseClient_1.supabaseAdmin
+                .from('decanos')
+                .select(`
+          id,
+          usuario_id,
+          facultad_id,
+          fecha_nombramiento,
+          activo,
+          observaciones,
+          usuarios:usuarios!usuario_id(
+            id,
+            nombre,
+            apellido,
+            email,
+            activo
+          ),
+          facultades:facultades!facultad_id(
+            id,
+            nombre,
+            codigo,
+            descripcion
+          )
+        `)
+                .eq('facultad_id', facultadId)
+                .eq('activo', true)
+                .eq('usuarios.activo', true)
+                .single();
+            if (error) {
+                console.error('Error obteniendo decano de facultad:', error);
+                return null;
+            }
+            return data;
+        }
+        catch (error) {
+            console.error('Error en obtenerDecanoFacultad:', error);
+            return null;
         }
     }
 }

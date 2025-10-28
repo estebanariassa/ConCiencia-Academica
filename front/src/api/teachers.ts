@@ -129,6 +129,78 @@ export async function fetchStudentInfo(): Promise<any> {
   }
 }
 
+// Función para obtener materias específicas de cada profesor
+export async function fetchProfessorSubjects(): Promise<any> {
+  try {
+    console.log('🌐 fetchProfessorSubjects: Obteniendo materias específicas de profesores')
+    const response = await apiClient.get('/api/teachers/professor-subjects')
+    console.log('🌐 Professor subjects response:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('❌ Error fetching professor subjects:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    throw new Error('Error al obtener las materias específicas de los profesores')
+  }
+}
+
+// Función para obtener materias de cada carrera
+export async function fetchCareerSubjects(): Promise<any> {
+  try {
+    console.log('🌐 fetchCareerSubjects: Obteniendo materias de cada carrera')
+    const response = await apiClient.get('/api/teachers/career-subjects')
+    console.log('🌐 Career subjects response:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('❌ Error fetching career subjects:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    throw new Error('Error al obtener las materias de las carreras')
+  }
+}
+
+// Función para obtener profesores detallados de toda la facultad (con materias)
+export async function fetchDetailedFacultyProfessors(): Promise<any> {
+  try {
+    console.log('🌐 fetchDetailedFacultyProfessors: Obteniendo profesores detallados de toda la facultad')
+    const response = await apiClient.get('/api/teachers/detailed-faculty')
+    console.log('🌐 Detailed faculty professors response:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('❌ Error fetching detailed faculty professors:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    throw new Error('Error al obtener los profesores detallados de la facultad')
+  }
+}
+
+// Función para obtener profesores de toda la facultad organizados por carrera (solo para decanos)
+export async function fetchFacultyProfessors(): Promise<any> {
+  try {
+    console.log('🌐 fetchFacultyProfessors: Obteniendo profesores de toda la facultad')
+    const response = await apiClient.get('/api/teachers/faculty')
+    console.log('🌐 Faculty professors response:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('❌ Error fetching faculty professors:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    throw new Error('Error al obtener los profesores de la facultad')
+  }
+}
+
 // Función para obtener profesores por carrera (para coordinadores)
 export async function fetchProfessorsByCareer(careerId: string): Promise<any[]> {
   try {
@@ -208,6 +280,9 @@ export async function fetchCoordinatorStats(): Promise<{
     } else if (user?.email === 'magonzalez@udemedellin.edu.co') {
       carreraId = '5'; // Mauricio - Telecomunicaciones
       console.log('🔧 TEMPORAL: Forzando carrera_id = 5 para Mauricio (Telecomunicaciones)');
+    } else if (user?.email === 'david.coordinador@udemedellin.edu.co' || user?.nombre?.toLowerCase().includes('david')) {
+      carreraId = '6'; // David - Ingeniería Financiera
+      console.log('🔧 TEMPORAL: Forzando carrera_id = 6 para David (Ingeniería Financiera)');
     }
     
     console.log('🔍 Carrera del coordinador final:', carreraId);
@@ -376,6 +451,28 @@ export async function debugAuth(): Promise<any> {
       status: (error as any)?.response?.status,
       data: (error as any)?.response?.data
     }
+  }
+}
+
+// Función para obtener resultados de todas las carreras
+export async function fetchAllCareerResults(): Promise<any> {
+  try {
+    const response = await apiClient.get('/api/teachers/career-results/all')
+    return response.data
+  } catch (error) {
+    console.error('Error fetching all career results:', error)
+    throw new Error('Error al cargar los resultados de todas las carreras')
+  }
+}
+
+// Función para obtener resultados de una carrera específica
+export async function fetchCareerResults(careerId: string): Promise<any> {
+  try {
+    const response = await apiClient.get(`/api/teachers/career-results/${careerId}`)
+    return response.data
+  } catch (error) {
+    console.error('Error fetching career results:', error)
+    throw new Error('Error al cargar los resultados de la carrera')
   }
 }
 

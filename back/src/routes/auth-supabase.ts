@@ -10,7 +10,7 @@ const registerSchema = z.object({
   email: z.string().email(),
   nombre: z.string().min(2),
   apellido: z.string().min(2),
-  tipo_usuario: z.enum(['estudiante', 'profesor', 'docente', 'coordinador', 'admin']),
+  tipo_usuario: z.enum(['estudiante', 'profesor', 'docente', 'coordinador', 'admin', 'decano']),
   password: z.string().min(6),
   // Campos opcionales para profesores
   codigo_profesor: z.string().optional(),
@@ -112,7 +112,7 @@ router.post('/login', async (req, res) => {
     console.log(`🎭 Roles del usuario: ${roles.join(', ')}`)
 
     // Verificar tipo de usuario válido (tanto en tipo_usuario como en roles)
-    const validUserTypes = ['estudiante', 'profesor', 'docente', 'coordinador', 'admin']
+    const validUserTypes = ['estudiante', 'profesor', 'docente', 'coordinador', 'admin', 'decano']
     const tieneRolValido = validUserTypes.includes(user.tipo_usuario) || 
                           roles.some(rol => validUserTypes.includes(rol))
     
@@ -202,6 +202,29 @@ router.post('/login', async (req, res) => {
     } catch (e) {
       console.warn('❌ Error obteniendo info del coordinador:', e)
     }
+
+    // Adjuntar información de decano (facultad_id) si aplica
+    let decanoInfo: any = null
+    try {
+      if (roles.includes('decano')) {
+        console.log('🔍 Usuario es decano, buscando info...')
+        const { RoleService } = await import('../services/roleService')
+        const info = await RoleService.obtenerDecanoPorUsuario(user.id)
+        console.log('🔍 Info decano obtenida:', info)
+        if (info) {
+          decanoInfo = { 
+            facultad_id: info.facultad_id ?? null,
+            facultad_nombre: info.facultades?.nombre ?? null,
+            fecha_nombramiento: info.fecha_nombramiento
+          }
+          console.log('🔍 decanoInfo asignado:', decanoInfo)
+        } else {
+          console.log('❌ No se encontró info del decano para usuario:', user.id)
+        }
+      }
+    } catch (e) {
+      console.warn('❌ Error obteniendo info del decano:', e)
+    }
     
     console.log(`📍 Dashboard asignado: ${dashboard}`)
     console.log(`🔑 Permisos: ${permisos.join(', ')}`)
@@ -229,10 +252,16 @@ router.post('/login', async (req, res) => {
     if (coordinadorInfo) {
       additionalInfo.coordinador = coordinadorInfo
     }
+
+    if (decanoInfo) {
+      additionalInfo.decano = decanoInfo
+    }
     
     // Información específica por rol principal
     if (roles.includes('admin')) {
       additionalInfo.role_description = 'Administrador del sistema'
+    } else if (roles.includes('decano')) {
+      additionalInfo.role_description = 'Decano de la facultad'
     } else if (roles.includes('coordinador')) {
       additionalInfo.role_description = 'Coordinador del sistema'
     } else if (roles.includes('profesor') || roles.includes('docente')) {
@@ -335,6 +364,9 @@ router.post('/login-with-role', async (req, res) => {
         break
       case 'coordinador':
         dashboard = '/dashboard-coordinador'
+        break
+      case 'decano':
+        dashboard = '/dashboard-decano'
         break
       case 'admin':
         dashboard = '/dashboard-admin'

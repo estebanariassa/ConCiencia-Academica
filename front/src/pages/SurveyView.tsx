@@ -146,7 +146,7 @@ export default function SurveyView({ user }: SurveyViewProps) {
           }}
         >
           {/* Overlay oscuro que cubre toda la página */}
-          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+          <div className="absolute inset-0 bg-black bg-opacity-60"></div>
         </div>
         
         {/* Contenido de carga */}
@@ -174,7 +174,7 @@ export default function SurveyView({ user }: SurveyViewProps) {
           }}
         >
           {/* Overlay oscuro que cubre toda la página */}
-          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+          <div className="absolute inset-0 bg-black bg-opacity-60"></div>
         </div>
         
         {/* Contenido principal */}
@@ -232,7 +232,7 @@ export default function SurveyView({ user }: SurveyViewProps) {
         }}
       >
         {/* Overlay oscuro que cubre toda la página */}
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        <div className="absolute inset-0 bg-black bg-opacity-60"></div>
       </div>
       
       {/* Contenido principal */}
@@ -327,7 +327,7 @@ export default function SurveyView({ user }: SurveyViewProps) {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                             {question.category}
                           </span>
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">

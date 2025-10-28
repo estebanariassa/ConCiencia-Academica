@@ -252,7 +252,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
         }}
       >
         {/* Overlay oscuro que cubre toda la página */}
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        <div className="absolute inset-0 bg-black bg-opacity-60"></div>
       </div>
       
       {/* Contenido principal */}
@@ -303,7 +303,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
         ) : user.type === 'teacher' ? (
           <Star className="h-6 w-6 text-yellow-600 ml-4" />
         ) : user.type === 'coordinator' ? (
-          <Users className="h-6 w-6 text-blue-600 ml-4" />
+          <Users className="h-6 w-6 text-red-600 ml-4" />
         ) : (
           <ClipboardCheck className="h-6 w-6 text-red-600 ml-4" />
         )}
@@ -316,7 +316,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               : user.type === 'teacher'
               ? 'text-yellow-600'
               : user.type === 'coordinator'
-              ? 'text-blue-600'
+              ? 'text-red-600'
               : 'text-red-600'
           }`}
         >
@@ -395,10 +395,10 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
             ? 'Cursos Impartidos'
             : 'Aprobaciones Pendientes'}
         </CardTitle>
-        <BookOpen className="h-6 w-6 text-blue-600 ml-4" />
+        <BookOpen className="h-6 w-6 text-red-600 ml-4" />
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold text-blue-600">
+        <div className="text-3xl font-bold text-red-600">
           {user.type === 'student'
             ? userData.stats.currentCourses
             : user.type === 'teacher'

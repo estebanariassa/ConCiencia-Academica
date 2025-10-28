@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { SupabaseDB } from '../config/supabaseClient'
+import { supabaseAdmin } from '../config/supabaseClient'
 import { authenticateToken } from '../middleware/auth'
 import crypto from 'crypto'
 import bcrypt from 'bcrypt'
@@ -51,7 +51,7 @@ router.post('/forgot-password', async (req, res) => {
     console.log('🔐 Solicitando reset de contraseña para:', email)
 
     // Verificar que el usuario existe
-    const { data: user, error: userError } = await SupabaseDB.supabaseAdmin
+    const { data: user, error: userError } = await supabaseAdmin
       .from('usuarios')
       .select('id, email, nombre, apellido')
       .eq('email', email)
@@ -73,7 +73,7 @@ router.post('/forgot-password', async (req, res) => {
     const expiresAt = generateExpirationDate()
 
     // Guardar token en la base de datos
-    const { error: tokenError } = await SupabaseDB.supabaseAdmin
+    const { error: tokenError } = await supabaseAdmin
       .from('password_reset_tokens')
       .insert({
         email: email,
@@ -129,7 +129,7 @@ router.get('/validate-reset-token/:token', async (req, res) => {
     console.log('🔐 Validando token de reset:', token, 'para:', email)
 
     // Buscar el token en la base de datos
-    const { data: tokenData, error: tokenError } = await SupabaseDB.supabaseAdmin
+    const { data: tokenData, error: tokenError } = await supabaseAdmin
       .from('password_reset_tokens')
       .select('*')
       .eq('token', token)
@@ -225,7 +225,7 @@ router.post('/reset-password', async (req, res) => {
     console.log('🔐 Reseteando contraseña para:', email)
 
     // Buscar y validar el token
-    const { data: tokenData, error: tokenError } = await SupabaseDB.supabaseAdmin
+    const { data: tokenData, error: tokenError } = await supabaseAdmin
       .from('password_reset_tokens')
       .select('*')
       .eq('token', token)
@@ -252,7 +252,7 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Verificar que el usuario existe
-    const { data: user, error: userError } = await SupabaseDB.supabaseAdmin
+    const { data: user, error: userError } = await supabaseAdmin
       .from('usuarios')
       .select('id, email')
       .eq('email', email)
@@ -271,7 +271,7 @@ router.post('/reset-password', async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds)
 
     // Actualizar la contraseña del usuario
-    const { error: updateError } = await SupabaseDB.supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from('usuarios')
       .update({ 
         password: hashedPassword,
@@ -287,7 +287,7 @@ router.post('/reset-password', async (req, res) => {
     }
 
     // Marcar el token como usado
-    const { error: markUsedError } = await SupabaseDB.supabaseAdmin
+    const { error: markUsedError } = await supabaseAdmin
       .from('password_reset_tokens')
       .update({ used: true })
       .eq('id', tokenData.id)

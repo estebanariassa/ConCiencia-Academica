@@ -27,6 +27,7 @@
     "test-endpoints": "ts-node src/test-endpoints.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.12.2",
     "bcrypt": "^5.1.1",

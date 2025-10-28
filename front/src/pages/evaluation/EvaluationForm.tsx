@@ -217,7 +217,7 @@ export default function EvaluationForm() {
             backgroundAttachment: 'fixed'
           }}
         >
-          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+          <div className="absolute inset-0 bg-black bg-opacity-60"></div>
         </div>
         
         <div className="relative z-10 flex items-center justify-center min-h-screen">
@@ -242,7 +242,7 @@ export default function EvaluationForm() {
           backgroundAttachment: 'fixed'
         }}
       >
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        <div className="absolute inset-0 bg-black bg-opacity-60"></div>
       </div>
       
       <div className="relative z-10">
@@ -311,7 +311,7 @@ export default function EvaluationForm() {
                           )}
                           {group.aula && (
                             <span className="flex item-center gap-2 text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                              <FaRegBuilding className="text-blue-600" /> 
+                              <FaRegBuilding className="text-red-600" /> 
                               {group.aula}
                             </span>
                           )}
@@ -365,7 +365,7 @@ export default function EvaluationForm() {
                               ratings[currentQuestion] >= 4
                                 ? 'bg-green-50 text-green-800 border-green-200'
                                 : ratings[currentQuestion] >= 3
-                                ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                ? 'bg-red-50 text-red-800 border-red-200'
                                 : 'bg-red-50 text-red-800 border-red-200'
                             }`}
                           >

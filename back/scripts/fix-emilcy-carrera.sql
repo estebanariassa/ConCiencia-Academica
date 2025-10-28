@@ -20,3 +20,12 @@ WHERE c.usuario_id = '48c5b5e4-155b-43cf-b75d-cf715f976141';
 
 
 
+
+
+
+
+
+
+
+
+

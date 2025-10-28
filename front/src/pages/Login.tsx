@@ -139,6 +139,8 @@ export default function Login() {
         return 'Docente'
       case 'coordinator':
         return 'Coordinador'
+      case 'decano':
+        return 'Decano'
       default:
         return 'Estudiante'
     }
@@ -151,6 +153,8 @@ export default function Login() {
       case 'teacher':
         return <FaChalkboardTeacher className={size} />
       case 'coordinator':
+        return <FaCog className={size} />
+      case 'decano':
         return <FaCog className={size} />
       default:
         return <FaGraduationCap className={size} />
@@ -235,7 +239,7 @@ export default function Login() {
                 className="h-20 w-20 sm:h-[140px] sm:w-[150px] object-contain"
               />
             </motion.div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">ConCiencia Academica</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">ConCiencia Académica</h1>
             <p className="text-gray-600 mt-2 text-xs sm:text-sm">
               Accede con tus credenciales institucionales
             </p>
@@ -270,7 +274,7 @@ export default function Login() {
                       transition={{ duration: 0.2 }}
                       className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50"
                     >
-                      {(['student', 'teacher', 'coordinator'] as UserType[]).map((type) => (
+                      {(['student', 'teacher', 'coordinator', 'decano'] as UserType[]).map((type) => (
                         <div
                           key={type}
                           className={`flex items-center p-3 hover:bg-gray-100 cursor-pointer transition-colors text-base ${
@@ -395,7 +399,7 @@ export default function Login() {
 
           {/* Footer */}
           <div className="text-center">
-            <p className="text-xs text-gray-600">Universidad de Medellín - ConCiencia Academica</p>
+            <p className="text-xs text-gray-600">Universidad de Medellín - ConCiencia Académica</p>
           </div>
         </Card>
 

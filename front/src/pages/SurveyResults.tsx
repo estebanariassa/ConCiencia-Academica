@@ -180,7 +180,7 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
           backgroundAttachment: 'fixed'
           }}
         >
-          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+          <div className="absolute inset-0 bg-black bg-opacity-60"></div>
         </div>
         
         <div className="relative z-10">
@@ -210,7 +210,7 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
           backgroundAttachment: 'fixed'
           }}
         >
-          <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+          <div className="absolute inset-0 bg-black bg-opacity-60"></div>
         </div>
         
         <div className="relative z-10">
@@ -244,7 +244,7 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
         }}
       >
         {/* Overlay oscuro que cubre toda la página */}
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        <div className="absolute inset-0 bg-black bg-opacity-60"></div>
       </div>
 
       {/* Contenido principal */}
@@ -298,11 +298,11 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
 
             {/* Información del contexto */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                <UserIcon className="h-5 w-5 text-blue-600" />
+              <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
+                <UserIcon className="h-5 w-5 text-red-600" />
                 <div>
-                  <p className="text-sm font-medium text-blue-900">Profesor</p>
-                  <p className="text-sm text-blue-700">{professorInfo?.name}</p>
+                  <p className="text-sm font-medium text-red-900">Profesor</p>
+                  <p className="text-sm text-red-700">{professorInfo?.name}</p>
                 </div>
               </div>
               
@@ -371,10 +371,10 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
               <Card className="bg-white shadow-md border border-gray-200">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Tasa de Respuesta</CardTitle>
-                  <Users className="h-4 w-4 text-blue-600" />
+                  <Users className="h-4 w-4 text-red-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{surveyData?.responseRate}%</div>
+                  <div className="text-2xl font-bold text-red-600">{surveyData?.responseRate}%</div>
                   <p className="text-xs text-gray-500">De estudiantes elegibles</p>
                 </CardContent>
               </Card>
@@ -566,7 +566,7 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Período</span>
-                      <Badge className="bg-blue-100 text-blue-800">{selectedPeriod}</Badge>
+                      <Badge className="bg-red-100 text-red-800">{selectedPeriod}</Badge>
                       </div>
                     </div>
 

@@ -275,9 +275,10 @@ export default function DashboardAdmin({ user }: DashboardAdminProps) {
           backgroundAttachment: 'fixed'
         }}
       >
-        {/* Overlay oscuro que cubre toda la página */}
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
       </div>
+      
+      {/* Overlay más oscuro para mejor contraste */}
+      <div className="absolute inset-0 bg-black bg-opacity-60 z-0"></div>
       
       {/* Contenido principal */}
       <div className="relative z-10">
@@ -317,10 +318,10 @@ export default function DashboardAdmin({ user }: DashboardAdminProps) {
                   <CardTitle className="text-lg font-medium text-gray-900 text-left">
                     Total de Usuarios
                   </CardTitle>
-                  <Users className="h-6 w-6 text-blue-600 ml-4" />
+                  <Users className="h-6 w-6 text-red-600 ml-4" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-blue-600">
+                  <div className="text-3xl font-bold text-red-600">
                     {adminData.stats.totalUsers}
                   </div>
                   <p className="text-sm text-gray-500 mt-2 text-left">
@@ -557,7 +558,7 @@ export default function DashboardAdmin({ user }: DashboardAdminProps) {
                         <Badge 
                           variant="outline" 
                           className={`text-xs ${
-                            activity.type === 'login' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            activity.type === 'login' ? 'bg-red-50 text-red-700 border-red-200' :
                             activity.type === 'system' ? 'bg-green-50 text-green-700 border-green-200' :
                             activity.type === 'evaluation' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                             'bg-gray-50 text-gray-700 border-gray-200'

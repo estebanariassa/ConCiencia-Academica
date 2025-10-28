@@ -1,10 +1,11 @@
-export type UserType = 'student' | 'teacher' | 'coordinator';
+export type UserType = 'student' | 'teacher' | 'coordinator' | 'decano';
 
 export interface User {
   id: string;
   name: string;
   type: UserType;
   email: string;
+  roles?: string[];
 }
 
 export interface Course {

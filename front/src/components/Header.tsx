@@ -58,7 +58,7 @@ export default function Header({
                 title="Ir al inicio"
               />
               <div className="hidden sm:block">
-                <h1 className="text-sm sm:text-lg lg:text-xl font-semibold text-gray-900">ConCiencia Academica</h1>
+                <h1 className="text-sm sm:text-lg lg:text-xl font-semibold text-gray-900">ConCiencia Académica</h1>
                 <p className="text-xs sm:text-sm lg:text-base text-gray-600">Universidad de Medellín</p>
               </div>
             </div>

@@ -76,6 +76,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           'student': ['estudiante'],
           'teacher': ['profesor', 'docente'],
           'coordinator': ['coordinador'],
+          'decano': ['decano'],
           'admin': ['admin']
         }
         

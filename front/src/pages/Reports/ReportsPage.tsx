@@ -1,5 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { fetchTeacherStats, fetchTeacherHistoricalStats } from '../../api/teachers';
+import { useState, useEffect } from 'react';
+import { fetchTeacherHistoricalStats } from '../../api/teachers';
+import { 
+  mockTrendData, 
+  mockDistributionData, 
+  mockCategoryData, 
+  mockCompetencyData, 
+  getMockDataWithIndicator 
+} from '../../data/mockData';
+import { debugRadarData } from '../../utils/debugRadar';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -131,7 +139,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   };
 
   // Datos reales, filtrados por curso si se seleccionó uno
-  const categoryData = teacherStats?.evaluacionesPorCurso?.length > 0 ? 
+  const realCategoryData = teacherStats?.evaluacionesPorCurso?.length > 0 ? 
     teacherStats.evaluacionesPorCurso
       .filter((curso: any) => selectedCourse === 'all' || curso.curso_id === parseInt(selectedCourse))
       .map((curso: any) => ({
@@ -140,13 +148,26 @@ export default function ReportsPage({ user }: ReportsPageProps) {
         total: curso.total
       })) : [];
 
-  // Datos de tendencia históricos reales
-  const trendData = historicalData.length > 0 ? historicalData : [];
+  // Usar datos de ejemplo si no hay datos reales
+  const categoryDataWithMock = getMockDataWithIndicator(realCategoryData, mockCategoryData);
+  const trendDataWithMock = getMockDataWithIndicator(historicalData, mockTrendData);
+  const competencyDataWithMock = getMockDataWithIndicator([], mockCompetencyData);
 
-  const radarData = [];
+  const categoryData = categoryDataWithMock.data;
+  const trendData = trendDataWithMock.data;
+  const competencyData = competencyDataWithMock.data;
+  const isUsingMockData = categoryDataWithMock.isMock || trendDataWithMock.isMock;
 
-  // Distribución de calificaciones (solo datos reales)
-  const distributionData = teacherStats?.totalEvaluaciones > 0 ? [
+  // Usar datos de competencias (radar) - siempre usar datos de ejemplo por ahora
+  const radarData = debugRadarData();
+  
+  // Debug: verificar datos del radar
+  console.log('🔍 Radar data:', radarData);
+  console.log('🔍 Mock competency data:', mockCompetencyData);
+  console.log('🔍 Radar data length:', radarData.length);
+
+  // Distribución de calificaciones (usar datos de ejemplo si no hay datos reales)
+  const realDistributionData = teacherStats?.totalEvaluaciones > 0 ? [
     { name: '5 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.35)), color: '#10B981' },
     { name: '4 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.28)), color: '#3B82F6' },
     { name: '3 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.20)), color: '#F59E0B' },
@@ -154,7 +175,11 @@ export default function ReportsPage({ user }: ReportsPageProps) {
     { name: '1 Estrella', value: Math.round((teacherStats.totalEvaluaciones * 0.05)), color: '#6B7280' }
   ] : [];
 
-  const departmentData = [];
+  // Usar datos reales de distribución si están disponibles, sino datos de ejemplo
+  const distributionDataWithMock = getMockDataWithIndicator(realDistributionData, mockDistributionData);
+  const distributionData = distributionDataWithMock.data;
+
+  const departmentData: any[] = [];
 
   // Estadísticas reales
   const mockStats = {
@@ -177,7 +202,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
         }}
       >
         {/* Overlay oscuro que cubre toda la página */}
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
+        <div className="absolute inset-0 bg-black bg-opacity-60"></div>
       </div>
       
       {/* Contenido principal */}
@@ -208,6 +233,13 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                       : `Resultados de tus evaluaciones docentes - Período ${selectedPeriod}`
                     }
                   </p>
+                  {isUsingMockData && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                      <p className="text-xs text-red-700">
+                        <strong>📊 Datos de ejemplo:</strong> Mostrando previsualización con datos de demostración
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -225,7 +257,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   <option value="2023-1">2023-1</option>
                 </select>
                 
-                {(user.type === 'teacher' || user.type === 'profesor' || user.type === 'docente') && (
+                {(user.type === 'teacher' || user.type === 'coordinator' || user.type === 'decano') && (
                   <select 
                     value={selectedCourse} 
                     onChange={(e) => setSelectedCourse(e.target.value)}
@@ -462,7 +494,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                         <p>Cargando datos...</p>
                       </div>
                     </div>
-                  ) : (
+                  ) : radarData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={250}>
                       <RadarChart data={radarData}>
                         <PolarGrid />
@@ -478,6 +510,14 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                         />
                       </RadarChart>
                     </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[250px] text-gray-500">
+                      <div className="text-center">
+                        <div className="text-4xl mb-2">📊</div>
+                        <p>No hay datos disponibles</p>
+                        <p className="text-sm text-gray-400">Datos de competencias no encontrados</p>
+                      </div>
+                    </div>
                   )}
                 </CardContent>
               </Card>

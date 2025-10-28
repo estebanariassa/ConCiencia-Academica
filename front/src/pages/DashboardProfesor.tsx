@@ -16,7 +16,6 @@ import {
   ClipboardCheck, 
   Star,
   BookOpen,
-  Clock,
   Mail,
   BarChart3,
   User as UserIcon,
@@ -25,6 +24,12 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { fetchTeacherStats, fetchTeacherCourses } from '../api/teachers';
+import { 
+  mockQuickStats, 
+  mockCourseEvaluations, 
+  mockUpcomingDeadlines,
+  getMockDataWithIndicator 
+} from '../data/mockData';
 
 // Importar el componente Calendar externo
 import Calendar from '../components/Calendar';
@@ -156,29 +161,36 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
   }, [currentUser.id]);
 
 
-  // Datos específicos para profesores (usar datos reales si están disponibles)
+  // Datos específicos para profesores (usar datos reales si están disponibles, sino datos de ejemplo)
+  const realStats = {
+    averageRating: teacherStats?.calificacionPromedio || 0,
+    totalEvaluations: teacherStats?.totalEvaluaciones || 0,
+    coursesTeaching: teacherCourses?.length || 0,
+    pendingReviews: 0,
+    currentSemester: '2025-2'
+  };
+
+  const realEvaluations = teacherStats?.evaluacionesPorCurso?.map((curso: any) => ({
+    id: curso.curso_id,
+    course: curso.nombre,
+    students: curso.total,
+    completed: curso.total,
+    average: curso.promedio,
+    period: 'Semestre 2025-2',
+    status: 'completed'
+  })) || [];
+
+  // Usar datos de ejemplo si no hay datos reales
+  const statsWithMock = getMockDataWithIndicator(realStats, mockQuickStats);
+  const evaluationsWithMock = getMockDataWithIndicator(realEvaluations, mockCourseEvaluations);
+  const deadlinesWithMock = getMockDataWithIndicator([], mockUpcomingDeadlines);
+
   const profesorData = {
-    stats: {
-      averageRating: teacherStats?.calificacionPromedio || 0,
-      totalEvaluations: teacherStats?.totalEvaluaciones || 0,
-      coursesTeaching: teacherCourses?.length || 0, // Usar cursos reales de asignaciones_profesor
-      pendingReviews: 0, // TODO: Implementar lógica para evaluaciones pendientes
-      currentSemester: '2025-1'
-    },
-    recentEvaluations: teacherStats?.evaluacionesPorCurso?.map((curso: any) => ({
-      id: curso.curso_id,
-      course: curso.nombre,
-      students: curso.total,
-      completed: curso.total,
-      average: curso.promedio,
-      period: 'Semestre 2025-1',
-      status: 'completed'
-    })) || [],
-    upcomingDeadlines: [
-      { id: 1, course: 'Matemáticas I', task: 'Revisar evaluaciones pendientes', deadline: '2025-01-25', urgent: true },
-      { id: 2, course: 'Física II', task: 'Cierre de período de evaluación', deadline: '2025-01-28', urgent: false },
-      { id: 3, course: 'Cálculo III', task: 'Envío de reportes', deadline: '2025-02-01', urgent: false }
-    ],
+    stats: statsWithMock.data,
+    isMockData: statsWithMock.isMock,
+    mockMessage: statsWithMock.message,
+    recentEvaluations: evaluationsWithMock.data,
+    upcomingDeadlines: deadlinesWithMock.data,
     quickActions: [
         {
           icon: BarChart3,
@@ -224,9 +236,10 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
           backgroundAttachment: 'fixed'
         }}
       >
-        {/* Overlay oscuro que cubre toda la página */}
-        <div className="absolute inset-0 bg-black bg-opacity-40"></div>
       </div>
+      
+      {/* Overlay más oscuro para mejor contraste */}
+      <div className="absolute inset-0 bg-black bg-opacity-60 z-0"></div>
       
       {/* Contenido principal */}
       <div className="relative z-10">
@@ -248,6 +261,22 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                 <p className="text-lg text-gray-600">
                   Bienvenido a tu panel de control docente. Aquí puedes gestionar tus evaluaciones y ver tu rendimiento.
                 </p>
+                {profesorData.isMockData && (
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-red-700">
+                          <strong>Datos de ejemplo:</strong> {profesorData.mockMessage}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -328,7 +357,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                   <CardTitle className="text-lg font-medium text-gray-900 text-left">
                     Cursos Impartidos
                   </CardTitle>
-                  <BookOpen className="h-6 w-6 text-blue-600 ml-4" />
+                  <BookOpen className="h-6 w-6 text-red-600 ml-4" />
                 </CardHeader>
                 <CardContent>
                   {loadingStats ? (
@@ -336,7 +365,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                       Cargando...
                     </div>
                   ) : (
-                    <div className="text-3xl font-bold text-blue-600">
+                    <div className="text-3xl font-bold text-red-600">
                       {profesorData.stats.coursesTeaching}
                     </div>
                   )}
@@ -507,36 +536,6 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
 
             {/* Columna lateral */}
             <div className="space-y-8">
-
-              {/* Próximas Fechas Límite */}
-              <SectionCard title="Próximas Fechas Límite" icon={Clock}>
-                <div className="space-y-4">
-                  {profesorData.upcomingDeadlines.map((deadline, index) => (
-                    <motion.div
-                      key={deadline.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 1.0 + index * 0.1 }}
-                      className={`p-4 rounded-lg border transition-colors ${
-                        deadline.urgent 
-                          ? 'bg-red-50 border-red-200' 
-                          : 'bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-medium text-gray-900">{deadline.course}</p>
-                        {deadline.urgent && (
-                          <Badge variant="outline" className="text-xs bg-red-100 text-red-700 border-red-200">
-                            Urgente
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-600 mb-1">{deadline.task}</p>
-                      <p className="text-sm text-gray-500">{deadline.deadline}</p>
-                    </motion.div>
-                  ))}
-                </div>
-              </SectionCard>
 
               {/* Información del Profesor */}
               <SectionCard title="Información del Profesor" icon={UserIcon}>
