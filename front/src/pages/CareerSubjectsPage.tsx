@@ -123,8 +123,8 @@ export default function CareerSubjectsPage({ user }: CareerSubjectsPageProps) {
           </div>
           
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-              <BookOpen className="h-6 w-6 text-red-600" />
+            <div className="w-12 h-12 bg-university-red-light rounded-full flex items-center justify-center">
+              <BookOpen className="h-6 w-6 text-university-red" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Materias por Carrera</h1>
@@ -146,10 +146,10 @@ export default function CareerSubjectsPage({ user }: CareerSubjectsPageProps) {
                 <CardTitle className="text-lg font-medium text-gray-900 text-left">
                   Total de Carreras
                 </CardTitle>
-                <Building2 className="h-6 w-6 text-red-600 ml-4" />
+                <Building2 className="h-6 w-6 text-university-red ml-4" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-red-600">
+                <div className="text-3xl font-bold text-university-red">
                   {careers.length}
                 </div>
                 <p className="text-sm text-gray-500 mt-2 text-left">

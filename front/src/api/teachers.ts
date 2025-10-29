@@ -472,3 +472,72 @@ export async function fetchCareerResults(careerId: string): Promise<any> {
   }
 }
 
+// Función para obtener estadísticas del estudiante
+export async function fetchStudentStats(): Promise<{
+  evaluacionesCompletadas: number;
+  evaluacionesPendientes: number;
+  materiasMatriculadas: number;
+  promedioGeneral: number;
+  progresoGeneral: number;
+}> {
+  try {
+    console.log('🌐 Fetching student stats...');
+    const response = await apiClient.get('/api/teachers/student-stats')
+    console.log('🌐 Student stats response:', response.data);
+    return response.data
+  } catch (error: any) {
+    console.error('❌ Error fetching student stats:', error)
+    console.error('❌ Error details:', {
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data
+    });
+    throw new Error('Error al obtener las estadísticas del estudiante')
+  }
+}
+
+// Función para obtener materias matriculadas del estudiante
+export async function fetchStudentEnrolledSubjects(): Promise<{
+  materiasMatriculadas: Array<{
+    id: string;
+    fechaInscripcion: string;
+    grupo: {
+      id: number;
+      numeroGrupo: number;
+      horario: string;
+      aula: string;
+      curso: {
+        id: number;
+        nombre: string;
+        codigo: string;
+        creditos: number;
+      };
+      profesor: {
+        id: string;
+        nombre: string;
+      };
+      periodo: {
+        id: number;
+        nombre: string;
+        codigo: string;
+      };
+    };
+  }>;
+  total: number;
+}> {
+  try {
+    console.log('🌐 Fetching student enrolled subjects...');
+    const response = await apiClient.get('/api/teachers/student-enrolled-subjects')
+    console.log('🌐 Student enrolled subjects response:', response.data);
+    return response.data
+  } catch (error: any) {
+    console.error('❌ Error fetching student enrolled subjects:', error)
+    console.error('❌ Error details:', {
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data
+    });
+    throw new Error('Error al obtener las materias matriculadas')
+  }
+}
+

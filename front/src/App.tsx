@@ -187,7 +187,10 @@ function DashboardWrapper({ onStartEvaluation, onViewReports }: {
   const user: User = {
     id: authUser.id,
     name: `${authUser.nombre} ${authUser.apellido}`.trim(),
-    type: (authUser.tipo_usuario as any) ?? 'student',
+    type: authUser.tipo_usuario === 'estudiante' ? 'student' : 
+          authUser.tipo_usuario === 'profesor' ? 'teacher' : 
+          authUser.tipo_usuario === 'coordinador' ? 'coordinator' : 
+          authUser.tipo_usuario === 'admin' ? 'decano' : 'student',
     email: authUser.email,
   }
   

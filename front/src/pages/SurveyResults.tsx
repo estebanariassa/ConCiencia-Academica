@@ -425,7 +425,7 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
                       />
                       <YAxis domain={[0, 5]} />
                       <Tooltip />
-                      <Bar dataKey="rating" fill="#E63946" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="rating" fill="#E30613" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -455,9 +455,9 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
                       <Line 
                         type="monotone" 
                         dataKey="rating" 
-                        stroke="#E63946" 
+                        stroke="#E30613" 
                         strokeWidth={3}
-                        dot={{ fill: '#E63946', strokeWidth: 2, r: 6 }}
+                        dot={{ fill: '#E30613', strokeWidth: 2, r: 6 }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -489,8 +489,8 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
                       <Radar
                         name="Calificación"
                         dataKey="A"
-                        stroke="#E63946"
-                        fill="#E63946"
+                        stroke="#E30613"
+                        fill="#E30613"
                         fillOpacity={0.3}
                         strokeWidth={2}
                       />

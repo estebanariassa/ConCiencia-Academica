@@ -239,7 +239,7 @@ export default function EvaluationForm() {
         
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-university-red mx-auto mb-4"></div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Cargando preguntas de evaluación</h2>
             <p className="text-gray-600">Obteniendo preguntas específicas para tu carrera...</p>
           </div>
@@ -303,8 +303,8 @@ export default function EvaluationForm() {
                             <h2 className="text-xl font-semibold text-gray-900">{teacher?.name}</h2>
                             <p className="text-md text-gray-600">{course?.name} - {course?.code}</p>
                             {course && (
-                              <p className="text-sm text-red-600 font-medium flex items-center gap-2">
-                                <FaBook className="text-red-600" />
+                              <p className="text-sm text-university-red font-medium flex items-center gap-2">
+                                <FaBook className="text-university-red" />
                                 Evaluación para: {course.code} - {course.name}
                               </p>
                             )}
@@ -315,20 +315,20 @@ export default function EvaluationForm() {
                   <div className="border-t border-gray-200 pt-4">
                     <div className="flex items-center gap-4">
                       <div className="flex-shrink-0">
-                        <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                          <span className="text-red-600 font-bold text-lg">G{group.numero_grupo}</span>
+                        <div className="w-12 h-12 bg-university-red-light rounded-lg flex items-center justify-center">
+                          <span className="text-university-red font-bold text-lg">G{group.numero_grupo}</span>
                         </div>
                       </div>
                       <div className="flex-1">
                         <div className="flex flex-wrap gap-4 mt-1">
                           {group.horario && (
                             <span className="flex item-center gap-2 text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                              <HiOutlineCalendar className="text-red-600" /> {group.horario}
+                              <HiOutlineCalendar className="text-university-red" /> {group.horario}
                             </span>
                           )}
                           {group.aula && (
                             <span className="flex item-center gap-2 text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                              <FaRegBuilding className="text-red-600" /> 
+                              <FaRegBuilding className="text-university-red" /> 
                               {group.aula}
                             </span>
                           )}
@@ -442,7 +442,7 @@ export default function EvaluationForm() {
                     </Button>
                     <Button
                       onClick={handleNext}
-                      className="bg-red-600 hover:bg-red-700 px-8 py-4 text-lg"
+                      className="bg-university-red hover:bg-university-red px-8 py-4 text-lg"
                     >
                       {currentQuestion === questions.length - 1 ? 'Ir a comentarios' : 'Siguiente'}
                       <ChevronRight className="h-6 w-6 ml-2" />
@@ -486,7 +486,7 @@ export default function EvaluationForm() {
                     </Button>
                     <Button
                       onClick={handleSubmit}
-                      className="bg-red-600 hover:bg-red-700 px-8 py-4 text-lg"
+                      className="bg-university-red hover:bg-university-red px-8 py-4 text-lg"
                     >
                       Finalizar Evaluación
                       <ChevronRight className="h-6 w-6 ml-2" />

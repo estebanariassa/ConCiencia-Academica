@@ -22,7 +22,8 @@ import {
   BarChart3,
   User as UserIcon
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { fetchStudentStats, fetchStudentEnrolledSubjects } from '../api/teachers';
 
 // Importar el componente Calendar externo
 import Calendar from '../components/Calendar';
@@ -63,6 +64,19 @@ const SectionCard = ({ title, icon: Icon, children, className = '' }: SectionCar
 export default function Dashboard({ user, onStartEvaluation, onViewReports }: DashboardProps) {
   const navigate = useNavigate();
   const [showCalendar, setShowCalendar] = useState(false);
+  
+  // Estado para datos del backend
+  const [studentStats, setStudentStats] = useState({
+    evaluacionesCompletadas: 0,
+    evaluacionesPendientes: 0,
+    materiasMatriculadas: 0,
+    promedioGeneral: 0,
+    progresoGeneral: 0
+  });
+  const [materiasMatriculadas, setMateriasMatriculadas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
   // Cargar user desde backend/localStorage si existe
   const storedUser = ((): User | null => {
     try {
@@ -79,6 +93,42 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
       return null;
     }
   })();
+
+  // Datos específicos por tipo de usuario
+  const currentUser = user ?? storedUser ?? { id: '', name: 'Usuario', type: 'student', email: '' };
+
+  // Cargar datos del backend para estudiantes
+  useEffect(() => {
+    const loadStudentData = async () => {
+      console.log('🔍 Frontend: Loading student data for user type:', currentUser.type);
+      if (currentUser.type === 'student') {
+        try {
+          setLoading(true);
+          const [statsData, materiasData] = await Promise.all([
+            fetchStudentStats(),
+            fetchStudentEnrolledSubjects()
+          ]);
+          
+          setStudentStats(statsData);
+          setMateriasMatriculadas(materiasData.materiasMatriculadas);
+          
+          console.log('✅ Frontend: Student data loaded:', {
+            stats: statsData,
+            materias: materiasData.materiasMatriculadas.length
+          });
+        } catch (error: any) {
+          console.error('❌ Error loading student data:', error);
+          setError(error.response?.data?.error || 'Error al cargar los datos del estudiante');
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    };
+
+    loadStudentData();
+  }, [currentUser.type]);
   
   const handleStartEvaluation = () => {
     navigate('/evaluate/selection');
@@ -103,18 +153,16 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
     return '¡Buenas noches';
   };
 
-  // Datos específicos por tipo de usuario
-  const currentUser = user ?? storedUser ?? { id: '', name: 'Usuario', type: 'student', email: '' };
-
   const getUserSpecificData = () => {
+    console.log('🔍 Frontend: getUserSpecificData called with studentStats:', studentStats);
     switch (currentUser.type) {
       case 'student':
         return {
           stats: {
-            evaluationsPending: 2,
-            evaluationsCompleted: 5,
-            currentCourses: 6,
-            averageGrade: 8.7
+            evaluationsPending: studentStats.evaluacionesPendientes,
+            evaluationsCompleted: studentStats.evaluacionesCompletadas,
+            currentCourses: studentStats.materiasMatriculadas,
+            averageGrade: studentStats.promedioGeneral
           },
           upcomingEvaluations: [
             { id: 1, course: 'Matemáticas I', teacher: 'Dr. Juan Pérez', deadline: '2025-01-25' },
@@ -390,15 +438,15 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
       <CardHeader className="flex flex-row items-center justify-between pb-4">
         <CardTitle className="text-lg font-medium text-gray-900 text-left">
           {user.type === 'student'
-            ? 'Cursos Actuales'
+            ? 'Cursos Matriculados'
             : user.type === 'teacher'
             ? 'Cursos Impartidos'
-            : 'Aprobaciones Pendientes'}
+            : 'Cursos Matriculados'}
         </CardTitle>
-        <BookOpen className="h-6 w-6 text-red-600 ml-4" />
+        <BookOpen className="h-6 w-6 text-university-red ml-4" />
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold text-red-600">
+        <div className="text-3xl font-bold text-university-red">
           {user.type === 'student'
             ? userData.stats.currentCourses
             : user.type === 'teacher'
@@ -407,7 +455,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
         </div>
         <p className="text-sm text-gray-500 mt-2 text-left">
           {user.type === 'student'
-            ? 'Cursos matriculados'
+            ? 'Este semestre'
             : user.type === 'teacher'
             ? 'Este semestre'
             : 'Por revisar'}

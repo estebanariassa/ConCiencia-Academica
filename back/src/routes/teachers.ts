@@ -2632,4 +2632,209 @@ router.get('/career-results/:careerId', authenticateToken, async (req: any, res)
   }
 })
 
+// GET /teachers/student-stats - Obtener estadísticas del estudiante
+router.get('/student-stats', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    
+    console.log('🔍 Backend: Getting student stats for user:', user.id);
+
+    // Verificar que el usuario es un estudiante
+    if (user.tipo_usuario !== 'estudiante') {
+      return res.status(403).json({ error: 'Solo los estudiantes pueden acceder a estas estadísticas' })
+    }
+
+    // Obtener el ID del estudiante
+    const { data: estudiante, error: estudianteError } = await SupabaseDB.supabaseAdmin
+      .from('estudiantes')
+      .select('id')
+      .eq('usuario_id', user.id)
+      .single()
+
+    if (estudianteError || !estudiante) {
+      console.log('❌ Backend: Error finding student:', estudianteError);
+      return res.status(404).json({ error: 'Estudiante no encontrado' })
+    }
+
+    console.log('✅ Backend: Estudiante found:', estudiante);
+
+    // Obtener evaluaciones completadas
+    const { data: evaluacionesCompletadas, error: completadasError } = await SupabaseDB.supabaseAdmin
+      .from('evaluaciones')
+      .select('id, calificacion_promedio')
+      .eq('estudiante_id', estudiante.id)
+      .eq('completada', true)
+
+    if (completadasError) {
+      console.log('❌ Backend: Error getting completed evaluations:', completadasError);
+    }
+
+    // Obtener materias matriculadas (grupos donde está inscrito)
+    const { data: materiasMatriculadas, error: materiasError } = await SupabaseDB.supabaseAdmin
+      .from('inscripciones')
+      .select(`
+        id,
+        grupo:grupos(
+          id,
+          numero_grupo,
+          curso:cursos(
+            id,
+            nombre,
+            codigo
+          )
+        )
+      `)
+      .eq('estudiante_id', estudiante.id)
+      .eq('activa', true)
+
+    if (materiasError) {
+      console.log('❌ Backend: Error getting enrolled subjects:', materiasError);
+    }
+
+    // Calcular promedio general
+    const promedioGeneral = evaluacionesCompletadas && evaluacionesCompletadas.length > 0
+      ? evaluacionesCompletadas.reduce((sum, e) => sum + (e.calificacion_promedio || 0), 0) / evaluacionesCompletadas.length
+      : 0
+
+    // Calcular estadísticas según la lógica correcta:
+    // 1. Materias matriculadas = contar inscripciones activas
+    // 2. Evaluaciones completadas = contar evaluaciones completadas
+    // 3. Evaluaciones pendientes = materias matriculadas - evaluaciones completadas
+    const materiasMatriculadasCount = materiasMatriculadas?.length || 0
+    const evaluacionesCompletadasCount = evaluacionesCompletadas?.length || 0
+    const evaluacionesPendientesCount = materiasMatriculadasCount - evaluacionesCompletadasCount
+
+    const stats = {
+      evaluacionesCompletadas: evaluacionesCompletadasCount,
+      evaluacionesPendientes: Math.max(0, evaluacionesPendientesCount), // No puede ser negativo
+      materiasMatriculadas: materiasMatriculadasCount,
+      promedioGeneral: Number(promedioGeneral.toFixed(2)),
+      progresoGeneral: materiasMatriculadasCount > 0 
+        ? Math.round((evaluacionesCompletadasCount / materiasMatriculadasCount) * 100)
+        : 0
+    }
+
+    console.log('✅ Backend: Student stats calculated:', {
+      materiasMatriculadasCount,
+      evaluacionesCompletadasCount,
+      evaluacionesPendientesCount,
+      promedioGeneral,
+      progresoGeneral: materiasMatriculadasCount > 0 
+        ? Math.round((evaluacionesCompletadasCount / materiasMatriculadasCount) * 100)
+        : 0,
+      stats
+    });
+
+    res.json(stats)
+  } catch (error) {
+    console.error('❌ Backend: Error getting student stats:', error)
+    res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
+// GET /teachers/student-enrolled-subjects - Obtener materias matriculadas del estudiante
+router.get('/student-enrolled-subjects', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    
+    console.log('🔍 Backend: Getting enrolled subjects for user:', user.id);
+
+    // Verificar que el usuario es un estudiante
+    if (user.tipo_usuario !== 'estudiante') {
+      return res.status(403).json({ error: 'Solo los estudiantes pueden acceder a esta información' })
+    }
+
+    // Obtener el ID del estudiante
+    const { data: estudiante, error: estudianteError } = await SupabaseDB.supabaseAdmin
+      .from('estudiantes')
+      .select('id')
+      .eq('usuario_id', user.id)
+      .single()
+
+    if (estudianteError || !estudiante) {
+      console.log('❌ Backend: Error finding student:', estudianteError);
+      return res.status(404).json({ error: 'Estudiante no encontrado' })
+    }
+
+    // Obtener materias matriculadas con información detallada
+    const { data: inscripciones, error: inscripcionesError } = await SupabaseDB.supabaseAdmin
+      .from('inscripciones')
+      .select(`
+        id,
+        fecha_inscripcion,
+        grupo:grupos(
+          id,
+          numero_grupo,
+          horario,
+          aula,
+          curso:cursos(
+            id,
+            nombre,
+            codigo,
+            creditos
+          ),
+          asignaciones_profesor:asignaciones_profesor(
+            profesor:profesores(
+              id,
+              usuario:usuarios(
+                nombre,
+                apellido
+              )
+            )
+          ),
+          periodo:periodos_academicos(
+            id,
+            nombre,
+            codigo
+          )
+        )
+      `)
+      .eq('estudiante_id', estudiante.id)
+      .eq('activa', true)
+      .order('fecha_inscripcion', { ascending: false })
+
+    if (inscripcionesError) {
+      console.log('❌ Backend: Error getting enrollments:', inscripcionesError);
+      return res.status(500).json({ error: 'Error al obtener materias matriculadas', details: inscripcionesError.message })
+    }
+
+    // Formatear los datos
+    const materiasMatriculadas = inscripciones?.map((inscripcion: any) => ({
+      id: inscripcion.id,
+      fechaInscripcion: inscripcion.fecha_inscripcion,
+      grupo: {
+        id: inscripcion.grupo?.id,
+        numeroGrupo: inscripcion.grupo?.numero_grupo,
+        horario: inscripcion.grupo?.horario,
+        aula: inscripcion.grupo?.aula,
+        curso: {
+          id: inscripcion.grupo?.curso?.id,
+          nombre: inscripcion.grupo?.curso?.nombre,
+          codigo: inscripcion.grupo?.curso?.codigo,
+          creditos: inscripcion.grupo?.curso?.creditos
+        },
+        profesor: {
+          id: inscripcion.grupo?.asignaciones_profesor?.[0]?.profesor?.id,
+          nombre: `${inscripcion.grupo?.asignaciones_profesor?.[0]?.profesor?.usuario?.nombre || ''} ${inscripcion.grupo?.asignaciones_profesor?.[0]?.profesor?.usuario?.apellido || ''}`.trim()
+        },
+        periodo: {
+          id: inscripcion.grupo?.periodo?.id,
+          nombre: inscripcion.grupo?.periodo?.nombre,
+          codigo: inscripcion.grupo?.periodo?.codigo
+        }
+      }
+    })).filter((materia: any) => materia.grupo?.curso?.id) || []
+
+    console.log('✅ Backend: Enrolled subjects found:', materiasMatriculadas.length);
+
+    res.json({
+      materiasMatriculadas,
+      total: materiasMatriculadas.length
+    })
+  } catch (error) {
+    console.error('❌ Backend: Error getting enrolled subjects:', error)
+    res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
 export default router

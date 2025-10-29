@@ -22,7 +22,7 @@ export const mockDistributionData = [
 
 // Datos de ejemplo para calificaciones por categoría
 export const mockCategoryData = [
-  { category: 'Comunicación', rating: 4.7, color: '#EF4444' },
+  { category: 'Comunicación', rating: 4.7, color: '#E30613' },
   { category: 'Conocimiento', rating: 4.5, color: '#F97316' },
   { category: 'Metodología', rating: 4.6, color: '#EAB308' },
   { category: 'Evaluación', rating: 4.4, color: '#22C55E' },

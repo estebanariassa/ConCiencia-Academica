@@ -2,6 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Colores personalizados de la universidad */
+.text-university-red {
+  color: #E30613;
+}
+
+.bg-university-red {
+  background-color: #E30613;
+}
+
+.border-university-red {
+  border-color: #E30613;
+}
+
+.hover\:bg-university-red:hover {
+  background-color: #E30613;
+}
+
+.hover\:border-university-red:hover {
+  border-color: #E30613;
+}
+
+.focus\:ring-university-red:focus {
+  --tw-ring-color: #E30613;
+}
+
+.focus\:border-university-red:focus {
+  border-color: #E30613;
+}
+
+.bg-university-red-light {
+  background-color: #FEF2F2;
+}
+
+.border-university-red-light {
+  border-color: #FECACA;
+}
+
+.text-university-red-dark {
+  color: #991B1B;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -12,7 +53,7 @@
   --card-foreground: #2D3748;
   --popover: #ffffff;
   --popover-foreground: #2D3748;
-  --primary: #E63946;
+  --primary: #E30613;
   --primary-foreground: #ffffff;
   --secondary: #1D3557;
   --secondary-foreground: #ffffff;
@@ -30,8 +71,8 @@
   --switch-background: #cbced4;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: #E63946;
-  --chart-1: #E63946;
+  --ring: #E30613;
+  --chart-1: #E30613;
   --chart-2: #1D3557;
   --chart-3: #48BB78;
   --chart-4: #ED8936;
@@ -39,12 +80,12 @@
   --radius: 0.625rem;
   --sidebar: #ffffff;
   --sidebar-foreground: #2D3748;
-  --sidebar-primary: #E63946;
+  --sidebar-primary: #E30613;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #F1FAEE;
   --sidebar-accent-foreground: #2D3748;
   --sidebar-border: rgba(45, 55, 72, 0.1);
-  --sidebar-ring: #E63946;
+  --sidebar-ring: #E30613;
 }
 
 .dark {
@@ -54,7 +95,7 @@
   --card-foreground: #F7FAFC;
   --popover: #2D3748;
   --popover-foreground: #F7FAFC;
-  --primary: #E63946;
+  --primary: #E30613;
   --primary-foreground: #ffffff;
   --secondary: #1D3557;
   --secondary-foreground: #F7FAFC;
@@ -66,15 +107,15 @@
   --destructive-foreground: #F7FAFC;
   --border: rgba(255, 255, 255, 0.1);
   --input: #4A5568;
-  --ring: #E63946;
+  --ring: #E30613;
   --sidebar: #2D3748;
   --sidebar-foreground: #F7FAFC;
-  --sidebar-primary: #E63946;
+  --sidebar-primary: #E30613;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #4A5568;
   --sidebar-accent-foreground: #F7FAFC;
   --sidebar-border: rgba(255, 255, 255, 0.1);
-  --sidebar-ring: #E63946;
+  --sidebar-ring: #E30613;
 }
 
 @theme inline {
