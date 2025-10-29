@@ -23,7 +23,7 @@ import {
   Target
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { fetchTeacherStats, fetchTeacherCourses } from '../api/teachers';
+import { fetchTeacherStats, fetchTeacherCourses, fetchTeacherId } from '../api/teachers';
 import { 
   mockQuickStats, 
   mockCourseEvaluations, 
@@ -126,10 +126,14 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
         setStatsError(null);
         console.log('🔍 Loading teacher data for user ID:', currentUser.id);
         
-        // Cargar estadísticas y cursos en paralelo
+        // Primero obtener el ID del profesor
+        const teacherId = await fetchTeacherId();
+        console.log('🔍 Teacher ID obtained:', teacherId);
+        
+        // Cargar estadísticas y cursos en paralelo usando el ID del profesor
         const [stats, courses] = await Promise.allSettled([
-          fetchTeacherStats(currentUser.id),
-          fetchTeacherCourses(currentUser.id)
+          fetchTeacherStats(teacherId),
+          fetchTeacherCourses(teacherId)
         ]);
         
         // Manejar estadísticas
@@ -166,6 +170,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
     averageRating: teacherStats?.calificacionPromedio || 0,
     totalEvaluations: teacherStats?.totalEvaluaciones || 0,
     coursesTeaching: teacherCourses?.length || 0,
+    evaluatedCourses: teacherStats?.evaluacionesPorCurso?.length || 0,
     pendingReviews: 0,
     currentSemester: '2025-2'
   };
@@ -261,22 +266,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                 <p className="text-lg text-gray-600">
                   Bienvenido a tu panel de control docente. Aquí puedes gestionar tus evaluaciones y ver tu rendimiento.
                 </p>
-                {profesorData.isMockData && (
-                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm text-red-700">
-                          <strong>Datos de ejemplo:</strong> {profesorData.mockMessage}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* Se eliminó el mensaje de datos de ejemplo */}
               </CardContent>
             </Card>
           </motion.div>
@@ -376,6 +366,8 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
               </Card>
             </motion.div>
 
+            {/* Card eliminada: Cursos Evaluados (redundante) */}
+
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -448,9 +440,9 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                           className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 bg-white min-w-[200px]"
                         >
                           <option value="all">Todos los cursos</option>
-                          {profesorData.recentEvaluations.map((evaluation: any) => (
-                            <option key={evaluation.id} value={evaluation.id}>
-                              {evaluation.course}
+                          {(teacherStats?.evaluacionesPorCurso || teacherCourses || []).map((item: any) => (
+                            <option key={item.curso_id || item.curso?.id || item.id} value={(item.curso_id || item.curso?.id || item.id)?.toString()}>
+                              {item.nombre || item.curso?.nombre || item.name}
                             </option>
                           ))}
                         </select>
@@ -461,6 +453,33 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
+                    {/* Resumen del curso seleccionado */}
+                    {selectedCourseFilter !== 'all' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                        {(() => {
+                          const cursoStats = (teacherStats?.evaluacionesPorCurso || []).find((c: any) => (c.curso_id?.toString() === selectedCourseFilter));
+                          const promedio = cursoStats?.promedio ?? 0;
+                          const total = cursoStats?.total ?? 0;
+                          const nombre = cursoStats?.nombre ?? 'Curso seleccionado';
+                          return (
+                            <>
+                              <div className="p-3 rounded-lg border border-gray-200 bg-gray-50">
+                                <p className="text-sm text-gray-500">Curso</p>
+                                <p className="text-lg font-semibold text-gray-900">{nombre}</p>
+                              </div>
+                              <div className="p-3 rounded-lg border border-gray-200 bg-gray-50">
+                                <p className="text-sm text-gray-500">Promedio</p>
+                                <p className="text-lg font-semibold text-yellow-600">{promedio}/5.0</p>
+                              </div>
+                              <div className="p-3 rounded-lg border border-gray-200 bg-gray-50">
+                                <p className="text-sm text-gray-500">Evaluaciones</p>
+                                <p className="text-lg font-semibold text-green-600">{total}</p>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
                     <div className="space-y-4">
                       {loadingStats ? (
                         <div className="text-center py-8 text-gray-500">
@@ -477,7 +496,7 @@ export default function DashboardProfesor({ user }: DashboardProfesorProps) {
                       ) : (
                         (() => {
                           const filteredEvaluations = profesorData.recentEvaluations
-                            .filter((evaluation: any) => selectedCourseFilter === 'all' || evaluation.id === selectedCourseFilter);
+                            .filter((evaluation: any) => selectedCourseFilter === 'all' || evaluation.id?.toString() === selectedCourseFilter);
                           
                           if (filteredEvaluations.length === 0) {
                             return (

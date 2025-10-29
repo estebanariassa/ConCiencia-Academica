@@ -37,8 +37,8 @@ export async function fetchCourseGroups(profesorId: string, courseId: string): P
 
 export async function fetchTeacherStats(profesorId: string): Promise<any> {
   try {
-    console.log('🌐 Making API call to:', `/teachers/${profesorId}/stats`);
-    const response = await apiClient.get(`/api/teachers/${profesorId}/stats`)
+    console.log('🌐 Making API call to:', `/teachers/teacher-stats/${profesorId}`);
+    const response = await apiClient.get(`/api/teachers/teacher-stats/${profesorId}`)
     console.log('🌐 Teacher Stats API Response:', response.data);
     return response.data
   } catch (error) {
@@ -49,6 +49,18 @@ export async function fetchTeacherStats(profesorId: string): Promise<any> {
       data: (error as any)?.response?.data
     });
     throw new Error('Error al cargar las estadísticas del profesor')
+  }
+}
+
+// Nuevo: estadísticas por período (para cards y tablas sin histórico)
+export async function fetchTeacherPeriodStats(period: string): Promise<any> {
+  try {
+    const url = `/api/teachers/period-stats?period=${encodeURIComponent(period)}`
+    const response = await apiClient.get(url)
+    return response.data
+  } catch (error) {
+    console.error('❌ Error fetching teacher period stats:', error)
+    throw new Error('Error al cargar estadísticas del período')
   }
 }
 
@@ -237,7 +249,7 @@ export async function fetchCareers(): Promise<any[]> {
 export async function fetchTeacherCourses(teacherId: string): Promise<any[]> {
   try {
     console.log('🌐 Fetching teacher courses for ID:', teacherId);
-    const response = await apiClient.get(`/api/teachers/${teacherId}/courses`);
+    const response = await apiClient.get(`/api/teachers/teacher-courses/${teacherId}`);
     console.log('✅ Teacher courses loaded:', response.data);
     return response.data || [];
   } catch (error) {
@@ -352,6 +364,24 @@ export async function fetchTeacherInfo(): Promise<any> {
       data: (error as any)?.response?.data
     });
     throw new Error('Error al obtener la información del profesor')
+  }
+}
+
+// Función para obtener el ID del profesor desde el usuario autenticado
+export async function fetchTeacherId(): Promise<string> {
+  try {
+    console.log('🌐 Fetching teacher ID from authenticated user');
+    const response = await apiClient.get('/api/teachers/teacher-id')
+    console.log('🌐 Teacher ID response:', response.data);
+    return response.data.teacherId
+  } catch (error) {
+    console.error('❌ Error fetching teacher ID:', error)
+    console.error('❌ Error details:', {
+      message: (error as any)?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
+    throw new Error('Error al obtener el ID del profesor')
   }
 }
 

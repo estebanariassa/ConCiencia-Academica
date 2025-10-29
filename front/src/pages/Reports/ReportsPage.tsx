@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchTeacherHistoricalStats } from '../../api/teachers';
+import { fetchTeacherHistoricalStats, fetchTeacherId, fetchTeacherStats, fetchTeacherPeriodStats } from '../../api/teachers';
 import { 
   mockTrendData, 
   mockDistributionData, 
@@ -64,12 +64,49 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   const [selectedPeriod, setSelectedPeriod] = useState('2025-2');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedCourse, setSelectedCourse] = useState('all');
-  const [teacherStats, setTeacherStats] = useState<any>(null);
+  const [selectedSubject, setSelectedSubject] = useState('all');
+  const [teacherId, setTeacherId] = useState<string>('');
+  const [teacherStats, setTeacherStats] = useState<any>(null); // histórico o base si no hay histórico
+  const [baseTeacherStats, setBaseTeacherStats] = useState<any>(null); // SIEMPRE: stats globales del profesor
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [historicalData, setHistoricalData] = useState<any[]>([]);
+  const [availableSubjects, setAvailableSubjects] = useState<any[]>([]);
+  const [usedFallbackFromStats, setUsedFallbackFromStats] = useState(false);
 
-  // Cargar estadísticas del profesor
+  // Cargar materias disponibles del profesor
+  useEffect(() => {
+    const loadAvailableSubjects = async () => {
+      console.log('🔍 Loading subjects for user:', { id: user?.id, type: user?.type });
+      
+      if (!user?.id || user.type !== 'teacher') {
+        console.log('❌ User not eligible for subject selection:', { id: user?.id, type: user?.type });
+        return;
+      }
+
+      try {
+        // Simular carga de materias - en un caso real, esto vendría del backend
+        const subjects = [
+          { id: 'all', name: 'Todas las materias', code: 'ALL' },
+          { id: '1', name: 'Programación I', code: 'PROG-101' },
+          { id: '2', name: 'Estructuras de Datos', code: 'ED-201' },
+          { id: '3', name: 'Bases de Datos', code: 'BD-301' },
+          { id: '4', name: 'Ingeniería de Software', code: 'IS-401' },
+          { id: '5', name: 'Algoritmos Avanzados', code: 'AA-501' }
+        ];
+        
+        setAvailableSubjects(subjects);
+        console.log('✅ Available subjects loaded:', subjects);
+      } catch (error) {
+        console.error('❌ Error loading available subjects:', error);
+        setAvailableSubjects([{ id: 'all', name: 'Todas las materias', code: 'ALL' }]);
+      }
+    };
+
+    loadAvailableSubjects();
+  }, [user?.id, user?.type]);
+
+  // Cargar estadísticas del profesor (cards = base stats; gráficas: histórico con fallback)
   useEffect(() => {
     const loadTeacherStats = async () => {
       if (!user?.id) {
@@ -81,11 +118,28 @@ export default function ReportsPage({ user }: ReportsPageProps) {
         setLoadingStats(true);
         setStatsError(null);
         console.log('🔍 Loading teacher stats for reports, user ID:', user.id, 'period:', selectedPeriod);
-        
-        // Cargar estadísticas del período seleccionado
-        const stats = await fetchTeacherHistoricalStats(user.id, selectedPeriod);
-        console.log('✅ Teacher stats loaded for reports:', stats);
-        setTeacherStats(stats);
+        // Obtener el ID real del profesor desde el backend
+        const tId = await fetchTeacherId();
+        setTeacherId(tId);
+
+        // Cargar en paralelo: histórico y stats base
+        const [historical, baseStats] = await Promise.all([
+          fetchTeacherHistoricalStats(tId, selectedPeriod),
+          fetchTeacherPeriodStats(selectedPeriod)
+        ]);
+        console.log('✅ Historical for reports:', historical);
+        console.log('✅ Base teacher-stats for cards:', baseStats);
+
+        setBaseTeacherStats(baseStats);
+
+        // Gráficas: usar histórico si hay datos, si no usar base
+        if (!historical || (historical.totalEvaluaciones ?? 0) === 0) {
+          setTeacherStats(baseStats);
+          setUsedFallbackFromStats(true);
+        } else {
+          setTeacherStats(historical);
+          setUsedFallbackFromStats(false);
+        }
       } catch (error) {
         console.error('❌ Error loading teacher stats for reports:', error);
         setStatsError('Error al cargar las estadísticas');
@@ -100,13 +154,13 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   // Cargar datos históricos para la gráfica de tendencia
   useEffect(() => {
     const loadHistoricalData = async () => {
-      if (!user?.id) return;
+      if (!teacherId) return;
 
       try {
         const periods = ['2023-1', '2023-2', '2024-1', '2024-2', '2025-1', '2025-2'];
         const historicalPromises = periods.map(async (period) => {
           try {
-            const stats = await fetchTeacherHistoricalStats(user.id, period);
+            const stats = await fetchTeacherHistoricalStats(teacherId, period);
             return {
               period,
               rating: stats.calificacionPromedio || 0,
@@ -131,16 +185,16 @@ export default function ReportsPage({ user }: ReportsPageProps) {
     };
 
     loadHistoricalData();
-  }, [user?.id]);
+  }, [teacherId]);
 
   // Función para manejar cambio de período
   const handlePeriodChange = (newPeriod: string) => {
     setSelectedPeriod(newPeriod);
   };
 
-  // Datos reales, filtrados por curso si se seleccionó uno
-  const realCategoryData = teacherStats?.evaluacionesPorCurso?.length > 0 ? 
-    teacherStats.evaluacionesPorCurso
+  // Datos reales para barras por categoría: usar SIEMPRE stats base
+  const realCategoryData = baseTeacherStats?.evaluacionesPorCurso?.length > 0 ? 
+    baseTeacherStats.evaluacionesPorCurso
       .filter((curso: any) => selectedCourse === 'all' || curso.curso_id === parseInt(selectedCourse))
       .map((curso: any) => ({
         category: curso.nombre,
@@ -167,12 +221,12 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   console.log('🔍 Radar data length:', radarData.length);
 
   // Distribución de calificaciones (usar datos de ejemplo si no hay datos reales)
-  const realDistributionData = teacherStats?.totalEvaluaciones > 0 ? [
-    { name: '5 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.35)), color: '#10B981' },
-    { name: '4 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.28)), color: '#3B82F6' },
-    { name: '3 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.20)), color: '#F59E0B' },
-    { name: '2 Estrellas', value: Math.round((teacherStats.totalEvaluaciones * 0.12)), color: '#EF4444' },
-    { name: '1 Estrella', value: Math.round((teacherStats.totalEvaluaciones * 0.05)), color: '#6B7280' }
+  const realDistributionData = baseTeacherStats?.totalEvaluaciones > 0 ? [
+    { name: '5 Estrellas', value: Math.round((baseTeacherStats.totalEvaluaciones * 0.35)), color: '#10B981' },
+    { name: '4 Estrellas', value: Math.round((baseTeacherStats.totalEvaluaciones * 0.28)), color: '#3B82F6' },
+    { name: '3 Estrellas', value: Math.round((baseTeacherStats.totalEvaluaciones * 0.20)), color: '#F59E0B' },
+    { name: '2 Estrellas', value: Math.round((baseTeacherStats.totalEvaluaciones * 0.12)), color: '#EF4444' },
+    { name: '1 Estrella', value: Math.round((baseTeacherStats.totalEvaluaciones * 0.05)), color: '#6B7280' }
   ] : [];
 
   // Usar datos reales de distribución si están disponibles, sino datos de ejemplo
@@ -181,10 +235,10 @@ export default function ReportsPage({ user }: ReportsPageProps) {
 
   const departmentData: any[] = [];
 
-  // Estadísticas reales
+  // Cards SIEMPRE desde stats base (independientes del histórico)
   const mockStats = {
-    totalEvaluations: teacherStats?.totalEvaluaciones || 0,
-    averageRating: teacherStats?.calificacionPromedio || 0,
+    totalEvaluations: baseTeacherStats?.totalEvaluaciones || 0,
+    averageRating: baseTeacherStats?.calificacionPromedio || 0,
     responseRate: 0, // TODO: Calcular tasa de respuesta real
     improvement: 0 // TODO: Calcular mejora real
   };
@@ -233,38 +287,54 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                       : `Resultados de tus evaluaciones docentes - Período ${selectedPeriod}`
                     }
                   </p>
-                  {isUsingMockData && (
-                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                      <p className="text-xs text-red-700">
-                        <strong>📊 Datos de ejemplo:</strong> Mostrando previsualización con datos de demostración
-                      </p>
-                    </div>
-                  )}
+                  {/* Se eliminó el mensaje de datos de ejemplo para una experiencia más limpia */}
                 </div>
               </div>
               
-              <div className="flex items-center gap-3">
-                <select 
-                  value={selectedPeriod} 
-                  onChange={(e) => handlePeriodChange(e.target.value)}
-                  className="w-32 rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-red-500 focus:outline-none focus:ring-red-500 sm:text-sm"
-                >
-                  <option value="2025-2">2025-2</option>
-                  <option value="2025-1">2025-1</option>
-                  <option value="2024-2">2024-2</option>
-                  <option value="2024-1">2024-1</option>
-                  <option value="2023-2">2023-2</option>
-                  <option value="2023-1">2023-1</option>
-                </select>
-                
-                {(user.type === 'teacher' || user.type === 'coordinator' || user.type === 'decano') && (
+               <div className="flex items-center gap-3">
+                 <select 
+                   value={selectedPeriod} 
+                   onChange={(e) => handlePeriodChange(e.target.value)}
+                   className="w-32 rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-red-500 focus:outline-none focus:ring-red-500 sm:text-sm"
+                 >
+                   <option value="2025-2">2025-2</option>
+                   <option value="2025-1">2025-1</option>
+                   <option value="2024-2">2024-2</option>
+                   <option value="2024-1">2024-1</option>
+                   <option value="2023-2">2023-2</option>
+                   <option value="2023-1">2023-1</option>
+                 </select>
+                 
+                 {user.type === 'teacher' && (
+                   <select 
+                     value={selectedSubject} 
+                     onChange={(e) => setSelectedSubject(e.target.value)}
+                     className="w-56 rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-red-500 focus:outline-none focus:ring-red-500 sm:text-sm"
+                   >
+                     {availableSubjects.map((subject) => (
+                       <option key={subject.id} value={subject.id}>
+                         {subject.code} - {subject.name}
+                       </option>
+                     ))}
+                   </select>
+                 )}
+                 
+                 {/* Debug info */}
+                 {process.env.NODE_ENV === 'development' && (
+                   <div className="text-xs text-gray-500">
+                     User type: {user.type} | Subjects: {availableSubjects.length}
+                   </div>
+                 )}
+                 
+                {/* Selector de curso disponible también para profesores */}
+                {teacherStats?.evaluacionesPorCurso && (
                   <select 
                     value={selectedCourse} 
                     onChange={(e) => setSelectedCourse(e.target.value)}
                     className="w-48 rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-red-500 focus:outline-none focus:ring-red-500 sm:text-sm"
                   >
                     <option value="all">Todos los cursos</option>
-                    {teacherStats?.evaluacionesPorCurso?.length > 0 ? (
+                    {teacherStats.evaluacionesPorCurso.length > 0 ? (
                       teacherStats.evaluacionesPorCurso.map((curso: any) => (
                         <option key={curso.curso_id} value={curso.curso_id}>
                           {curso.nombre}
@@ -275,12 +345,12 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                     )}
                   </select>
                 )}
-                
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
-              </div>
+                 
+                 <Button variant="outline" size="sm">
+                   <Download className="h-4 w-4 mr-2" />
+                   Exportar
+                 </Button>
+               </div>
             </div>
 
             {user.type === 'coordinator' && (
@@ -300,91 +370,103 @@ export default function ReportsPage({ user }: ReportsPageProps) {
             )}
           </motion.header>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card className="bg-white shadow-md border border-gray-200">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Evaluaciones</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-red-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{mockStats.totalEvaluations}</div>
-                  <p className="text-xs text-gray-500">Este período académico</p>
-                </CardContent>
-              </Card>
-            </motion.div>
+           {/* Stats Cards */}
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+             <motion.div
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ delay: 0.1 }}
+             >
+               <Card className="bg-white shadow-md border border-gray-200 h-full">
+                 <CardHeader>
+                   <CardTitle className="flex items-center gap-2">
+                     <BarChart3 className="h-5 w-5 text-red-600" />
+                     Total Evaluaciones
+                   </CardTitle>
+                   <CardDescription>Este período académico</CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                   <div className="text-4xl font-bold text-red-600 mb-2">{mockStats.totalEvaluations}</div>
+                   <p className="text-sm text-gray-600">Evaluaciones completadas</p>
+                 </CardContent>
+               </Card>
+             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="bg-white shadow-md border border-gray-200">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Calificación Promedio</CardTitle>
-                  <Star className="h-4 w-4 text-yellow-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-yellow-600">{mockStats.averageRating}/5.0</div>
-                  <div className="flex items-center gap-1 text-xs text-green-600">
-                    <TrendingUp className="h-3 w-3" />
-                    +{mockStats.improvement}% vs período anterior
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+             <motion.div
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ delay: 0.2 }}
+             >
+               <Card className="bg-white shadow-md border border-gray-200 h-full">
+                 <CardHeader>
+                   <CardTitle className="flex items-center gap-2">
+                     <Star className="h-5 w-5 text-yellow-500" />
+                     Calificación Promedio
+                   </CardTitle>
+                   <CardDescription>Promedio general de todas las evaluaciones</CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                   <div className="text-4xl font-bold text-yellow-600 mb-2">{mockStats.averageRating}/5.0</div>
+                   <div className="flex items-center gap-1 text-sm text-green-600">
+                     <TrendingUp className="h-4 w-4" />
+                     +{mockStats.improvement}% vs período anterior
+                   </div>
+                 </CardContent>
+               </Card>
+             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="bg-white shadow-md border border-gray-200">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Tasa de Respuesta</CardTitle>
-                  <Users className="h-4 w-4 text-blue-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{mockStats.responseRate}%</div>
-                  <p className="text-xs text-gray-500">De estudiantes elegibles</p>
-                </CardContent>
-              </Card>
-            </motion.div>
+             <motion.div
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ delay: 0.3 }}
+             >
+               <Card className="bg-white shadow-md border border-gray-200 h-full">
+                 <CardHeader>
+                   <CardTitle className="flex items-center gap-2">
+                     <Users className="h-5 w-5 text-blue-600" />
+                     Tasa de Respuesta
+                   </CardTitle>
+                   <CardDescription>De estudiantes elegibles</CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                   <div className="text-4xl font-bold text-blue-600 mb-2">{mockStats.responseRate}%</div>
+                   <p className="text-sm text-gray-600">Estudiantes que respondieron</p>
+                 </CardContent>
+               </Card>
+             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card className="bg-white shadow-md border border-gray-200">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {user.type === 'coordinator' ? 'Docentes Evaluados' : 'Cursos Evaluados'}
-                  </CardTitle>
-                  <Calendar className="h-4 w-4 text-green-600" />
-                </CardHeader>
-                <CardContent>
-                  {loadingStats ? (
-                    <div className="text-2xl font-bold text-gray-400">Cargando...</div>
-                  ) : statsError ? (
-                    <div className="text-lg font-medium text-red-600">Error</div>
-                  ) : (
-                    <div className="text-2xl font-bold text-green-600">
-                      {user.type === 'coordinator' ? '24' : (teacherStats?.totalCursos || 0)}
-                    </div>
-                  )}
-                  <p className="text-xs text-gray-500">
-                    {loadingStats ? 'Cargando datos...' : (user.type === 'coordinator' ? 'En el departamento' : 'Cursos evaluados')}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
+             <motion.div
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ delay: 0.4 }}
+             >
+               <Card className="bg-white shadow-md border border-gray-200 h-full">
+                 <CardHeader>
+                   <CardTitle className="flex items-center gap-2">
+                     <Calendar className="h-5 w-5 text-green-600" />
+                     {user.type === 'coordinator' ? 'Docentes Evaluados' : 'Cursos Evaluados'}
+                   </CardTitle>
+                   <CardDescription>
+                     {user.type === 'coordinator' ? 'En el departamento' : 'Cursos evaluados'}
+                   </CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                   {loadingStats ? (
+                     <div className="text-4xl font-bold text-gray-400 mb-2">Cargando...</div>
+                   ) : statsError ? (
+                     <div className="text-3xl font-bold text-red-600 mb-2">Error</div>
+                   ) : (
+                     <div className="text-4xl font-bold text-green-600 mb-2">
+                       {user.type === 'coordinator' ? '24' : (teacherStats?.totalCursos || 0)}
+                     </div>
+                   )}
+                   <p className="text-sm text-gray-600">
+                     {loadingStats ? 'Cargando datos...' : (user.type === 'coordinator' ? 'Profesores activos' : 'Materias impartidas')}
+                   </p>
+                 </CardContent>
+               </Card>
+             </motion.div>
+           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Category Ratings Chart */}
@@ -393,7 +475,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
             >
-              <Card className="bg-white shadow-md border border-gray-200">
+              <Card className="bg-white shadow-md border border-gray-200 h-full">
                 <CardHeader>
                   <CardTitle>Calificaciones por Categoría</CardTitle>
                   <CardDescription>
@@ -402,14 +484,14 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                 </CardHeader>
                 <CardContent>
                   {loadingStats ? (
-                    <div className="flex items-center justify-center h-[300px] text-gray-500">
+                    <div className="flex items-center justify-center h-[350px] text-gray-500">
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-2"></div>
                         <p>Cargando datos...</p>
                       </div>
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height={300}>
+                    <ResponsiveContainer width="100%" height={350}>
                       <BarChart data={categoryData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis 
@@ -435,7 +517,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
             >
-              <Card className="bg-white shadow-md border border-gray-200">
+              <Card className="bg-white shadow-md border border-gray-200 h-full">
                 <CardHeader>
                   <CardTitle>Tendencia Histórica</CardTitle>
                   <CardDescription>
@@ -444,14 +526,14 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                 </CardHeader>
                 <CardContent>
                   {loadingStats ? (
-                    <div className="flex items-center justify-center h-[300px] text-gray-500">
+                    <div className="flex items-center justify-center h-[350px] text-gray-500">
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-2"></div>
                         <p>Cargando datos...</p>
                       </div>
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height={300}>
+                    <ResponsiveContainer width="100%" height={350}>
                       <LineChart data={trendData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="period" />
@@ -472,14 +554,14 @@ export default function ReportsPage({ user }: ReportsPageProps) {
             </motion.div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
             {/* Radar Chart */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7 }}
             >
-              <Card className="bg-white shadow-md border border-gray-200">
+              <Card className="bg-white shadow-md border border-gray-200 h-full">
                 <CardHeader>
                   <CardTitle>Perfil de Competencias</CardTitle>
                   <CardDescription>
@@ -488,14 +570,14 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                 </CardHeader>
                 <CardContent>
                   {loadingStats ? (
-                    <div className="flex items-center justify-center h-[250px] text-gray-500">
+                    <div className="flex items-center justify-center h-[400px] text-gray-500">
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-2"></div>
                         <p>Cargando datos...</p>
                       </div>
                     </div>
                   ) : radarData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
+                    <ResponsiveContainer width="100%" height={400}>
                       <RadarChart data={radarData}>
                         <PolarGrid />
                         <PolarAngleAxis dataKey="subject" />
@@ -511,7 +593,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                       </RadarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-[250px] text-gray-500">
+                    <div className="flex items-center justify-center h-[400px] text-gray-500">
                       <div className="text-center">
                         <div className="text-4xl mb-2">📊</div>
                         <p>No hay datos disponibles</p>
@@ -529,7 +611,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
-              <Card className="bg-white shadow-md border border-gray-200">
+              <Card className="bg-white shadow-md border border-gray-200 h-full">
                 <CardHeader>
                   <CardTitle>Distribución de Calificaciones</CardTitle>
                   <CardDescription>
@@ -538,20 +620,20 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                 </CardHeader>
                 <CardContent>
                   {loadingStats ? (
-                    <div className="flex items-center justify-center h-[250px] text-gray-500">
+                    <div className="flex items-center justify-center h-[400px] text-gray-500">
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-2"></div>
                         <p>Cargando datos...</p>
                       </div>
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height={250}>
+                    <ResponsiveContainer width="100%" height={400}>
                       <PieChart>
                         <Pie
                           data={distributionData}
                           cx="50%"
                           cy="50%"
-                          outerRadius={80}
+                          outerRadius={140}
                           dataKey="value"
                           label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                         >
@@ -562,58 +644,6 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                         <Tooltip />
                       </PieChart>
                     </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Quick Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.9 }}
-            >
-              <Card className="bg-white shadow-md border border-gray-200">
-                <CardHeader>
-                  <CardTitle>Estadísticas Rápidas</CardTitle>
-                  <CardDescription>
-                    Métricas clave del período
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Mejor Calificación</span>
-                      <Badge className="bg-green-100 text-green-800">
-                        {teacherStats?.calificacionPromedio ? `${teacherStats.calificacionPromedio.toFixed(1)}/5.0` : 'N/A'}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Total Evaluaciones</span>
-                      <Badge variant="outline">{teacherStats?.totalEvaluaciones || 0}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Cursos Evaluados</span>
-                      <Badge variant="outline" className="text-orange-600">{teacherStats?.totalCursos || 0}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Período</span>
-                      <Badge className="bg-blue-100 text-blue-800">{selectedPeriod}</Badge>
-                    </div>
-                  </div>
-
-                  {user.type === 'coordinator' && departmentData.length > 0 && (
-                    <div className="pt-4 border-t border-gray-200">
-                      <h4 className="font-medium mb-3">Por Departamento</h4>
-                      <div className="space-y-2">
-                        {departmentData.map((dept, index) => (
-                          <div key={dept.department} className="flex justify-between text-sm">
-                            <span>{dept.department}</span>
-                            <span className="font-medium">{dept.rating}/5.0</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   )}
                 </CardContent>
               </Card>

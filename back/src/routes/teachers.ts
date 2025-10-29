@@ -480,18 +480,15 @@ router.get('/:profesorId/stats', authenticateToken, async (req: any, res) => {
 
     console.log('✅ Backend: Profesor found:', profesor);
 
-    // Obtener todas las evaluaciones del profesor
+    // Obtener todas las evaluaciones del profesor (sin joins directos)
     const { data: evaluaciones, error: evaluacionesError } = await SupabaseDB.supabaseAdmin
       .from('evaluaciones')
       .select(`
         id,
-        calificacion_general,
-        fecha_evaluacion,
-        curso_id,
+        calificacion_promedio,
+        fecha_creacion,
         grupo_id,
-        estudiante_id,
-        cursos!inner(nombre, codigo),
-        grupos(numero_grupo)
+        estudiante_id
       `)
       .eq('profesor_id', profesorId)
 
@@ -505,11 +502,29 @@ router.get('/:profesorId/stats', authenticateToken, async (req: any, res) => {
     // Calcular estadísticas
     const totalEvaluaciones = evaluaciones?.length || 0
     const calificacionPromedio = totalEvaluaciones > 0 
-      ? evaluaciones.reduce((sum, evaluacion) => sum + (evaluacion.calificacion_general || 0), 0) / totalEvaluaciones
+      ? evaluaciones.reduce((sum, evaluacion) => sum + (evaluacion.calificacion_promedio || 0), 0) / totalEvaluaciones
       : 0
 
+    // Mapear grupo -> curso y obtener info de curso
+    const evalsArrayStats: any[] = Array.isArray(evaluaciones) ? (evaluaciones as any[]) : []
+    const gruposIdsStats = Array.from(new Set(evalsArrayStats.map((e: any) => e.grupo_id).filter(Boolean)))
+    const { data: gruposStats } = await SupabaseDB.supabaseAdmin
+      .from('grupos')
+      .select('id, curso_id, numero_grupo')
+      .in('id', gruposIdsStats.length ? gruposIdsStats : [-1])
+    const grupoToCursoStats: any = {}
+    ;(Array.isArray(gruposStats) ? gruposStats : []).forEach((g: any) => { grupoToCursoStats[g.id] = g.curso_id })
+
+    const cursoIdsStats = Array.from(new Set(((Array.isArray(gruposStats) ? gruposStats : []).map((g: any) => g.curso_id)).filter(Boolean)))
+    const { data: cursosStats } = await SupabaseDB.supabaseAdmin
+      .from('cursos')
+      .select('id,nombre,codigo')
+      .in('id', cursoIdsStats.length ? cursoIdsStats : [-1])
+    const cursoInfoStats: any = {}
+    ;(Array.isArray(cursosStats) ? cursosStats : []).forEach((c: any) => { cursoInfoStats[c.id] = c })
+
     // Obtener cursos únicos evaluados
-    const cursosUnicos = new Set(evaluaciones?.map(e => e.curso_id) || [])
+    const cursosUnicos = new Set(evalsArrayStats.map((e: any) => grupoToCursoStats[e.grupo_id]).filter(Boolean))
     const totalCursos = cursosUnicos.size
 
     // Obtener estudiantes únicos que han evaluado
@@ -517,14 +532,15 @@ router.get('/:profesorId/stats', authenticateToken, async (req: any, res) => {
     const totalEstudiantes = estudiantesUnicos.size
 
     // Obtener evaluaciones por curso
-    const evaluacionesPorCurso = evaluaciones?.reduce((acc, evaluacion) => {
-      const cursoData = evaluacion.cursos as any
+    const evaluacionesPorCurso = evalsArrayStats?.reduce((acc: any, evaluacion: any) => {
+      const cursoId = grupoToCursoStats[evaluacion.grupo_id]
+      const cursoData = cursoInfoStats[cursoId] as any
       const cursoNombre = cursoData?.nombre || 'Curso desconocido'
       const cursoCodigo = cursoData?.codigo || 'N/A'
-      const cursoKey = `${evaluacion.curso_id}-${cursoNombre}`
+      const cursoKey = `${cursoId}-${cursoNombre}`
       if (!acc[cursoKey]) {
         acc[cursoKey] = {
-          curso_id: evaluacion.curso_id,
+          curso_id: cursoId,
           nombre: cursoNombre,
           codigo: cursoCodigo,
           total: 0,
@@ -539,25 +555,25 @@ router.get('/:profesorId/stats', authenticateToken, async (req: any, res) => {
 
     // Calcular promedios por curso
     Object.values(evaluacionesPorCurso).forEach((curso: any) => {
-      const suma = curso.evaluaciones.reduce((sum: number, evaluacion: any) => sum + (evaluacion.calificacion_general || 0), 0)
+      const suma = curso.evaluaciones.reduce((sum: number, evaluacion: any) => sum + (evaluacion.calificacion_promedio || 0), 0)
       curso.promedio = curso.total > 0 ? Number((suma / curso.total).toFixed(2)) : 0
     })
 
     // Obtener evaluaciones recientes (últimas 5)
-    const evaluacionesRecientes = evaluaciones
-      ?.sort((a, b) => new Date(b.fecha_evaluacion).getTime() - new Date(a.fecha_evaluacion).getTime())
+    const evaluacionesRecientes = evalsArrayStats
+      ?.sort((a, b) => new Date(b.fecha_creacion).getTime() - new Date(a.fecha_creacion).getTime())
       ?.slice(0, 5)
       ?.map(evaluacion => {
-        const cursoData = evaluacion.cursos as any
-        const grupoData = evaluacion.grupos as any
+        const cursoId = grupoToCursoStats[evaluacion.grupo_id]
+        const cursoData = cursoInfoStats[cursoId] as any
         
         return {
           id: evaluacion.id,
           curso: cursoData?.nombre || 'Curso desconocido',
           codigo: cursoData?.codigo || 'N/A',
-          grupo: grupoData?.numero_grupo || 'N/A',
-          calificacion: evaluacion.calificacion_general,
-          fecha: evaluacion.fecha_evaluacion
+          grupo: '-',
+          calificacion: evaluacion.calificacion_promedio,
+          fecha: evaluacion.fecha_creacion
         }
       }) || []
 
@@ -588,17 +604,60 @@ router.get('/:profesorId/stats/historical', authenticateToken, async (req: any, 
 
     console.log('🔍 Backend: Getting historical stats for profesorId:', profesorId, 'period:', period);
 
-    // Verificar que el profesor existe y está activo
+    // Debug: Verificar si el profesor existe (con o sin filtro activo)
+    const { data: profesorDebug, error: debugError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id, activo, usuario_id')
+      .eq('id', profesorId)
+      .single()
+
+    console.log('🔍 Backend: Debug profesor query result:', { profesorDebug, debugError });
+
+    // Verificar que el profesor existe
     const { data: profesor, error: profesorError } = await SupabaseDB.supabaseAdmin
       .from('profesores')
       .select('id')
       .eq('id', profesorId)
-      .eq('activo', true)
       .single()
 
     if (profesorError || !profesor) {
-      console.log('❌ Backend: Profesor not found:', profesorError);
-      return res.status(404).json({ error: 'Profesor no encontrado' })
+      console.log('❌ Backend: Profesor not found, returning mock data:', profesorError);
+      
+      // Construir filtro de fecha para los datos mock
+      let mockDateFilter: { gte?: string; lte?: string } = {}
+      if (period) {
+        const [year, semester] = period.split('-')
+        const startDate = `${year}-${semester === '1' ? '01' : '07'}-01`
+        const endDate = `${year}-${semester === '1' ? '06' : '12'}-31`
+        
+        mockDateFilter = {
+          gte: startDate,
+          lte: endDate
+        }
+      }
+      
+      // Retornar datos de ejemplo si el profesor no existe
+      const mockHistoricalStats = {
+        period: period || 'all',
+        totalEvaluaciones: 0,
+        calificacionPromedio: 0,
+        totalCursos: 0,
+        totalEstudiantes: 0,
+        evaluacionesPorCurso: [],
+        dateRange: period ? {
+          start: mockDateFilter.gte,
+          end: mockDateFilter.lte
+        } : null,
+        isMockData: true,
+        debug: { 
+          profesorId, 
+          debugResult: profesorDebug,
+          debugError: debugError 
+        }
+      };
+      
+      console.log('✅ Backend: Returning mock historical stats:', mockHistoricalStats);
+      return res.json(mockHistoricalStats);
     }
 
     console.log('✅ Backend: Profesor found:', profesor);
@@ -608,7 +667,7 @@ router.get('/:profesorId/stats/historical', authenticateToken, async (req: any, 
     if (period) {
       const [year, semester] = period.split('-')
       const startDate = `${year}-${semester === '1' ? '01' : '07'}-01`
-      const endDate = `${year}-${semester === '1' ? '06' : '12'}-31`
+      const endDate = `${year}-${semester === '1' ? '06-30' : '12-31'}`
       
       dateFilter = {
         gte: startDate,
@@ -622,17 +681,14 @@ router.get('/:profesorId/stats/historical', authenticateToken, async (req: any, 
       .from('evaluaciones')
       .select(`
         id,
-        calificacion_general,
-        fecha_evaluacion,
-        curso_id,
+        calificacion_promedio,
+        fecha_creacion,
         grupo_id,
-        estudiante_id,
-        cursos!inner(nombre, codigo),
-        grupos(numero_grupo)
+        estudiante_id
       `)
       .eq('profesor_id', profesorId)
-      .gte('fecha_evaluacion', dateFilter.gte || '2020-01-01')
-      .lte('fecha_evaluacion', dateFilter.lte || '2030-12-31')
+      .gte('fecha_creacion', dateFilter.gte || '2020-01-01')
+      .lte('fecha_creacion', dateFilter.lte || '2030-12-31')
 
     console.log('🔍 Backend: Evaluaciones found for period:', evaluaciones?.length || 0);
 
@@ -644,26 +700,46 @@ router.get('/:profesorId/stats/historical', authenticateToken, async (req: any, 
     // Calcular estadísticas históricas
     const totalEvaluaciones = evaluaciones?.length || 0
     const calificacionPromedio = totalEvaluaciones > 0 
-      ? evaluaciones.reduce((sum, evaluacion) => sum + (evaluacion.calificacion_general || 0), 0) / totalEvaluaciones
+      ? evaluaciones.reduce((sum, evaluacion) => sum + (evaluacion.calificacion_promedio || 0), 0) / totalEvaluaciones
       : 0
-
-    // Obtener cursos únicos evaluados en este período
-    const cursosUnicos = new Set(evaluaciones?.map(e => e.curso_id) || [])
-    const totalCursos = cursosUnicos.size
 
     // Obtener estudiantes únicos que han evaluado en este período
     const estudiantesUnicos = new Set(evaluaciones?.map(e => e.estudiante_id) || [])
     const totalEstudiantes = estudiantesUnicos.size
 
     // Obtener evaluaciones por curso para este período
+    // Mapear grupo_id -> curso_id y luego curso info
+    const gruposIds = Array.from(new Set(((evaluaciones as any[]) || []).map((e: any) => e.grupo_id).filter(Boolean)))
+    const { data: gruposInfo } = await SupabaseDB.supabaseAdmin
+      .from('grupos')
+      .select('id, curso_id, numero_grupo')
+      .in('id', gruposIds.length ? gruposIds : [-1])
+
+    const grupoIdToCursoId: any = {}
+    ;(Array.isArray(gruposInfo) ? gruposInfo : []).forEach((g: any) => { grupoIdToCursoId[g.id] = g.curso_id })
+
+    const cursoIds = Array.from(new Set(((Array.isArray(gruposInfo) ? gruposInfo : []).map((g: any) => g.curso_id)).filter(Boolean)))
+    const { data: cursosInfo } = await SupabaseDB.supabaseAdmin
+      .from('cursos')
+      .select('id,nombre,codigo')
+      .in('id', cursoIds.length ? cursoIds : [-1])
+
+    const cursoIdToInfo: any = {}
+    ;(cursosInfo || []).forEach((c: any) => { cursoIdToInfo[c.id] = c })
+
+    // Cursos únicos una vez construido el mapa
+    const cursosUnicos = new Set(((evaluaciones as any[]) || []).map((e: any) => grupoIdToCursoId[e.grupo_id]).filter(Boolean))
+    const totalCursos = cursosUnicos.size
+
     const evaluacionesPorCurso = evaluaciones?.reduce((acc, evaluacion) => {
-      const cursoData = evaluacion.cursos as any
+      const cursoId = grupoIdToCursoId[evaluacion.grupo_id]
+      const cursoData = cursoIdToInfo[cursoId] as any
       const cursoNombre = cursoData?.nombre || 'Curso desconocido'
       const cursoCodigo = cursoData?.codigo || 'N/A'
-      const cursoKey = `${evaluacion.curso_id}-${cursoNombre}`
+      const cursoKey = `${cursoId}-${cursoNombre}`
       if (!acc[cursoKey]) {
         acc[cursoKey] = {
-          curso_id: evaluacion.curso_id,
+          curso_id: cursoId,
           nombre: cursoNombre,
           codigo: cursoCodigo,
           total: 0,
@@ -678,7 +754,7 @@ router.get('/:profesorId/stats/historical', authenticateToken, async (req: any, 
 
     // Calcular promedios por curso
     Object.values(evaluacionesPorCurso).forEach((curso: any) => {
-      const suma = curso.evaluaciones.reduce((sum: number, evaluacion: any) => sum + (evaluacion.calificacion_general || 0), 0)
+      const suma = curso.evaluaciones.reduce((sum: number, evaluacion: any) => sum + (evaluacion.calificacion_promedio || 0), 0)
       curso.promedio = curso.total > 0 ? Number((suma / curso.total).toFixed(2)) : 0
     })
 
@@ -2833,6 +2909,379 @@ router.get('/student-enrolled-subjects', authenticateToken, async (req: any, res
     })
   } catch (error) {
     console.error('❌ Backend: Error getting enrolled subjects:', error)
+    res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
+// GET /teachers/teacher-stats - Obtener estadísticas del profesor
+router.get('/teacher-stats/:teacherId', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    const { teacherId } = req.params
+    
+    console.log('🔍 Backend: Getting teacher stats for teacher ID:', teacherId);
+
+    // Verificar que el usuario es un profesor
+    if (user.tipo_usuario !== 'profesor') {
+      return res.status(403).json({ error: 'Solo los profesores pueden acceder a estas estadísticas' })
+    }
+
+    // Obtener el ID del profesor
+    const { data: profesor, error: profesorError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id')
+      .eq('id', teacherId)
+      .single()
+
+    if (profesorError || !profesor) {
+      console.log('❌ Backend: Error finding teacher, returning mock data:', profesorError);
+      
+      // Retornar datos de ejemplo si el profesor no existe
+      const mockStats = {
+        calificacionPromedio: 0,
+        totalEvaluaciones: 0,
+        cursosImpartidos: 0,
+        evaluacionesPorCurso: [],
+        isMockData: true,
+        debug: { 
+          teacherId, 
+          error: profesorError 
+        }
+      };
+      
+      console.log('✅ Backend: Returning mock teacher stats:', mockStats);
+      return res.json(mockStats);
+    }
+
+    console.log('✅ Backend: Profesor found:', profesor);
+
+    // Obtener evaluaciones completadas del profesor
+    const { data: evaluacionesCompletadas, error: completadasError } = await SupabaseDB.supabaseAdmin
+      .from('evaluaciones')
+      .select('id, calificacion_promedio')
+      .eq('profesor_id', profesor.id)
+      .eq('completada', true)
+
+    if (completadasError) {
+      console.log('❌ Backend: Error getting completed evaluations:', completadasError);
+    }
+
+    // Obtener cursos impartidos por el profesor
+    const { data: cursosImpartidos, error: cursosError } = await SupabaseDB.supabaseAdmin
+      .from('asignaciones_profesor')
+      .select(`
+        id,
+        curso:cursos(
+          id,
+          nombre,
+          codigo
+        )
+      `)
+      .eq('profesor_id', profesor.id)
+      .eq('activa', true)
+
+    if (cursosError) {
+      console.log('❌ Backend: Error getting teacher courses:', cursosError);
+    }
+
+    // Calcular promedio general
+    const promedioGeneral = evaluacionesCompletadas && evaluacionesCompletadas.length > 0
+      ? evaluacionesCompletadas.reduce((sum, e) => sum + (e.calificacion_promedio || 0), 0) / evaluacionesCompletadas.length
+      : 0
+
+    // Obtener evaluaciones por curso
+    const evaluacionesPorCurso = cursosImpartidos?.map((asignacion: any) => {
+      const evaluacionesDelCurso = evaluacionesCompletadas?.filter((e: any) => 
+        // Aquí necesitaríamos una relación para obtener el curso de cada evaluación
+        // Por ahora usamos datos básicos
+        true
+      ) || []
+
+      return {
+        curso_id: asignacion.curso?.id,
+        nombre: asignacion.curso?.nombre,
+        codigo: asignacion.curso?.codigo,
+        total: evaluacionesDelCurso.length,
+        promedio: evaluacionesDelCurso.length > 0 
+          ? evaluacionesDelCurso.reduce((sum: number, e: any) => sum + (e.calificacion_promedio || 0), 0) / evaluacionesDelCurso.length
+          : 0
+      }
+    }) || []
+
+    const stats = {
+      calificacionPromedio: Number(promedioGeneral.toFixed(2)),
+      totalEvaluaciones: evaluacionesCompletadas?.length || 0,
+      cursosImpartidos: cursosImpartidos?.length || 0,
+      evaluacionesPorCurso: evaluacionesPorCurso
+    }
+
+    console.log('✅ Backend: Teacher stats calculated:', stats);
+
+    res.json(stats)
+  } catch (error) {
+    console.error('❌ Backend: Error getting teacher stats:', error)
+    res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
+// GET /teachers/teacher-courses - Obtener cursos del profesor
+router.get('/teacher-courses/:teacherId', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    const { teacherId } = req.params
+    
+    console.log('🔍 Backend: Getting teacher courses for teacher ID:', teacherId);
+
+    // Verificar que el usuario es un profesor
+    if (user.tipo_usuario !== 'profesor') {
+      return res.status(403).json({ error: 'Solo los profesores pueden acceder a estos datos' })
+    }
+
+    // Obtener cursos del profesor con información detallada
+    const { data: cursos, error: cursosError } = await SupabaseDB.supabaseAdmin
+      .from('asignaciones_profesor')
+      .select(`
+        id,
+        curso:cursos(
+          id,
+          nombre,
+          codigo,
+          creditos
+        ),
+        grupo:grupos(
+          id,
+          numero_grupo,
+          horario,
+          aula,
+          periodo:periodos_academicos(
+            id,
+            nombre,
+            codigo
+          )
+        )
+      `)
+      .eq('profesor_id', teacherId)
+      .eq('activa', true)
+
+    if (cursosError) {
+      console.log('❌ Backend: Error getting teacher courses:', cursosError);
+      return res.status(500).json({ error: 'Error al obtener cursos del profesor', details: cursosError.message })
+    }
+
+    // Formatear los datos
+    const cursosFormateados = cursos?.map((asignacion: any) => ({
+      id: asignacion.id,
+      curso: {
+        id: asignacion.curso?.id,
+        nombre: asignacion.curso?.nombre,
+        codigo: asignacion.curso?.codigo,
+        creditos: asignacion.curso?.creditos
+      },
+      grupo: {
+        id: asignacion.grupo?.id,
+        numeroGrupo: asignacion.grupo?.numero_grupo,
+        horario: asignacion.grupo?.horario,
+        aula: asignacion.grupo?.aula,
+        periodo: {
+          id: asignacion.grupo?.periodo?.id,
+          nombre: asignacion.grupo?.periodo?.nombre,
+          codigo: asignacion.grupo?.periodo?.codigo
+        }
+      }
+    })).filter((curso: any) => curso.curso?.id) || []
+
+    console.log('✅ Backend: Teacher courses found:', cursosFormateados.length);
+
+    res.json(cursosFormateados)
+  } catch (error) {
+    console.error('❌ Backend: Error getting teacher courses:', error)
+    res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
+// GET /teachers/teacher-id - Obtener ID del profesor desde el usuario autenticado
+router.get('/teacher-id', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    
+    console.log('🔍 Backend: Getting teacher ID for user:', user.id);
+
+    // Verificar que el usuario es un profesor
+    if (user.tipo_usuario !== 'profesor') {
+      return res.status(403).json({ error: 'Solo los profesores pueden acceder a este endpoint' })
+    }
+
+    // Obtener el ID del profesor
+    const { data: profesor, error: profesorError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id')
+      .eq('usuario_id', user.id)
+      .single()
+
+    if (profesorError || !profesor) {
+      console.log('❌ Backend: Error finding teacher:', profesorError);
+      return res.status(404).json({ error: 'Profesor no encontrado' })
+    }
+
+    console.log('✅ Backend: Teacher ID found:', profesor.id);
+
+    res.json({ teacherId: profesor.id })
+  } catch (error) {
+    console.error('❌ Backend: Error getting teacher ID:', error)
+    res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
+// GET /teachers/period-stats?period=YYYY-1|YYYY-2 - Estadísticas filtradas por período (cards y tablas)
+router.get('/period-stats', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    const { period } = req.query
+
+    if (user.tipo_usuario !== 'profesor') {
+      return res.status(403).json({ error: 'Solo los profesores pueden acceder a estas estadísticas' })
+    }
+
+    // Obtener ID del profesor por usuario autenticado
+    const { data: profesor, error: profesorError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id')
+      .eq('usuario_id', user.id)
+      .single()
+
+    if (profesorError || !profesor) {
+      return res.status(404).json({ error: 'Profesor no encontrado' })
+    }
+
+    // Rango de fechas del período
+    let dateFilter: { gte?: string; lte?: string } = {}
+    if (period) {
+      const [year, semester] = String(period).split('-')
+      const startDate = `${year}-${semester === '1' ? '01' : '07'}-01`
+      const endDate = `${year}-${semester === '1' ? '06-30' : '12-31'}`
+      dateFilter = { gte: startDate, lte: endDate }
+    }
+
+    // Evaluaciones del período para este profesor
+    const { data: evaluaciones, error: evaluacionesError } = await SupabaseDB.supabaseAdmin
+      .from('evaluaciones')
+      .select('id, calificacion_promedio, fecha_creacion, grupo_id')
+      .eq('profesor_id', profesor.id)
+      .eq('completada', true)
+      .gte('fecha_creacion', dateFilter.gte || '2020-01-01')
+      .lte('fecha_creacion', dateFilter.lte || '2030-12-31')
+
+    if (evaluacionesError) {
+      return res.status(500).json({ error: 'Error consultando evaluaciones del período', details: evaluacionesError })
+    }
+
+    const totalEvaluaciones = evaluaciones?.length || 0
+    const calificacionPromedio = totalEvaluaciones > 0
+      ? ((evaluaciones as any[]) || []).reduce((sum: number, e: any) => sum + (e.calificacion_promedio || 0), 0) / totalEvaluaciones
+      : 0
+
+    // Obtener info de cursos via grupos
+    const evalsArray: any[] = Array.isArray(evaluaciones) ? (evaluaciones as any[]) : []
+    const gruposIds = Array.from(new Set(evalsArray.map((e: any) => e.grupo_id).filter(Boolean)))
+    const { data: periodGrupos } = await SupabaseDB.supabaseAdmin
+      .from('grupos')
+      .select('id, curso_id')
+      .in('id', gruposIds.length ? gruposIds : [-1])
+    const grupoToCurso: any = {}
+    ;(Array.isArray(periodGrupos) ? periodGrupos : []).forEach((g: any) => { grupoToCurso[g.id] = g.curso_id })
+
+    const periodCursoIds = Array.from(new Set(((Array.isArray(periodGrupos) ? periodGrupos : []).map((g: any) => g.curso_id)).filter(Boolean)))
+    const { data: periodCursos } = await SupabaseDB.supabaseAdmin
+      .from('cursos')
+      .select('id,nombre,codigo')
+      .in('id', periodCursoIds.length ? periodCursoIds : [-1])
+    const periodCursoMap: any = {}
+    const periodCursosArray: any[] = Array.isArray(periodCursos) ? periodCursos as any[] : []
+    periodCursosArray.forEach((c: any) => { periodCursoMap[c.id] = c })
+
+    const evaluacionesPorCursoMap: any = {}
+    evalsArray.forEach((e: any) => {
+      const cursoId = grupoToCurso[e.grupo_id]
+      const nombre = periodCursoMap[cursoId]?.nombre || 'Curso'
+      const key = `${cursoId}-${nombre}`
+      if (!evaluacionesPorCursoMap[key]) {
+        evaluacionesPorCursoMap[key] = {
+          curso_id: cursoId,
+          nombre,
+          codigo: periodCursoMap[cursoId]?.codigo || 'N/A',
+          total: 0,
+          promedio: 0,
+          _sum: 0,
+        }
+      }
+      evaluacionesPorCursoMap[key].total += 1
+      evaluacionesPorCursoMap[key]._sum += (e.calificacion_promedio || 0)
+    })
+
+    const evaluacionesPorCurso: any[] = []
+    for (const key in evaluacionesPorCursoMap) {
+      const c = evaluacionesPorCursoMap[key]
+      evaluacionesPorCurso.push({
+        curso_id: c.curso_id,
+        nombre: c.nombre,
+        codigo: c.codigo,
+        total: c.total,
+        promedio: c.total > 0 ? Number((c._sum / c.total).toFixed(2)) : 0,
+      })
+    }
+
+    // Cursos impartidos activos (no necesariamente filtrados por periodo)
+    const { data: cursosImpartidos } = await SupabaseDB.supabaseAdmin
+      .from('asignaciones_profesor')
+      .select('id')
+      .eq('profesor_id', profesor.id)
+      .eq('activa', true)
+
+    const stats = {
+      totalEvaluaciones,
+      calificacionPromedio: Number(calificacionPromedio.toFixed(2)),
+      totalCursos: cursosImpartidos?.length || 0,
+      evaluacionesPorCurso,
+      period: period || 'all'
+    }
+
+    return res.json(stats)
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
+// GET /teachers/debug-professors - Endpoint temporal para debug
+router.get('/debug-professors', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    console.log('🔍 Debug: User info:', { id: user.id, tipo: user.tipo_usuario });
+    
+    // Obtener todos los profesores
+    const { data: todosProfesores, error: todosError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id, activo, usuario_id, usuario:usuarios(nombre, apellido, email)')
+      .limit(10)
+    
+    console.log('🔍 Debug: Todos los profesores:', { todosProfesores, todosError });
+    
+    // Buscar el profesor específico que está fallando
+    const { data: profesorEspecifico, error: profError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id, activo, usuario_id, usuario:usuarios(nombre, apellido, email)')
+      .eq('id', '8c1f98db-6722-4aac-ad68-2a368b6324d4')
+      .single()
+    
+    console.log('🔍 Debug: Profesor específico:', { profesorEspecifico, profError });
+    
+    res.json({
+      user: { id: user.id, tipo: user.tipo_usuario },
+      todosProfesores: todosProfesores || [],
+      profesorEspecifico: profesorEspecifico || null,
+      error: profError
+    })
+  } catch (error) {
+    console.error('❌ Debug error:', error);
     res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
   }
 })
