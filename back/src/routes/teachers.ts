@@ -3251,6 +3251,123 @@ router.get('/period-stats', authenticateToken, async (req: any, res) => {
   }
 })
 
+// GET /teachers/period-category-stats?period=YYYY-X&courseId=NN
+// Promedios por categoría a partir de respuestas_evaluacion
+router.get('/period-category-stats', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    const { period, courseId } = req.query
+
+    if (user.tipo_usuario !== 'profesor') {
+      return res.status(403).json({ error: 'Solo los profesores pueden acceder a estas estadísticas' })
+    }
+
+    // 1) Profesor
+    const { data: profesor, error: profesorError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id')
+      .eq('usuario_id', user.id)
+      .single()
+    if (profesorError || !profesor) {
+      return res.status(404).json({ error: 'Profesor no encontrado' })
+    }
+
+    // 2) Rango de fechas del período
+    let dateFilter: { gte?: string; lte?: string } = {}
+    if (period) {
+      const [year, semester] = String(period).split('-')
+      const startDate = `${year}-${semester === '1' ? '01' : '07'}-01`
+      const endDate = `${year}-${semester === '1' ? '06-30' : '12-31'}`
+      dateFilter = { gte: startDate, lte: endDate }
+    }
+
+    // 3) Evaluaciones del período del profesor
+    const { data: evaluaciones, error: evalError } = await SupabaseDB.supabaseAdmin
+      .from('evaluaciones')
+      .select('id, grupo_id, fecha_creacion')
+      .eq('profesor_id', profesor.id)
+      .eq('completada', true)
+      .gte('fecha_creacion', dateFilter.gte || '2020-01-01')
+      .lte('fecha_creacion', dateFilter.lte || '2030-12-31')
+    if (evalError) {
+      return res.status(500).json({ error: 'Error obteniendo evaluaciones', details: evalError })
+    }
+
+    let evalsArray: any[] = Array.isArray(evaluaciones) ? evaluaciones as any[] : []
+
+    // 3.1) Si viene courseId, filtrar las evaluaciones por curso vía grupo_id -> grupos.curso_id
+    if (courseId && evalsArray.length > 0) {
+      const grupoIds = Array.from(new Set(evalsArray.map((e: any) => e.grupo_id).filter(Boolean)))
+      const { data: grupos } = await SupabaseDB.supabaseAdmin
+        .from('grupos')
+        .select('id, curso_id')
+        .in('id', grupoIds.length ? grupoIds : [-1])
+      const grupoToCurso: any = {}
+      ;(Array.isArray(grupos) ? grupos : []).forEach((g: any) => { grupoToCurso[g.id] = g.curso_id })
+      evalsArray = evalsArray.filter((e: any) => String(grupoToCurso[e.grupo_id]) === String(courseId))
+    }
+
+    const evaluacionIds = Array.from(new Set(evalsArray.map((e: any) => e.id)))
+    if (evaluacionIds.length === 0) {
+      return res.json([])
+    }
+
+    // 4) Respuestas por evaluación (valor por pregunta)
+    const { data: respuestas, error: respError } = await SupabaseDB.supabaseAdmin
+      .from('respuestas_evaluacion')
+      .select('evaluacion_id, pregunta_id, valor')
+      .in('evaluacion_id', evaluacionIds)
+    if (respError) {
+      return res.status(500).json({ error: 'Error obteniendo respuestas', details: respError })
+    }
+
+    const preguntaIds = Array.from(new Set(((respuestas as any[]) || []).map((r: any) => r.pregunta_id)))
+    if (preguntaIds.length === 0) {
+      return res.json([])
+    }
+
+    // 5) Mapeo pregunta -> categoria_id
+    const { data: catPreg, error: catPregError } = await SupabaseDB.supabaseAdmin
+      .from('categorias_preguntas')
+      .select('id, categoria_id')
+      .in('id', preguntaIds)
+    if (catPregError) {
+      return res.status(500).json({ error: 'Error obteniendo categorías de preguntas', details: catPregError })
+    }
+    const preguntaToCategoria: any = {}
+    ;(Array.isArray(catPreg) ? catPreg : []).forEach((cp: any) => { preguntaToCategoria[cp.id] = cp.categoria_id })
+
+    // 6) Info de categorías
+    const categoriaIds = Array.from(new Set(((catPreg as any[]) || []).map((cp: any) => cp.categoria_id).filter(Boolean)))
+    const { data: categorias } = await SupabaseDB.supabaseAdmin
+      .from('categorias')
+      .select('id, nombre')
+      .in('id', categoriaIds.length ? categoriaIds : [-1])
+    const categoriaInfo: any = {}
+    ;(Array.isArray(categorias) ? categorias : []).forEach((c: any) => { categoriaInfo[c.id] = c.nombre })
+
+    // 7) Agregar promedios por categoría
+    const acumulado: any = {}
+    ;(Array.isArray(respuestas) ? respuestas as any[] : []).forEach((r: any) => {
+      const catId = preguntaToCategoria[r.pregunta_id]
+      if (!catId) return
+      if (!acumulado[catId]) acumulado[catId] = { sum: 0, count: 0 }
+      acumulado[catId].sum += (r.valor || 0)
+      acumulado[catId].count += 1
+    })
+
+    const result = Object.keys(acumulado).map((catId: any) => ({
+      categoriaId: Number(catId),
+      nombre: categoriaInfo[catId] || `Categoría ${catId}`,
+      promedio: acumulado[catId].count > 0 ? Number((acumulado[catId].sum / acumulado[catId].count).toFixed(2)) : 0
+    }))
+
+    return res.json(result)
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
+  }
+})
+
 // GET /teachers/debug-professors - Endpoint temporal para debug
 router.get('/debug-professors', authenticateToken, async (req: any, res) => {
   try {

@@ -64,6 +64,21 @@ export async function fetchTeacherPeriodStats(period: string): Promise<any> {
   }
 }
 
+// Nuevo: promedios por categoría del período (opcionalmente por curso)
+export async function fetchTeacherPeriodCategoryStats(period: string, courseId?: string | number): Promise<Array<{ categoriaId: number; nombre: string; promedio: number }>> {
+  try {
+    const params = new URLSearchParams()
+    if (period) params.set('period', String(period))
+    if (courseId != null) params.set('courseId', String(courseId))
+    const url = `/api/teachers/period-category-stats?${params.toString()}`
+    const response = await apiClient.get(url)
+    return response.data || []
+  } catch (error) {
+    console.error('❌ Error fetching teacher period category stats:', error)
+    return []
+  }
+}
+
 export async function fetchTeacherHistoricalStats(profesorId: string, period?: string): Promise<any> {
   try {
     const url = period 

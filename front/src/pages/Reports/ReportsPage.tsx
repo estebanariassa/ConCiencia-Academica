@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchTeacherHistoricalStats, fetchTeacherId, fetchTeacherStats, fetchTeacherPeriodStats } from '../../api/teachers';
+import { fetchTeacherHistoricalStats, fetchTeacherId, fetchTeacherStats, fetchTeacherPeriodStats, fetchTeacherPeriodCategoryStats } from '../../api/teachers';
 import { 
   mockTrendData, 
   mockDistributionData, 
@@ -193,14 +193,24 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   };
 
   // Datos reales para barras por categoría: usar SIEMPRE stats base
-  const realCategoryData = baseTeacherStats?.evaluacionesPorCurso?.length > 0 ? 
-    baseTeacherStats.evaluacionesPorCurso
-      .filter((curso: any) => selectedCourse === 'all' || curso.curso_id === parseInt(selectedCourse))
-      .map((curso: any) => ({
-        category: curso.nombre,
-        rating: curso.promedio,
-        total: curso.total
-      })) : [];
+  const [categoryStats, setCategoryStats] = useState<any[]>([]);
+
+  // Cargar promedios por categoría del período (y curso si aplica)
+  useEffect(() => {
+    const loadCategory = async () => {
+      try {
+        const data = await fetchTeacherPeriodCategoryStats(selectedPeriod, selectedCourse !== 'all' ? selectedCourse : undefined);
+        setCategoryStats(Array.isArray(data) ? data : []);
+      } catch {
+        setCategoryStats([]);
+      }
+    };
+    loadCategory();
+  }, [selectedPeriod, selectedCourse]);
+
+  const realCategoryData = categoryStats.length > 0
+    ? categoryStats.map((c: any) => ({ category: c.nombre, rating: c.promedio }))
+    : [];
 
   // Usar datos de ejemplo si no hay datos reales
   const categoryDataWithMock = getMockDataWithIndicator(realCategoryData, mockCategoryData);
