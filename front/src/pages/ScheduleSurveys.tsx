@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
 import Card, { CardHeader, CardContent, CardTitle, CardDescription } from '../components/Card'
 import Button from '../components/Button'
-import Badge from '../components/Badge'
+
 
 export default function ScheduleSurveys() {
   const navigate = useNavigate()
@@ -99,11 +99,7 @@ export default function ScheduleSurveys() {
                   <Button type="button" variant="outline" onClick={backToDashboard}>Cancelar</Button>
                 </div>
 
-                <div className="pt-4">
-                  <Badge variant="outline" className="bg-yellow-50 border-yellow-200 text-yellow-800">
-                    Esta pantalla es funcional a nivel de UI; conecta tu endpoint cuando esté listo.
-                  </Badge>
-                </div>
+                
               </form>
             </CardContent>
           </Card>

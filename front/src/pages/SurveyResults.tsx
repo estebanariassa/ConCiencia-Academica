@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   CardHeader, 
@@ -32,7 +32,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   LineChart,
   Line,
   RadarChart,
@@ -55,6 +54,7 @@ interface SurveyResultsProps {
 
 export default function SurveyResults({ user }: SurveyResultsProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [selectedPeriod, setSelectedPeriod] = useState('2025-2');
   
@@ -65,9 +65,19 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
   
   // Estado para los datos
   const [surveyData, setSurveyData] = useState<any>(null);
-  const [professorInfo, setProfessorInfo] = useState<any>(null);
-  const [courseInfo, setCourseInfo] = useState<any>(null);
-  const [groupInfo, setGroupInfo] = useState<any>(null);
+  const normalizeGroup = (g: any) =>
+    g
+      ? {
+          id: g.id,
+          number: g.numero_grupo ?? g.number ?? g.numero ?? g.id,
+          schedule: g.horario ?? g.schedule ?? '',
+          classroom: g.aula ?? g.classroom ?? ''
+        }
+      : null;
+
+  const [professorInfo, setProfessorInfo] = useState<any>(location.state?.professor || null);
+  const [courseInfo, setCourseInfo] = useState<any>(location.state?.course || null);
+  const [groupInfo, setGroupInfo] = useState<any>(normalizeGroup(location.state?.group) || null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,7 +100,7 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
         // - Información del curso
         // - Información del grupo
         
-        // Datos mock para demostración
+        // Datos mock solo para gráficas mientras no hay endpoint de resultados
         const mockData = {
           totalEvaluations: 45,
           averageRating: 4.3,
@@ -133,29 +143,17 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
           ]
         };
 
-        const mockProfessorInfo = {
-          name: 'William David Velazquez Ramirez',
-          email: 'wvelasquez@udemedellin.edu.co',
-          department: 'Ingeniería de Sistemas'
-        };
-
-        const mockCourseInfo = {
-          name: 'LPCL',
-          code: 'SIS-601',
-          credits: 3,
-          description: 'Lenguajes de Programación y Compiladores'
-        };
-
-        const mockGroupInfo = {
-          number: 1,
-          schedule: 'Lunes 8:00-10:00, Miércoles 8:00-10:00',
-          classroom: 'Aula 201'
-        };
-
         setSurveyData(mockData);
-        setProfessorInfo(mockProfessorInfo);
-        setCourseInfo(mockCourseInfo);
-        setGroupInfo(mockGroupInfo);
+        // Mantener la info enviada desde la navegación; si no vino, usar placeholders mínimos
+        if (!professorInfo) {
+          setProfessorInfo({ name: 'Profesor', email: '', department: '' });
+        }
+        if (!courseInfo) {
+          setCourseInfo({ name: 'Curso', code: courseId, credits: null, description: '' });
+        }
+        if (!groupInfo) {
+          setGroupInfo({ number: groupId, schedule: '', classroom: '' });
+        }
         
       } catch (error) {
         console.error('❌ Error loading survey data:', error);
@@ -522,7 +520,7 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
                         cy="50%"
                         outerRadius={80}
                         dataKey="value"
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }: any) => `${name}: ${(((percent as number) || 0) * 100).toFixed(0)}%`}
                       >
                         {surveyData?.distributionData?.map((entry: any, index: number) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
