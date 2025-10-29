@@ -146,13 +146,13 @@ export default function EvaluationForm() {
       const answers = questions.map((q, idx) => {
         if (q.type === 'rating') {
           return {
-            questionId: q.id,
+            questionId: parseInt(q.id, 10),
             rating: ratings[idx],
             textAnswer: null
           };
         } else {
           return {
-            questionId: q.id,
+            questionId: parseInt(q.id, 10),
             rating: null,
             textAnswer: textAnswers[idx]
           };
@@ -192,7 +192,24 @@ export default function EvaluationForm() {
       navigate('/dashboard')
     } catch (e: any) {
       console.error('❌ Error enviando evaluación:', e)
-      const errorMessage = e?.message ?? 'Error guardando la evaluación'
+      
+      // Manejo mejorado de errores
+      let errorMessage = 'Error guardando la evaluación'
+      
+      if (e?.response?.data?.error) {
+        errorMessage = e.response.data.error
+        
+        // Si hay detalles de validación, mostrarlos
+        if (e.response.data.details && Array.isArray(e.response.data.details)) {
+          const validationErrors = e.response.data.details
+            .map((detail: any) => `${detail.field}: ${detail.message}`)
+            .join('\n')
+          errorMessage += '\n\nDetalles:\n' + validationErrors
+        }
+      } else if (e?.message) {
+        errorMessage = e.message
+      }
+      
       alert(errorMessage)
     }
   };

@@ -1,5 +1,6 @@
 import { apiClient } from './client'
 import { Teacher } from '../types'
+import { EvaluationRequest, EvaluationResponse } from '../types/evaluationTypes'
 
 export interface TeachersResponse {
   teachers: Teacher[]
@@ -71,27 +72,22 @@ export async function fetchTeacherHistoricalStats(profesorId: string, period?: s
   }
 }
 
-export async function submitEvaluation(evaluationData: {
-  teacherId: string;
-  courseId: string;
-  groupId?: string;
-  answers: Array<{ questionId: string; rating: number | null; textAnswer: string | null }>;
-  overallRating: number;
-  comments?: string;
-}): Promise<any> {
+export async function submitEvaluation(evaluationData: EvaluationRequest): Promise<EvaluationResponse> {
   try {
     console.log('🌐 Submitting evaluation:', evaluationData);
     const response = await apiClient.post('/api/teachers/evaluations', evaluationData)
     console.log('🌐 Evaluation submission response:', response.data);
     return response.data
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error submitting evaluation:', error)
     console.error('❌ Error details:', {
-      message: (error as any)?.message,
-      status: (error as any)?.response?.status,
-      data: (error as any)?.response?.data
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data
     });
-    throw new Error('Error al enviar la evaluación')
+    
+    // Re-lanzar el error para que el componente pueda manejarlo
+    throw error;
   }
 }
 

@@ -1,7 +1,9 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import { SupabaseDB } from '../config/supabase-only'
 import { authenticateToken } from '../middleware/auth'
 import jwt from 'jsonwebtoken'
+import { EvaluationRequest, EvaluationResponse } from '../types/evaluationTypes'
 
 const router = Router()
 
@@ -34,7 +36,7 @@ router.get('/', authenticateToken, async (req: any, res) => {
         .from('inscripciones')
         .select('grupo_id')
         .eq('estudiante_id', estudiante.id)
-        .eq('activo', true)
+        .eq('activa', true)
 
       if (inscError) {
         console.error('Error consultando inscripciones:', inscError)
@@ -390,7 +392,7 @@ router.get('/:profesorId/courses/:courseId/groups', authenticateToken, async (re
       .select('id, profesor_id, curso_id, grupo_id, activa')
       .eq('profesor_id', profesorId)
       .eq('curso_id', isNaN(numericCourseId) ? courseId : numericCourseId)
-      .eq('activo', true)
+      .eq('activa', true)
     if (asignsErr) {
       console.error('❌ Backend: Error consultando asignaciones_profesor:', asignsErr)
       return res.status(500).json({ error: 'Error consultando asignaciones', details: asignsErr })
@@ -702,10 +704,31 @@ router.get('/:profesorId/stats/historical', authenticateToken, async (req: any, 
   }
 })
 
+// Schema de validación para evaluaciones
+const evaluationSchema = z.object({
+  teacherId: z.string().uuid('ID de profesor inválido'),
+  courseId: z.union([
+    z.string().uuid('ID de curso inválido (UUID)'),
+    z.string().transform(val => parseInt(val, 10)).pipe(z.number().int().positive('ID de curso inválido (número)'))
+  ]),
+  groupId: z.string().optional(),
+  answers: z.array(z.object({
+    questionId: z.number().int().positive('ID de pregunta inválido'),
+    rating: z.number().int().min(1).max(5).nullable().optional(),
+    textAnswer: z.string().nullable().optional(),
+    selectedOption: z.string().nullable().optional()
+  })).min(1, 'Debe haber al menos una respuesta'),
+  overallRating: z.number().min(1).max(5, 'Calificación promedio debe estar entre 1 y 5'),
+  comments: z.string().optional()
+})
+
 // POST /teachers/evaluations - Guardar evaluación de un profesor
 router.post('/evaluations', authenticateToken, async (req: any, res) => {
   try {
     const user = req.user
+    
+    // Validar datos de entrada
+    const validatedData = evaluationSchema.parse(req.body)
     const {
       teacherId,
       courseId,
@@ -713,11 +736,14 @@ router.post('/evaluations', authenticateToken, async (req: any, res) => {
       answers,
       overallRating,
       comments
-    } = req.body
+    } = validatedData
+
+    // Asegurar que courseId sea un número para las consultas de BD
+    const numericCourseId = typeof courseId === 'string' ? parseInt(courseId, 10) : courseId
 
     console.log('🔍 Backend: Saving evaluation:', {
       teacherId,
-      courseId,
+      courseId: numericCourseId,
       groupId,
       studentId: user.id,
       userType: user.tipo_usuario,
@@ -840,6 +866,18 @@ router.post('/evaluations', authenticateToken, async (req: any, res) => {
       evaluationId: evaluacion.id
     })
   } catch (error) {
+    // Manejo específico de errores de validación Zod
+    if (error instanceof z.ZodError) {
+      console.log('❌ Backend: Validation error:', error.errors);
+      return res.status(400).json({ 
+        error: 'Datos de evaluación inválidos', 
+        details: error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message
+        }))
+      })
+    }
+    
     console.error('❌ Backend: Error al guardar evaluación:', error)
     console.error('❌ Backend: Error stack:', (error as any)?.stack)
     res.status(500).json({ error: 'Error interno del servidor', details: (error as any)?.message || String(error) })
@@ -920,7 +958,7 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
         orden,
         categoria:categorias_pregunta(nombre)
       `)
-      .eq('activo', true)
+      .eq('activa', true)
       .order('orden', { ascending: true });
 
     if (carreraId) {
@@ -953,7 +991,7 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
           categoria:categorias_pregunta(nombre)
         `)
         .is('id_carrera', null)
-        .eq('activo', true)
+        .eq('activa', true)
         .order('orden', { ascending: true })
 
       if (preguntasGeneralesError) {
@@ -1106,7 +1144,7 @@ router.get('/survey-by-career/:careerId', authenticateToken, async (req: any, re
         orden,
         categoria:categorias_pregunta(nombre)
       `)
-      .eq('activo', true)
+      .eq('activa', true)
       .order('orden', { ascending: true });
 
     if (careerId && careerId !== 'null') {
@@ -1139,7 +1177,7 @@ router.get('/survey-by-career/:careerId', authenticateToken, async (req: any, re
           categoria:categorias_pregunta(nombre)
         `)
         .is('id_carrera', null)
-        .eq('activo', true)
+        .eq('activa', true)
         .order('orden', { ascending: true })
 
       if (preguntasGeneralesError) {
@@ -2007,7 +2045,7 @@ router.get('/debug-groups/:profesorId/:courseId', authenticateToken, async (req:
     // 3. Verificar asignaciones del profesor para este curso
     const { data: asignaciones, error: asignacionesError } = await SupabaseDB.supabaseAdmin
       .from('asignaciones_profesor')
-      .select('id, profesor_id, curso_id, activo')
+      .select('id, profesor_id, curso_id, activa')
       .eq('profesor_id', profesorId)
       .eq('curso_id', courseId)
 
@@ -2304,7 +2342,7 @@ router.get('/:teacherId/courses', authenticateToken, async (req: any, res) => {
         )
       `)
       .eq('profesor_id', profesor.id)
-      .eq('activo', true)
+      .eq('activa', true)
 
     if (asignError) {
       console.error('Error consultando asignaciones del profesor:', asignError)

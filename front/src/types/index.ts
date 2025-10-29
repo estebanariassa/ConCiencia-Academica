@@ -36,7 +36,7 @@ export interface Evaluation {
 }
 
 export interface EvaluationAnswer {
-  questionId: string;
+  questionId: number;
   rating: number;
   comment?: string;
 }
