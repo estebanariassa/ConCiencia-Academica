@@ -58,32 +58,29 @@ export default function UserMenu() {
   };
 
   const switchRole = () => {
-    // Lógica de cambio considerando decano, coordinador y profesor
-    if (currentViewRole === 'decano') {
-      setCurrentViewRole('coordinador');
-      switchUserRole('coordinador');
-      console.log('🔄 Cambiando de decano a coordinador');
-      navigate('/dashboard-coordinador');
-    } else if (currentViewRole === 'coordinador') {
-      if (hasRole('decano')) {
-        setCurrentViewRole('decano');
-        // Nota: switchUserRole admite 'coordinador' | 'profesor'; mantenemos coordinador en contexto
-        // y solo cambiamos la vista local, la navegación lleva al dashboard de decano.
-        console.log('🔄 Cambiando de coordinador a decano');
-        navigate('/dashboard-decano');
-      } else {
-        setCurrentViewRole('profesor');
-        switchUserRole('profesor');
-        console.log('🔄 Cambiando de coordinador a profesor');
-        navigate('/dashboard-profesor');
-      }
-    } else {
-      setCurrentViewRole('coordinador');
-      switchUserRole('coordinador');
-      console.log('🔄 Cambiando de profesor a coordinador');
-      navigate('/dashboard-coordinador');
+    // Determinar siguiente rol al que se debe cambiar según disponibilidad real
+    // Preferencia: decano > coordinador > profesor, pero siempre evitando el rol actual
+    const canGoDean = isDean && currentViewRole !== 'decano'
+    const canGoCoordinator = isCoordinator && currentViewRole !== 'coordinador'
+    const canGoProfessor = isProfessor && currentViewRole !== 'profesor'
+
+    if (canGoDean) {
+      setCurrentViewRole('decano')
+      console.log('🔄 Cambiando a decano')
+      // No tocamos tipo_usuario porque el contexto solo soporta (coordinador|profesor)
+      navigate('/dashboard-decano')
+    } else if (canGoCoordinator) {
+      setCurrentViewRole('coordinador')
+      switchUserRole('coordinador')
+      console.log('🔄 Cambiando a coordinador')
+      navigate('/dashboard-coordinador')
+    } else if (canGoProfessor) {
+      setCurrentViewRole('profesor')
+      switchUserRole('profesor')
+      console.log('🔄 Cambiando a profesor')
+      navigate('/dashboard-profesor')
     }
-    setIsOpen(false);
+    setIsOpen(false)
   };
 
   if (!user) {
@@ -165,20 +162,37 @@ export default function UserMenu() {
                     onClick={switchRole}
                     className="w-full justify-start text-blue-600 hover:text-blue-700 hover:bg-blue-50 mb-1 border border-blue-200 rounded-lg"
                   >
-                    {currentViewRole === 'coordinador' ? (
-                      <GraduationCap className="h-4 w-4 mr-3 text-red-600" />
-                    ) : currentViewRole === 'decano' ? (
-                      <Shield className="h-4 w-4 mr-3 text-red-600" />
-                    ) : (
-                      <Shield className="h-4 w-4 mr-3 text-red-600" />
-                    )}
+                    {/* Icono del rol destino */}
+                    {(() => {
+                      const targetIsDean = isDean && currentViewRole !== 'decano'
+                      const targetIsCoordinator = isCoordinator && currentViewRole !== 'coordinador' && !targetIsDean
+                      return targetIsDean ? (
+                        <Shield className="h-4 w-4 mr-3 text-red-600" />
+                      ) : targetIsCoordinator ? (
+                        <Shield className="h-4 w-4 mr-3 text-red-600" />
+                      ) : (
+                        <GraduationCap className="h-4 w-4 mr-3 text-red-600" />
+                      )
+                    })()}
                     <div className="flex flex-col items-start">
-                      <span className="font-medium">
-                        Cambiar a {currentViewRole === 'coordinador' ? 'Profesor' : currentViewRole === 'decano' ? 'Coordinador' : 'Coordinador'}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {currentViewRole === 'coordinador' ? 'Vista de docente' : currentViewRole === 'decano' ? 'Vista de coordinador' : 'Vista de coordinador'}
-                      </span>
+                      {(() => {
+                        const targetLabel = isDean && currentViewRole !== 'decano'
+                          ? 'Decano'
+                          : (isCoordinator && currentViewRole !== 'coordinador')
+                          ? 'Coordinador'
+                          : 'Profesor'
+                        const targetSub = targetLabel === 'Decano'
+                          ? 'Vista de decano'
+                          : targetLabel === 'Coordinador'
+                          ? 'Vista de coordinador'
+                          : 'Vista de docente'
+                        return (
+                          <>
+                            <span className="font-medium">Cambiar a {targetLabel}</span>
+                            <span className="text-xs text-gray-500">{targetSub}</span>
+                          </>
+                        )
+                      })()}
                     </div>
                   </Button>
                 )}

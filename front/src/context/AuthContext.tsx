@@ -250,6 +250,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const updatedUser = {
       ...user,
       tipo_usuario: newRole,
+      // Mantener sincronizado con la UI que usa selected_role como preferencia
+      selected_role: newRole,
       // Mantener los roles originales para poder volver
       original_tipo_usuario: user.tipo_usuario
     }
