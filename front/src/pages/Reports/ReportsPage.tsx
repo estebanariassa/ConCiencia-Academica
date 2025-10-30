@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fetchTeacherHistoricalStats, fetchTeacherId, fetchTeacherStats, fetchTeacherPeriodStats, fetchTeacherPeriodCategoryStats } from '../../api/teachers';
 import { 
   mockTrendData, 
@@ -54,6 +54,7 @@ import {
 
 // Importar la imagen de fondo
 const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
+import { exportElementToPDF, exportElementToPNG, exportObjectsToExcel } from '../../utils/export';
 
 interface ReportsPageProps {
   user: User;
@@ -61,6 +62,7 @@ interface ReportsPageProps {
 
 export default function ReportsPage({ user }: ReportsPageProps) {
   const navigate = useNavigate();
+  const reportRef = useRef<HTMLDivElement | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState('2025-2');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedCourse, setSelectedCourse] = useState('all');
@@ -274,7 +276,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
         {/* Usamos el componente Header */}
         <Header user={user} />
         
-        <main className="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
+        <main ref={reportRef} className="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
           {/* Header interno con botón de volver y filtros */}
           <motion.header
             initial={{ y: -20, opacity: 0 }}
@@ -356,7 +358,11 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   </select>
                 )}
                  
-                 <Button variant="outline" size="sm">
+                 <Button variant="outline" size="sm" onClick={async () => {
+                   if (reportRef.current) {
+                     await exportElementToPDF(reportRef.current, `reporte-${selectedPeriod}.pdf`)
+                   }
+                 }}>
                    <Download className="h-4 w-4 mr-2" />
                    Exportar
                  </Button>
@@ -678,15 +684,31 @@ export default function ReportsPage({ user }: ReportsPageProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={async () => {
+                    if (reportRef.current) {
+                      await exportElementToPDF(reportRef.current, `reporte-${selectedPeriod}.pdf`)
+                    }
+                  }}>
                     <Download className="h-4 w-4 mr-2" />
                     Reporte PDF
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={() => {
+                    const sheets = [
+                      { name: 'Resumen', rows: [mockStats] },
+                      { name: 'Categorias', rows: categoryData },
+                      { name: 'Tendencia', rows: trendData },
+                      { name: 'Distribucion', rows: distributionData }
+                    ]
+                    exportObjectsToExcel(sheets, `reporte-${selectedPeriod}.xlsx`)
+                  }}>
                     <Download className="h-4 w-4 mr-2" />
                     Datos Excel
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={async () => {
+                    if (reportRef.current) {
+                      await exportElementToPNG(reportRef.current, `graficos-${selectedPeriod}.png`)
+                    }
+                  }}>
                     <Download className="h-4 w-4 mr-2" />
                     Gráficos PNG
                   </Button>

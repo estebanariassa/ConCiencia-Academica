@@ -13,6 +13,8 @@ interface User {
   permissions?: string[]
   role_description?: string
   roles?: string[] // Roles múltiples
+  multiple_roles?: boolean
+  selected_role?: string
 }
 
 interface AuthContextType {
@@ -209,7 +211,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Función para verificar si el usuario tiene un rol específico
   const hasRole = (role: string): boolean => {
     if (!user) return false
-    return user.roles?.includes(role) || user.tipo_usuario === role
+    const normalize = (r?: string) => (r || '').toLowerCase()
+    const synonyms: Record<string, string[]> = {
+      coordinador: ['coordinador', 'coordinator'],
+      profesor: ['profesor', 'docente', 'teacher'],
+      estudiante: ['estudiante', 'student'],
+      decano: ['decano', 'dean'],
+      admin: ['admin', 'administrator']
+    }
+    const matches = (target: string, candidate?: string) => {
+      const t = normalize(target)
+      const c = normalize(candidate)
+      return t === c || (synonyms[t] && synonyms[t].includes(c))
+    }
+    // Preferir el rol activo/seleccionado si existe
+    if (matches(role, user.selected_role)) return true
+    if (matches(role, user.tipo_usuario)) return true
+    // Solo considerar lista de roles si realmente el usuario tiene múltiples roles
+    if (user.multiple_roles || (user.roles && user.roles.length > 1)) {
+      return (user.roles || []).some(r => matches(role, r))
+    }
+    return false
   }
 
   // Función para verificar si el usuario tiene un permiso específico

@@ -26,8 +26,9 @@ import {
   Star,
   BookOpen
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fetchCareerSubjects, fetchAllCareerResults, fetchCareerResults } from '../api/teachers';
+import { exportElementToPDF, exportElementToPNG, exportObjectsToExcel } from '../utils/export';
 
 // Importar la imagen de fondo
 const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
@@ -38,6 +39,7 @@ interface CareerResultsPageProps {
 
 export default function CareerResultsPage({ user }: CareerResultsPageProps) {
   const navigate = useNavigate();
+  const reportRef = useRef<HTMLDivElement | null>(null);
   const [careers, setCareers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOption, setSelectedOption] = useState<'all' | 'specific' | null>(null);
@@ -141,7 +143,7 @@ export default function CareerResultsPage({ user }: CareerResultsPageProps) {
         <Header user={currentUser} />
 
         {/* Contenido principal */}
-        <main className="container mx-auto px-4 py-8">
+        <main ref={reportRef} className="container mx-auto px-4 py-8">
           {/* Encabezado */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -445,15 +447,28 @@ export default function CareerResultsPage({ user }: CareerResultsPageProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={async () => {
+                    if (reportRef.current) {
+                      await exportElementToPDF(reportRef.current, 'resultados-carreras.pdf')
+                    }
+                  }}>
                     <Download className="h-4 w-4 mr-2" />
                     Reporte PDF
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={() => {
+                    const sheets = [
+                      { name: 'Carreras', rows: careers.map((c) => ({ id: c.id, nombre: c.nombre, materias: c.total_materias || 0 })) }
+                    ]
+                    exportObjectsToExcel(sheets, 'resultados-carreras.xlsx')
+                  }}>
                     <Download className="h-4 w-4 mr-2" />
                     Datos Excel
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={async () => {
+                    if (reportRef.current) {
+                      await exportElementToPNG(reportRef.current, 'graficos-carreras.png')
+                    }
+                  }}>
                     <Download className="h-4 w-4 mr-2" />
                     Gráficos PNG
                   </Button>
