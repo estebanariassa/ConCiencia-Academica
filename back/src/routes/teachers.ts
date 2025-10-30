@@ -1479,7 +1479,7 @@ router.get('/by-career/:careerId', authenticateToken, async (req: any, res) => {
         .from('asignaciones_profesor')
         .select('id, profesor_id, curso_id, activa')
         .in('profesor_id', profesorIds.length ? profesorIds : ['00000000-0000-0000-0000-000000000000'])
-        .eq('activo', true)
+        .eq('activa', true)
       
       console.log('🔍 Respuesta de asignaciones_profesor:', resp)
       
@@ -1519,16 +1519,8 @@ router.get('/by-career/:careerId', authenticateToken, async (req: any, res) => {
       console.log('🔎 Cursos encontrados de asignaciones:', cursos?.length || 0)
       console.log('🔎 Cursos encontrados:', cursos?.map(c => ({ id: c.id, nombre: c.nombre, carrera_id: c.carrera_id })))
     } else {
-      console.log('⚠️ No hay cursoIds de asignaciones, cargando TODOS los cursos de la carrera')
-      // Cargar TODOS los cursos de la carrera como fallback
-      const { data: todosLosCursos, error: todosLosCursosErr } = await SupabaseDB.supabaseAdmin
-        .from('cursos')
-        .select('id, nombre, codigo, carrera_id')
-        .or(`carrera_id.eq.${careerId},carrera_id.eq.8`) // Carrera específica + tronco común
-      console.log('🔍 Respuesta de TODOS los cursos de la carrera:', { data: todosLosCursos, error: todosLosCursosErr })
-      if (!todosLosCursosErr) cursos = todosLosCursos || []
-      console.log('🔎 TODOS los cursos de la carrera cargados:', cursos?.length || 0)
-      console.log('🔎 TODOS los cursos:', cursos?.map(c => ({ id: c.id, nombre: c.nombre, carrera_id: c.carrera_id })))
+      console.log('⚠️ No hay cursoIds de asignaciones; no se cargarán cursos adicionales. Se mostrará vacío para no exponer materias no asignadas.')
+      cursos = []
     }
     console.log('🔎 Cursos filtrados por carrera cargados:', cursos?.length || 0)
     const cursoById = new Map((cursos || []).map((c: any) => [c.id, c]))
@@ -1571,22 +1563,8 @@ router.get('/by-career/:careerId', authenticateToken, async (req: any, res) => {
         })
         .filter(Boolean)
       
-      // Si no hay cursos de asignaciones, mostrar TODOS los cursos de la carrera
-      let cursosProf = cursosDeAsignaciones
-      if (cursosDeAsignaciones.length === 0) {
-        console.log(`🔍 DEBUG: No hay asignaciones para ${p.usuarios?.nombre}, mostrando todos los cursos de la carrera`)
-        cursosProf = (cursos || [])
-          .filter((c: any) => {
-            // Incluir cursos de la carrera específica Y cursos de tronco común (id_carrera = 8)
-            const isCoordinatorCareer = c.carrera_id === parseInt(careerId)
-            const isCommonTrunk = c.carrera_id === 8
-            return isCoordinatorCareer || isCommonTrunk
-          })
-          .map((c: any) => ({
-            ...c,
-            calificacion_promedio: null
-          }))
-      }
+      // Mostrar únicamente cursos provenientes de asignaciones; si no hay, lista vacía
+      const cursosProf = cursosDeAsignaciones
       
       console.log(`🔍 DEBUG: cursosProf final para ${p.usuarios?.nombre}:`, cursosProf)
       return {
@@ -1598,7 +1576,7 @@ router.get('/by-career/:careerId', authenticateToken, async (req: any, res) => {
         nombre: p.usuarios?.nombre || '',
         apellido: p.usuarios?.apellido || '',
         email: p.usuarios?.email || '',
-        activo: p.activo,
+        activa: p.activo,
         cursos: cursosProf
       }
     })
@@ -2408,7 +2386,7 @@ router.get('/:teacherId/courses', authenticateToken, async (req: any, res) => {
           codigo,
           creditos,
           descripcion,
-          activa,
+          activo,
           carrera_id,
           carreras:carreras(
             id,

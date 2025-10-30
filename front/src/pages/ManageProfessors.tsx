@@ -241,8 +241,17 @@ export default function ManageProfessors() {
 
   const viewSurveyResults = () => {
     if (selectedCourse && selectedProfessor && selectedGroup) {
-      // Navegar a página de resultados de encuestas con grupo específico
-      navigate(`/reports/survey-results?courseId=${selectedCourse.id}&professorId=${selectedProfessor.id}&groupId=${selectedGroup.id}`)
+      // Navegar a página de resultados con estado para evitar mocks
+      navigate(
+        `/reports/survey-results?courseId=${selectedCourse.id}&professorId=${selectedProfessor.id}&groupId=${selectedGroup.id}`,
+        {
+          state: {
+            professor: selectedProfessor,
+            course: selectedCourse,
+            group: selectedGroup,
+          }
+        }
+      )
     }
   }
 
