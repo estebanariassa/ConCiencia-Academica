@@ -147,7 +147,7 @@ export default function CareerResultsPage({ user }: CareerResultsPageProps) {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="mb-8"
+            className="mb-8 bg-white bg-opacity-95 rounded-lg shadow-md p-4"
           >
             <div className="flex items-center gap-4 mb-4">
               <Button

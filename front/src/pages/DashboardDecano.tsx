@@ -19,7 +19,8 @@ import {
   GraduationCap,
   TrendingUp,
   Building2,
-  Bell
+  Bell,
+  ChevronRight
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { fetchProfessorSubjects, fetchDetailedFacultyProfessors } from '../api/teachers';
@@ -466,29 +467,53 @@ export default function DashboardDecano({ user }: DashboardDecanoProps) {
 
             {/* Columna lateral */}
             <div className="space-y-8">
-              {/* Resumen de Actividad */}
+              {/* Top Carreras */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.9 }}
               >
-                <SectionCard title="Resumen de Actividad" icon={TrendingUp}>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Evaluaciones este mes</span>
-                      <span className="font-semibold text-gray-900">156</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Promedio facultad</span>
-                      <span className="font-semibold text-gray-900">4.3/5.0</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Carreras activas</span>
-                      <span className="font-semibold text-gray-900">{careers.length}</span>
-                    </div>
+                <SectionCard title="Carreras Destacadas" icon={GraduationCap}>
+                  <div className="space-y-3">
+                    {careers.length > 0 ? (
+                      careers
+                        .map((career: any) => ({
+                          ...career,
+                          professorCount: professorsByCareer[career.id.toString()]?.length || 0
+                        }))
+                        .sort((a: any, b: any) => b.professorCount - a.professorCount)
+                        .slice(0, 3)
+                        .map((career: any, index: number) => (
+                          <div
+                            key={career.id}
+                            className="flex items-center gap-3 p-3 bg-gradient-to-r from-red-50 to-white rounded-lg border border-red-100 hover:border-red-300 transition-colors cursor-pointer"
+                            onClick={() => navigate('/professors')}
+                          >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${
+                              index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : 'bg-amber-600'
+                            }`}>
+                              {index + 1}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900 text-sm">{career.nombre}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Users className="h-3 w-3 text-gray-500" />
+                                <span className="text-xs text-gray-600">{career.professorCount} profesores</span>
+                              </div>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-gray-400" />
+                          </div>
+                        ))
+                    ) : (
+                      <div className="text-center py-4 text-gray-500 text-sm">
+                        Cargando datos de carreras...
+                      </div>
+                    )}
                   </div>
                 </SectionCard>
               </motion.div>
+
+              
             </div>
           </div>
         </main>

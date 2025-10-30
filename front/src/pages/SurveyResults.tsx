@@ -44,6 +44,10 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 
 // Importar la imagen de fondo
 const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
@@ -228,6 +232,166 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
       </div>
     );
   }
+
+  // Funciones de exportación
+  const exportToExcel = () => {
+    if (!surveyData) return;
+
+    const workbook = XLSX.utils.book_new();
+    
+    // Hoja 1: Resumen general
+    const summaryData = [
+      ['Información General'],
+      ['Profesor', professorInfo?.name || 'N/A'],
+      ['Curso', `${courseInfo?.name || 'N/A'} (${courseInfo?.code || 'N/A'})`],
+      ['Grupo', `Grupo ${groupInfo?.number || 'N/A'}`],
+      ['Período', selectedPeriod],
+      [''],
+      ['Estadísticas'],
+      ['Total Evaluaciones', surveyData.totalEvaluations],
+      ['Calificación Promedio', `${surveyData.averageRating}/5.0`],
+      ['Tasa de Respuesta', `${surveyData.responseRate}%`],
+      ['Estudiantes Evaluadores', surveyData.totalEvaluations],
+    ];
+
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen');
+
+    // Hoja 2: Calificaciones por categoría
+    const categoryHeaders = [['Categoría', 'Calificación', 'Total Evaluaciones']];
+    const categoryRows = surveyData.categoryData.map((cat: any) => [
+      cat.category,
+      cat.rating,
+      cat.total
+    ]);
+    const categoryData = [...categoryHeaders, ...categoryRows];
+    const categorySheet = XLSX.utils.aoa_to_sheet(categoryData);
+    XLSX.utils.book_append_sheet(workbook, categorySheet, 'Calificaciones por Categoría');
+
+    // Hoja 3: Tendencia histórica
+    const trendHeaders = [['Período', 'Calificación']];
+    const trendRows = surveyData.trendData.map((t: any) => [t.period, t.rating]);
+    const trendData = [...trendHeaders, ...trendRows];
+    const trendSheet = XLSX.utils.aoa_to_sheet(trendData);
+    XLSX.utils.book_append_sheet(workbook, trendSheet, 'Tendencia Histórica');
+
+    // Hoja 4: Distribución de calificaciones
+    const distHeaders = [['Nivel', 'Cantidad', 'Porcentaje']];
+    const totalDist = surveyData.distributionData.reduce((sum: number, d: any) => sum + d.value, 0);
+    const distRows = surveyData.distributionData.map((d: any) => [
+      d.name,
+      d.value,
+      `${((d.value / totalDist) * 100).toFixed(1)}%`
+    ]);
+    const distData = [...distHeaders, ...distRows];
+    const distSheet = XLSX.utils.aoa_to_sheet(distData);
+    XLSX.utils.book_append_sheet(workbook, distSheet, 'Distribución');
+
+    // Guardar archivo
+    const fileName = `Resultados_Encuesta_${courseInfo?.code || 'curso'}_${selectedPeriod}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  };
+
+  const exportToPDF = () => {
+    if (!surveyData) return;
+
+    const doc = new jsPDF();
+    let yPos = 20;
+
+    // Título
+    doc.setFontSize(18);
+    doc.setTextColor(227, 6, 19); // Color rojo de la universidad
+    doc.text('Resultados de Encuesta', 105, yPos, { align: 'center' });
+    yPos += 10;
+
+    // Información general
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Profesor: ${professorInfo?.name || 'N/A'}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Curso: ${courseInfo?.name || 'N/A'} (${courseInfo?.code || 'N/A'})`, 20, yPos);
+    yPos += 7;
+    doc.text(`Grupo: ${groupInfo?.number || 'N/A'} - Período: ${selectedPeriod}`, 20, yPos);
+    yPos += 15;
+
+    // Estadísticas principales
+    doc.setFontSize(14);
+    doc.text('Estadísticas Principales', 20, yPos);
+    yPos += 10;
+
+    const statsData = [
+      ['Total Evaluaciones', surveyData.totalEvaluations],
+      ['Calificación Promedio', `${surveyData.averageRating}/5.0`],
+      ['Tasa de Respuesta', `${surveyData.responseRate}%`],
+      ['Estudiantes Evaluadores', surveyData.totalEvaluations],
+    ];
+
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['Métrica', 'Valor']],
+      body: statsData,
+      theme: 'striped',
+      headStyles: { fillColor: [227, 6, 19] },
+    });
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    // Calificaciones por categoría
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.text('Calificaciones por Categoría', 20, yPos);
+    yPos += 10;
+
+    const categoryTableData = surveyData.categoryData.map((cat: any) => [
+      cat.category,
+      `${cat.rating}/5.0`,
+      cat.total.toString()
+    ]);
+
+    (doc as any).autoTable({
+      startY: yPos,
+      head: [['Categoría', 'Calificación', 'Total']],
+      body: categoryTableData,
+      theme: 'striped',
+      headStyles: { fillColor: [227, 6, 19] },
+    });
+
+    // Guardar archivo
+    const fileName = `Resultados_Encuesta_${courseInfo?.code || 'curso'}_${selectedPeriod}.pdf`;
+    doc.save(fileName);
+  };
+
+  const exportChartsToPNG = async () => {
+    const charts = document.querySelectorAll('.recharts-wrapper');
+    if (charts.length === 0) {
+      alert('No se encontraron gráficos para exportar');
+      return;
+    }
+
+    try {
+      // Exportar cada gráfico
+      for (let i = 0; i < charts.length; i++) {
+        const chart = charts[i] as HTMLElement;
+        const canvas = await html2canvas(chart, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          logging: false,
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `Grafico_${i + 1}_${courseInfo?.code || 'curso'}_${selectedPeriod}.png`;
+        link.href = imgData;
+        link.click();
+      }
+    } catch (error) {
+      console.error('Error exportando gráficos:', error);
+      alert('Error al exportar los gráficos');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -604,15 +768,15 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={exportToPDF}>
                     <Download className="h-4 w-4 mr-2" />
                     Reporte PDF
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={exportToExcel}>
                     <Download className="h-4 w-4 mr-2" />
                     Datos Excel
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full" onClick={exportChartsToPNG}>
                     <Download className="h-4 w-4 mr-2" />
                     Gráficos PNG
                   </Button>
