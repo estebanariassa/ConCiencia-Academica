@@ -13,7 +13,8 @@ import {
   FaEnvelope,
   FaLock,
   FaExclamationCircle,
-  FaUserCheck
+  FaUserCheck,
+  FaUserTie
 } from 'react-icons/fa'
 
 // Importación corregida usando new URL()
@@ -155,7 +156,7 @@ export default function Login() {
       case 'coordinator':
         return <FaCog className={size} />
       case 'decano':
-        return <FaCog className={size} />
+        return <FaUserTie className={size} />
       default:
         return <FaGraduationCap className={size} />
     }
@@ -186,6 +187,8 @@ export default function Login() {
         return <FaChalkboardTeacher className={size} />
       case 'coordinador':
         return <FaCog className={size} />
+      case 'decano':
+        return <FaUserTie className={size} />
       case 'admin':
         return <FaUserCheck className={size} />
       default:

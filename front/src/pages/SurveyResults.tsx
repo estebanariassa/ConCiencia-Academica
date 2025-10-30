@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   CardHeader, 
@@ -51,6 +51,7 @@ import html2canvas from 'html2canvas';
 
 // Importar la imagen de fondo
 const fondo = new URL('../assets/fondo.webp', import.meta.url).href;
+import { exportElementToPDF, exportElementToPNG, exportObjectsToExcel } from '../utils/export';
 
 interface SurveyResultsProps {
   user: User;
@@ -58,7 +59,7 @@ interface SurveyResultsProps {
 
 export default function SurveyResults({ user }: SurveyResultsProps) {
   const navigate = useNavigate();
-  const location = useLocation();
+  const reportRef = useRef<HTMLDivElement | null>(null);
   const [searchParams] = useSearchParams();
   const [selectedPeriod, setSelectedPeriod] = useState('2025-2');
   
@@ -414,7 +415,7 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
         {/* Usamos el componente Header */}
         <Header user={user} />
 
-        <main className="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
+        <main ref={reportRef} className="max-w-7xl mx-auto p-4 lg:p-6 space-y-6">
           {/* Header interno con botón de volver y información del contexto */}
           <motion.header
             initial={{ y: -20, opacity: 0 }}
@@ -451,7 +452,11 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
                   <option value="2023-1">2023-1</option>
                 </select>
                 
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={async () => {
+                  if (reportRef.current) {
+                    await exportElementToPDF(reportRef.current, `encuesta-${selectedPeriod}.pdf`)
+                  }
+                }}>
                   <Download className="h-4 w-4 mr-2" />
                   Exportar
             </Button>
@@ -768,15 +773,37 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Button variant="outline" className="w-full" onClick={exportToPDF}>
+                  <Button variant="outline" className="w-full" onClick={async () => {
+                    if (reportRef.current) {
+                      await exportElementToPDF(reportRef.current, `encuesta-${selectedPeriod}.pdf`)
+                    }
+                  }}>
                     <Download className="h-4 w-4 mr-2" />
                     Reporte PDF
                   </Button>
-                  <Button variant="outline" className="w-full" onClick={exportToExcel}>
+                  <Button variant="outline" className="w-full" onClick={() => {
+                    if (!surveyData) return;
+                    const sheets = [
+                      { name: 'Resumen', rows: [{
+                        totalEvaluations: surveyData.totalEvaluations,
+                        averageRating: surveyData.averageRating,
+                        responseRate: surveyData.responseRate,
+                        period: selectedPeriod
+                      }] },
+                      { name: 'Categorias', rows: surveyData.categoryData || [] },
+                      { name: 'Tendencia', rows: surveyData.trendData || [] },
+                      { name: 'Distribucion', rows: surveyData.distributionData || [] }
+                    ]
+                    exportObjectsToExcel(sheets, `encuesta-${selectedPeriod}.xlsx`)
+                  }}>
                     <Download className="h-4 w-4 mr-2" />
                     Datos Excel
                   </Button>
-                  <Button variant="outline" className="w-full" onClick={exportChartsToPNG}>
+                  <Button variant="outline" className="w-full" onClick={async () => {
+                    if (reportRef.current) {
+                      await exportElementToPNG(reportRef.current, `graficos-encuesta-${selectedPeriod}.png`)
+                    }
+                  }}>
                     <Download className="h-4 w-4 mr-2" />
                     Gráficos PNG
                   </Button>
