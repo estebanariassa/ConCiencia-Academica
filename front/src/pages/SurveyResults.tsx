@@ -47,6 +47,7 @@ import {
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import AISummaryCard from '../components/AISummaryCard';
 import html2canvas from 'html2canvas';
 
 // Importar la imagen de fondo
@@ -145,6 +146,18 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
             { subject: 'Evaluación', A: 4.3, fullMark: 5 },
             { subject: 'Trato', A: 4.6, fullMark: 5 },
             { subject: 'Motivación', A: 3.9, fullMark: 5 }
+          ],
+          openResponses: [
+            'El ritmo de la clase es muy rápido y a veces cuesta seguir.',
+            'Me gustan los ejemplos prácticos, ayudan a entender mejor.',
+            'Falta un poco de claridad en las explicaciones de algunos temas.',
+            'Sería bueno tener más tiempo para resolver dudas al final de clase.',
+            'El profesor domina el tema, pero podría mejorar la distribución del tiempo.',
+            'Los materiales son buenos, pero a veces llegan tarde.',
+            'El sistema de evaluación no refleja del todo el aprendizaje.',
+            'Se agradece la disponibilidad del profesor para atender fuera de clase.',
+            'Más ejercicios guiados ayudarían a consolidar los contenidos.',
+            'Buen trato, pero el ritmo podría ser más pausado.'
           ]
         };
 
@@ -393,6 +406,7 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
       alert('Error al exportar los gráficos');
     }
   };
+
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -810,6 +824,16 @@ export default function SurveyResults({ user }: SurveyResultsProps) {
                 </div>
               </CardContent>
             </Card>
+          </motion.div>
+        </main>
+        {/* Card de IA: reutilizable en cualquier página */}
+        <main className="max-w-7xl mx-auto p-4 lg:p-6">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1 }}>
+            <AISummaryCard
+              texts={surveyData?.openResponses || []}
+              title="Resumen automático de respuestas abiertas (IA)"
+              description="Generado con Hugging Face y extracción local de temas"
+            />
           </motion.div>
         </main>
       </div>

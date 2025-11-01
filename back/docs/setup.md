@@ -115,3 +115,32 @@ El esquema incluye las siguientes tablas principales:
 - Validación de datos con Zod
 - CORS habilitado para desarrollo
 
+## IA: Resumen de respuestas abiertas (Google Gemini)
+
+1. **Obtén tu API key GRATIS**:
+   - Ve a https://makersuite.google.com/app/apikey
+   - Inicia sesión con tu cuenta de Google
+   - Crea una nueva API key (es gratuita, tier generoso)
+
+2. **Configura en `back/.env`**:
+   ```env
+   GOOGLE_GEMINI_API_KEY=tu_api_key_aqui
+   ```
+
+3. **Endpoints disponibles** (requiere JWT con rol docente/admin/coordinador/decano):
+   - `POST /api/ai/summarize` - Resumir textos directamente
+   - `GET /api/ai/summarize/by-professor?profesor_id=...&periodo_id=...`
+   - `GET /api/ai/summarize/by-career?carrera_id=...&periodo_id=...`
+   - `GET /api/ai/summarize/by-faculty?periodo_id=...`
+
+4. **Implementación**:
+   - **Resumen**: Generado por Google Gemini 2.5 Flash (modelo gratuito, excelente calidad)
+   - **Temas**: Extracción local inteligente + temas sugeridos por Gemini
+   - **Fallback**: Si Gemini no está disponible, usa resumen local inteligente
+
+5. **Ventajas de Gemini**:
+   - ✅ Tier gratuito generoso (60 requests/minuto)
+   - ✅ Excelente calidad en español
+   - ✅ Sin costos ocultos
+   - ✅ Respuestas contextuales y coherentes
+

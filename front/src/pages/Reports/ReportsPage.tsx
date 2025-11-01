@@ -55,6 +55,8 @@ import {
 // Importar la imagen de fondo
 const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
 import { exportElementToPDF, exportElementToPNG, exportObjectsToExcel } from '../../utils/export';
+import AISummaryCard from '../../components/AISummaryCard';
+import { apiClient } from '../../api/client';
 
 interface ReportsPageProps {
   user: User;
@@ -122,6 +124,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
         console.log('🔍 Loading teacher stats for reports, user ID:', user.id, 'period:', selectedPeriod);
         // Obtener el ID real del profesor desde el backend
         const tId = await fetchTeacherId();
+        console.log('✅ Teacher ID obtenido:', tId);
         setTeacherId(tId);
 
         // Cargar en paralelo: histórico y stats base
@@ -224,13 +227,24 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   const competencyData = competencyDataWithMock.data;
   const isUsingMockData = categoryDataWithMock.isMock || trendDataWithMock.isMock;
 
-  // Usar datos de competencias (radar) - siempre usar datos de ejemplo por ahora
-  const radarData = debugRadarData();
+  // Radar: usar datos reales de categorías si están disponibles, sino usar mock
+  const realRadarData = categoryStats.length > 0
+    ? categoryStats
+        .slice(0, 6) // Limitar a 6 categorías para mejor visualización
+        .map((c: any) => ({
+          subject: c.nombre?.substring(0, 12) || `Cat.${c.categoriaId}`, // Acortar nombres
+          A: Number(c.promedio) || 0,
+          fullMark: 5
+        }))
+        .filter((d: any) => d.A > 0) // Solo categorías con datos
+    : [];
+
+  const radarData = realRadarData.length > 0 ? realRadarData : debugRadarData();
   
   // Debug: verificar datos del radar
-  console.log('🔍 Radar data:', radarData);
-  console.log('🔍 Mock competency data:', mockCompetencyData);
-  console.log('🔍 Radar data length:', radarData.length);
+  console.log('🔍 Radar data (real):', realRadarData);
+  console.log('🔍 Radar data (final):', radarData);
+  console.log('🔍 Category stats:', categoryStats);
 
   // Distribución de calificaciones (usar datos de ejemplo si no hay datos reales)
   const realDistributionData = baseTeacherStats?.totalEvaluaciones > 0 ? [
@@ -246,6 +260,16 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   const distributionData = distributionDataWithMock.data;
 
   const departmentData: any[] = [];
+  
+  // El backend ahora acepta el formato YYYY-X directamente
+  const periodoId = selectedPeriod; // Ya está en formato YYYY-X
+  
+  // Debug: Log para verificar valores
+  useEffect(() => {
+    if (user.type === 'teacher') {
+      console.log('🔍 [ReportsPage] Teacher ID state:', { teacherId, userId: user.id, periodoId, loadingStats })
+    }
+  }, [teacherId, user.id, periodoId, loadingStats, user.type])
 
   // Cards SIEMPRE desde stats base (independientes del histórico)
   const mockStats = {
@@ -651,9 +675,12 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                           cy="50%"
                           outerRadius={140}
                           dataKey="value"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          label={({ name, percent }: any) => {
+                            const p = typeof percent === 'number' ? percent : 0
+                            return `${name ?? ''}: ${(p * 100).toFixed(0)}%`
+                          }}
                         >
-                          {distributionData.map((entry, index) => (
+                          {distributionData.map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
@@ -666,11 +693,89 @@ export default function ReportsPage({ user }: ReportsPageProps) {
             </motion.div>
           </div>
 
-          {/* Export Options */}
+          {/* IA: Resumen de respuestas abiertas */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1 }}
+          >
+            {(() => {
+              const currentPeriod = periodoId || selectedPeriod
+              const currentProfesorId = teacherId || user.id
+              
+              console.log('🔍 [ReportsPage] Renderizando AISummaryCard:', {
+                userType: user.type,
+                teacherId,
+                currentProfesorId,
+                periodoId: currentPeriod,
+                userId: user.id,
+                selectedPeriod
+              })
+              
+              // Para teachers: siempre mostrar con endpoint by-professor
+              if (user.type === 'teacher') {
+                return (
+                  <AISummaryCard
+                    endpoint="by-professor"
+                    params={{
+                      profesor_id: currentProfesorId,
+                      periodo_id: currentPeriod
+                    }}
+                    title="Resumen IA (Mis cursos)"
+                    description="Generado con Google Gemini y extracción local de temas"
+                  />
+                )
+              }
+              
+              // Para coordinadores: usar by-career (solo su carrera)
+              if (user.type === 'coordinator') {
+                return (
+                  <AISummaryCard
+                    endpoint="by-career"
+                    params={{
+                      periodo_id: currentPeriod
+                    }}
+                    title="Resumen IA (Mi Carrera)"
+                    description="Generado con Google Gemini y extracción local de temas - Todas las evaluaciones de tu carrera"
+                  />
+                )
+              }
+              
+              // Para decanos: usar by-faculty (toda la facultad)
+              if (user.type === 'decano') {
+                return (
+                  <AISummaryCard
+                    endpoint="by-faculty"
+                    params={{
+                      periodo_id: currentPeriod
+                    }}
+                    title="Resumen IA (Facultad de Ingeniería)"
+                    description="Generado con Google Gemini y extracción local de temas - Todas las evaluaciones de la facultad"
+                  />
+                )
+              }
+              
+              // Fallback: para cualquier otro tipo, intentar usar by-professor con user.id
+              console.warn('⚠️ [ReportsPage] Tipo de usuario no reconocido:', user.type, '- Usando fallback')
+              return (
+                <AISummaryCard
+                  endpoint="by-professor"
+                  params={{
+                    profesor_id: user.id,
+                    periodo_id: currentPeriod
+                  }}
+                  title="Resumen IA"
+                  description="Generado con Google Gemini y extracción local de temas"
+                />
+              )
+            })()}
+          </motion.div>
+
+          {/* Export Options */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.1 }}
           >
             <Card className="bg-white shadow-md border border-gray-200">
               <CardHeader>
