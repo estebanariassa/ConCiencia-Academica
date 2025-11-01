@@ -3,7 +3,11 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 export type AiSummaryResult = {
   summary: string
   topics: string[]
+  acosoDetectado?: boolean
+  mensajeAcoso?: string
 }
+
+export type SummaryContext = 'profesor' | 'coordinador' | 'decano'
 
 // Inicializar Gemini API
 const genAI = process.env.GOOGLE_GEMINI_API_KEY 
@@ -99,9 +103,39 @@ function generateSmartSummary(responses: string[]): string {
 }
 
 export class AiService {
-  static async summarizeOpenResponses(responses: string[]): Promise<AiSummaryResult> {
+  static async summarizeOpenResponses(responses: string[], context: SummaryContext = 'profesor'): Promise<AiSummaryResult> {
     // Extraer temas por frecuencia local (SIEMPRE funciona, gratis)
     const topics = extractTopKeywords(responses, 10)
+    
+    // Detectar posibles menciones de acoso
+    const acosoKeywords = [
+      'acoso', 'harassment', 'hostigamiento', 'abus', 'maltrato', 'intimidación',
+      'inapropiado', 'inadecuado', 'abusivo', 'violencia', 'amenaza', 'amenaz',
+      'miedo', 'temor', 'inseguro', 'insegura', 'incomodo', 'incómodo', 'disgusto',
+      'vergüenza', 'vergüenza', 'humillación', 'humillar', 'denunciar', 'queja grave',
+      'comportamiento inapropiado', 'comentario inapropiado', 'tocamiento', 'tocar',
+      'agresión', 'agredir', 'ofensa sexual', 'insinuación', 'insinuar'
+    ]
+    
+    let acosoDetectado = false
+    let mensajeAcoso = ''
+    const textosConAcoso: string[] = []
+    
+    for (const respuesta of responses) {
+      const lowerRespuesta = normalizeText(respuesta)
+      for (const keyword of acosoKeywords) {
+        if (lowerRespuesta.includes(normalizeText(keyword))) {
+          acosoDetectado = true
+          textosConAcoso.push(respuesta)
+          break
+        }
+      }
+    }
+    
+    if (acosoDetectado) {
+      mensajeAcoso = `⚠️ ALERTA: Se detectaron menciones que podrían referirse a situaciones de acoso o comportamiento inapropiado en ${textosConAcoso.length} respuesta(s). Se recomienda revisar estas respuestas inmediatamente y tomar las acciones correspondientes según los protocolos institucionales.`
+      console.warn('🚨 [AI Service] Posible acoso detectado:', textosConAcoso.length, 'respuesta(s)')
+    }
     
     // Intentar usar Gemini API si está disponible
     let aiSummary = ''
@@ -112,12 +146,55 @@ export class AiService {
           model: 'gemini-2.5-flash',
           generationConfig: { 
             temperature: 0.3,
-            maxOutputTokens: 500
+            maxOutputTokens: 600
           } 
         })
         
         const joined = responses.slice(0, 50).join('\n- ') // Limitar a 50 respuestas para no exceder tokens
-        const prompt = `Eres un asistente experto en análisis de retroalimentación educativa. 
+        
+        // Generar prompt según el contexto
+        let contextoPrompt = ''
+        if (context === 'coordinador') {
+          contextoPrompt = `Eres un asistente experto en análisis de retroalimentación educativa. Estás analizando las opiniones de estudiantes sobre TODOS los profesores de una carrera completa. 
+
+Analiza las siguientes opiniones de estudiantes sobre su experiencia académica con los profesores de la carrera y genera:
+
+1. Un resumen conciso (2-3 oraciones) que capture los puntos más importantes mencionados por los estudiantes sobre los profesores en general de la carrera.
+2. Una lista de 5-10 temas o palabras clave más relevantes mencionados por los estudiantes sobre todos los profesores (separados por comas).
+
+IMPORTANTE: 
+- Habla en general sobre los profesores de la carrera, no sobre un profesor específico.
+- El resumen debe reflejar las opiniones generales sobre todos los profesores.
+- Responde SOLO en español y en este formato exacto:
+Resumen: [tu resumen aquí]
+Temas: [tema1, tema2, tema3, ...]
+
+⚠️ DETECCIÓN DE ACOSO: Si detectas cualquier mención relacionada con acoso, hostigamiento, comportamiento inapropiado, violencia, abuso, intimidación, o cualquier situación que pueda representar un riesgo para los estudiantes, DEBES incluirlo claramente en el resumen con una mención destacada.
+
+Opiniones de estudiantes sobre los profesores de la carrera:
+${joined}`
+        } else if (context === 'decano') {
+          contextoPrompt = `Eres un asistente experto en análisis de retroalimentación educativa. Estás analizando las opiniones de estudiantes sobre TODOS los profesores de una facultad completa. 
+
+Analiza las siguientes opiniones de estudiantes sobre su experiencia académica con los profesores de la facultad y genera:
+
+1. Un resumen conciso (2-3 oraciones) que capture los puntos más importantes mencionados por los estudiantes sobre los profesores en general de la facultad.
+2. Una lista de 5-10 temas o palabras clave más relevantes mencionados por los estudiantes sobre todos los profesores (separados por comas).
+
+IMPORTANTE: 
+- Habla en general sobre los profesores de la facultad, no sobre profesores específicos.
+- El resumen debe reflejar las opiniones generales sobre todos los profesores.
+- Responde SOLO en español y en este formato exacto:
+Resumen: [tu resumen aquí]
+Temas: [tema1, tema2, tema3, ...]
+
+⚠️ DETECCIÓN DE ACOSO: Si detectas cualquier mención relacionada con acoso, hostigamiento, comportamiento inapropiado, violencia, abuso, intimidación, o cualquier situación que pueda representar un riesgo para los estudiantes, DEBES incluirlo claramente en el resumen con una mención destacada.
+
+Opiniones de estudiantes sobre los profesores de la facultad:
+${joined}`
+        } else {
+          // Contexto por defecto: profesor individual
+          contextoPrompt = `Eres un asistente experto en análisis de retroalimentación educativa. 
 
 Analiza las siguientes opiniones de estudiantes sobre su experiencia académica y genera:
 
@@ -128,10 +205,13 @@ IMPORTANTE: Responde SOLO en español y en este formato exacto:
 Resumen: [tu resumen aquí]
 Temas: [tema1, tema2, tema3, ...]
 
+⚠️ DETECCIÓN DE ACOSO: Si detectas cualquier mención relacionada con acoso, hostigamiento, comportamiento inapropiado, violencia, abuso, intimidación, o cualquier situación que pueda representar un riesgo para los estudiantes, DEBES incluirlo claramente en el resumen con una mención destacada.
+
 Opiniones de estudiantes:
 ${joined}`
+        }
 
-        const result = await model.generateContent(prompt)
+        const result = await model.generateContent(contextoPrompt)
         const response = await result.response
         const text = response.text()
         
@@ -153,7 +233,21 @@ ${joined}`
             
             // Combinar temas de IA con temas locales (priorizando IA)
             const combinedTopics = [...new Set([...temasIA, ...topics.slice(0, 5)])].slice(0, 10)
-            return { summary: aiSummary, topics: combinedTopics }
+            
+            // Agregar mensaje de acoso si se detectó
+            if (acosoDetectado && mensajeAcoso) {
+              // Incluir el mensaje de acoso en el resumen si no está ya incluido
+              if (!aiSummary.includes('acoso') && !aiSummary.includes('Acoso')) {
+                aiSummary = `⚠️ ALERTA DE ACOSO: ${mensajeAcoso}\n\n${aiSummary}`
+              }
+            }
+            
+            return { 
+              summary: aiSummary, 
+              topics: combinedTopics,
+              acosoDetectado,
+              mensajeAcoso: acosoDetectado ? mensajeAcoso : undefined
+            }
           }
         } else {
           // Si no viene en formato esperado, usar el texto completo como resumen
@@ -172,9 +266,19 @@ ${joined}`
     const localSummary = generateSmartSummary(responses)
     
     // Preferir resumen de IA si está disponible, sino usar local
-    const summary = aiSummary.trim() || localSummary
+    let summary = aiSummary.trim() || localSummary
     
-    return { summary, topics }
+    // Agregar mensaje de acoso si se detectó y no está en el resumen
+    if (acosoDetectado && mensajeAcoso && !summary.includes('acoso') && !summary.includes('Acoso')) {
+      summary = `⚠️ ALERTA DE ACOSO: ${mensajeAcoso}\n\n${summary}`
+    }
+    
+    return { 
+      summary, 
+      topics,
+      acosoDetectado,
+      mensajeAcoso: acosoDetectado ? mensajeAcoso : undefined
+    }
   }
 }
 

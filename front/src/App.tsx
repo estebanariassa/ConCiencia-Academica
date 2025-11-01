@@ -242,9 +242,10 @@ function ReportsPageWrapper() {
     email: authUser.email,
   }
   
-  // Si es coordinador pero también es profesor, permitir acceso a funcionalidades de profesor
+  // Si es coordinador, mantener el tipo como 'coordinator' para usar el endpoint correcto (by-career)
+  // No convertir a 'teacher' porque eso haría que use by-professor con un profesor_id específico
   if (authUser.tipo_usuario === 'coordinador') {
-    user.type = 'teacher'; // Permitir que los coordinadores accedan a funcionalidades de profesor
+    user.type = 'coordinator'; // Mantener como coordinador para usar by-career
   }
   
   return <ReportsPage user={user} />

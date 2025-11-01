@@ -22,7 +22,13 @@ type Props = {
 export default function AISummaryCard({ texts, title, description, endpoint, params }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<{ summary: string; topics: string[]; textsCount?: number } | null>(null)
+  const [result, setResult] = useState<{ 
+    summary: string; 
+    topics: string[]; 
+    textsCount?: number;
+    acosoDetectado?: boolean;
+    mensajeAcoso?: string;
+  } | null>(null)
   
   // hasData es true si:
   // 1. Hay endpoint configurado (el backend manejará la validación de params)
@@ -152,19 +158,6 @@ export default function AISummaryCard({ texts, title, description, endpoint, par
               <p className="text-xs">No hay endpoint configurado. Configura un endpoint en el componente padre.</p>
             </div>
           )}
-          {endpoint && (!params?.profesor_id || !params?.periodo_id) && !loading && (
-            <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded border border-blue-200">
-              <p className="font-semibold mb-1">ℹ️ Nota:</p>
-              <p className="text-xs">
-                {!params?.profesor_id && 'Falta profesor_id. '}
-                {!params?.periodo_id && 'Falta periodo_id. '}
-                Puedes hacer clic igual para ver el error exacto del backend.
-              </p>
-              {process.env.NODE_ENV === 'development' && (
-                <p className="text-xs text-gray-500 mt-1">Debug - Endpoint: {endpoint} | Params: {JSON.stringify(params || {})}</p>
-              )}
-            </div>
-          )}
         </div>
         {error && (
           <div className="text-sm text-red-600 mb-4 p-3 bg-red-50 border border-red-200 rounded">
@@ -207,6 +200,17 @@ export default function AISummaryCard({ texts, title, description, endpoint, par
               <p className="text-xs text-gray-500">
                 ✅ Analizadas {result.textsCount} respuestas abiertas
               </p>
+            )}
+            {result.acosoDetectado && result.mensajeAcoso && (
+              <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-2">
+                  <span className="text-red-600 text-xl font-bold">⚠️</span>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-red-800 mb-1">ALERTA DE ACOSO DETECTADO</h4>
+                    <p className="text-sm text-red-700 whitespace-pre-line">{result.mensajeAcoso}</p>
+                  </div>
+                </div>
+              </div>
             )}
             <div>
               <h4 className="text-sm font-semibold text-gray-900">Resumen</h4>
