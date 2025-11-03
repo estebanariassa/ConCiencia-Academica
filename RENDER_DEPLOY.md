@@ -98,6 +98,8 @@ GOOGLE_GEMINI_API_KEY=tu_api_key_si_la_tienes
 - **Build Command:** `npm install && npm run build`
 - **Publish Directory:** `dist`
 
+⚠️ **NOTA:** El comando de build ahora es solo `vite build` (ya no incluye `tsc`) porque Vite maneja TypeScript internamente.
+
 **Environment Variables:**
 Agrega esta variable:
 ```
