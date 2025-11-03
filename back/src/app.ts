@@ -14,7 +14,13 @@ dotenv.config()
 
 export const app = express()
 
-app.use(cors())
+// Configurar CORS para producción
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true,
+  optionsSuccessStatus: 200
+}
+app.use(cors(corsOptions))
 app.use(express.json())
 
 // Rutas
