@@ -15,9 +15,12 @@ import {
   FaSpinner
 } from 'react-icons/fa'
 
-// Importación corregida usando new URL()
-const fondo = new URL('../assets/fondo.webp', import.meta.url).href
-const logoUniversidad = new URL('../assets/logo_conciencia.webp', import.meta.url).href
+// Importación de assets
+import fondoImg from '../assets/fondo.webp'
+import logoUniversidadImg from '../assets/logo_conciencia.webp'
+
+const fondo = fondoImg
+const logoUniversidad = logoUniversidadImg
 
 interface FormData {
   email: string

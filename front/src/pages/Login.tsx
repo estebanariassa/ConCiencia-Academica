@@ -17,9 +17,9 @@ import {
   FaUserTie
 } from 'react-icons/fa'
 
-// Importación corregida usando new URL()
-const fondo = new URL('../assets/fondo.webp', import.meta.url).href
-const logoUniversidad = new URL('../assets/logo_conciencia.webp', import.meta.url).href
+// Importación de assets
+import fondoImg from '../assets/fondo.webp'
+import logoUniversidadImg from '../assets/logo_conciencia.webp'
 
 export default function Login() {
   const [userType, setUserType] = useState<UserType>('student')
@@ -212,7 +212,7 @@ export default function Login() {
     <div 
       className="min-h-screen flex items-center justify-center p-4 bg-gray-100"
       style={{
-        backgroundImage: `url(${fondo})`,
+        backgroundImage: `url(${fondoImg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center'
       }}
@@ -237,7 +237,7 @@ export default function Login() {
             >
               {/* Reemplazado el círculo rojo con birrete por el logo */}
               <img 
-                src={logoUniversidad} 
+                src={logoUniversidadImg} 
                 alt="Logo Universidad de Medellín" 
                 className="h-20 w-20 sm:h-[140px] sm:w-[150px] object-contain"
               />

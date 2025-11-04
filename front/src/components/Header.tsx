@@ -8,7 +8,9 @@ import { ArrowLeft } from 'lucide-react';
 import { User } from '../types';
 
 // Importar imágenes
-const logoUniversidad = new URL('../assets/logo_conciencia.webp', import.meta.url).href;
+import logoUniversidadImg from '../assets/logo_conciencia.webp';
+
+const logoUniversidad = logoUniversidadImg;
 
 interface HeaderProps {
   user?: User;
