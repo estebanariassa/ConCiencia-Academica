@@ -326,229 +326,236 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
               </CardContent>
             </Card>
           </motion.div>
-{/* Stats Cards - Específicas para cada tipo de usuario */}
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-  {/* Tarjeta 1 - Diferente según el tipo de usuario */}
-  <motion.div
-    variants={cardVariants}
-    initial="hidden"
-    animate="visible"
-    transition={{ delay: 0.2 }}
-  >
-    <Card className="bg-white shadow-md border border-gray-200 p-6">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="text-lg font-medium text-gray-900 text-left">
-          {user.type === 'student'
-            ? 'Evaluaciones Pendientes'
-            : user.type === 'teacher'
-            ? 'Calificación Promedio'
-            : user.type === 'coordinator'
-            ? 'Total de Profesores'
-            : 'Evaluaciones Pendientes'}
-        </CardTitle>
-        {user.type === 'student' ? (
-          <ClipboardCheck className="h-6 w-6 text-red-600 ml-4" />
-        ) : user.type === 'teacher' ? (
-          <Star className="h-6 w-6 text-yellow-600 ml-4" />
-        ) : user.type === 'coordinator' ? (
-          <Users className="h-6 w-6 text-red-600 ml-4" />
-        ) : (
-          <ClipboardCheck className="h-6 w-6 text-red-600 ml-4" />
-        )}
-      </CardHeader>
-      <CardContent>
-        <div
-          className={`text-3xl font-bold ${
-            user.type === 'student'
-              ? 'text-red-600'
-              : user.type === 'teacher'
-              ? 'text-yellow-600'
-              : user.type === 'coordinator'
-              ? 'text-red-600'
-              : 'text-red-600'
-          }`}
-        >
-          {user.type === 'student'
-            ? userData.stats.evaluationsPending
-            : user.type === 'teacher'
-            ? userData.stats.averageRating
-            : user.type === 'coordinator'
-            ? userData.stats.totalTeachers
-            : userData.stats.evaluationsPending}
-          {user.type === 'teacher' && '/5.0'}
-        </div>
-        <p className="text-sm text-gray-500 mt-2 text-left">
-          {user.type === 'student'
-            ? 'Deben completarse pronto'
-            : user.type === 'teacher'
-            ? 'Última evaluación'
-            : user.type === 'coordinator'
-            ? 'En el departamento'
-            : 'Deben completarse pronto'}
-        </p>
-      </CardContent>
-    </Card>
-  </motion.div>
 
-  {/* Tarjeta 2 - Evaluaciones Completadas/Total Evaluaciones */}
-  <motion.div
-    variants={cardVariants}
-    initial="hidden"
-    animate="visible"
-    transition={{ delay: 0.3 }}
-  >
-    <Card className="bg-white shadow-md border border-gray-200 p-6">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="text-lg font-medium text-gray-900 text-left">
-          {user.type === 'student'
-            ? 'Evaluaciones Completadas'
-            : user.type === 'teacher'
-            ? 'Total Evaluaciones'
-            : 'Evaluaciones Completadas'}
-        </CardTitle>
-        <Star className="h-6 w-6 text-green-600 ml-4" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold text-green-600">
-          {user.type === 'student'
-            ? userData.stats.evaluationsCompleted
-            : user.type === 'teacher'
-            ? userData.stats.totalEvaluations
-            : userData.stats.evaluationsCompleted}
-        </div>
-        <p className="text-sm text-gray-500 mt-2 text-left">
-          {user.type === 'student'
-            ? 'Este período académico'
-            : user.type === 'teacher'
-            ? 'Evaluaciones recibidas'
-            : 'En el sistema'}
-        </p>
-      </CardContent>
-    </Card>
-  </motion.div>
+          {/* Contenedor para poder reordenar secciones según viewport */}
+          <div className="flex flex-col gap-8">
+            {/* En móvil: primero acciones rápidas; en desktop: primero estadísticas */}
+            <div className="order-1 lg:order-2">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Columna principal */}
+                <div className="lg:col-span-2 space-y-8">
+                  {/* Card combinada de Acciones Rápidas */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <Card className="bg-white shadow-md border border-gray-200 p-6">
+                      <CardHeader className="pb-4">
+                        <div className="flex items-center gap-2">
+                          <ClipboardCheck className="h-5 w-5 text-gray-700" />
+                          <CardTitle className="text-2xl text-gray-900">Cosas por hacer:</CardTitle>
+                        </div>
+                        <CardDescription className="text-base">
+                          Aca estan las opciones de lo que puedes realizar
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* Acciones Rápidas */}
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900 mb-4">Acciones Rápidas</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            {userData.quickActions.map((action, index) => (
+                              <motion.div key={index} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                                <Button
+                                  onClick={action.onClick}
+                                  variant={action.variant}
+                                  className={`w-full h-auto py-5 flex flex-col items-center gap-3 ${action.className}`}
+                                >
+                                  <action.icon className="h-8 w-8" />
+                                  <div className="text-center">
+                                    <div className="font-medium text-lg">
+                                      {action.label}
+                                    </div>
+                                    <div className="text-sm opacity-80">
+                                      {action.description}
+                                    </div>
+                                  </div>
+                                </Button>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </div>
 
-  {/* Tarjeta 3 - Cursos Actuales/Cursos Impartidos */}
-  <motion.div
-    variants={cardVariants}
-    initial="hidden"
-    animate="visible"
-    transition={{ delay: 0.4 }}
-  >
-    <Card className="bg-white shadow-md border border-gray-200 p-6">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="text-lg font-medium text-gray-900 text-left">
-          {user.type === 'student'
-            ? 'Cursos Matriculados'
-            : user.type === 'teacher'
-            ? 'Cursos Impartidos'
-            : 'Cursos Matriculados'}
-        </CardTitle>
-        <BookOpen className="h-6 w-6 text-university-red ml-4" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold text-university-red">
-          {user.type === 'student'
-            ? userData.stats.currentCourses
-            : user.type === 'teacher'
-            ? userData.stats.coursesTeaching
-            : userData.stats.pendingApprovals}
-        </div>
-        <p className="text-sm text-gray-500 mt-2 text-left">
-          {user.type === 'student'
-            ? 'Este semestre'
-            : user.type === 'teacher'
-            ? 'Este semestre'
-            : 'Por revisar'}
-        </p>
-      </CardContent>
-    </Card>
-  </motion.div>
-</div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Columna principal */}
-            <div className="lg:col-span-2 space-y-8">
-              {/* Card combinada de Acciones Rápidas y Evaluaciones Próximas */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-              >
-                <Card className="bg-white shadow-md border border-gray-200 p-6">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center gap-2">
-                      <ClipboardCheck className="h-5 w-5 text-gray-700" />
-                      <CardTitle className="text-2xl text-gray-900">Cosas por hacer:</CardTitle>
-                    </div>
-                    <CardDescription className="text-base">
-                      Aca estan las opciones de lo que puedes realizar
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Acciones Rápidas */}
-                    <div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-4">Acciones Rápidas</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        {userData.quickActions.map((action, index) => (
-                          <motion.div key={index} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                            <Button
-                              onClick={action.onClick}
-                              variant={action.variant}
-                              className={`w-full h-auto py-5 flex flex-col items-center gap-3 ${action.className}`}
-                            >
-                              <action.icon className="h-8 w-8" />
-                              <div className="text-center">
-                                <div className="font-medium text-lg">
-                                  {action.label}
-                                </div>
-                                <div className="text-sm opacity-80">
-                                  {action.description}
-                                </div>
-                              </div>
-                            </Button>
-                          </motion.div>
-                        ))}
+                {/* Columna lateral - Información de Usuario */}
+                <div className="space-y-8">
+                  <SectionCard title="Información del Usuario" icon={UserIcon}>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <p className="font-medium text-gray-900">{user.name}</p>
+                          <p className="text-sm text-gray-600 capitalize">
+                            {user.type === 'student' ? 'Estudiante' :
+                              user.type === 'teacher' ? 'Profesor' :
+                              'Coordinador'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-gray-500" />
+                          <p className="text-sm text-gray-600">{user.email}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-500" />
+                          <p className="text-sm text-gray-600">+123 456 7890</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-gray-500" />
+                          <p className="text-sm text-gray-600">Facultad de Ingeniería</p>
+                        </div>
                       </div>
                     </div>
-
-                  </CardContent>
-                </Card>
-              </motion.div>
+                  </SectionCard>
+                </div>
+              </div>
             </div>
 
-            {/* Columna lateral - Información de Usuario */}
-            <div className="space-y-8">
-
-              {/* Información del Usuario */}
-              <SectionCard title="Información del Usuario" icon={UserIcon}>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <p className="font-medium text-gray-900">{user.name}</p>
-                      <p className="text-sm text-gray-600 capitalize">
-                        {user.type === 'student' ? 'Estudiante' :
-                          user.type === 'teacher' ? 'Profesor' :
-                          'Coordinador'}
+            {/* Sección de estadísticas: en móvil va debajo, en desktop arriba */}
+            <div className="order-2 lg:order-1">
+              {/* Stats Cards - Específicas para cada tipo de usuario */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Tarjeta 1 - Diferente según el tipo de usuario */}
+                <motion.div
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  transition={{ delay: 0.2 }}
+                >
+                  <Card className="bg-white shadow-md border border-gray-200 p-6">
+                    <CardHeader className="flex flex-row items-center justify-between pb-4">
+                      <CardTitle className="text-lg font-medium text-gray-900 text-left">
+                        {user.type === 'student'
+                          ? 'Evaluaciones Pendientes'
+                          : user.type === 'teacher'
+                          ? 'Calificación Promedio'
+                          : user.type === 'coordinator'
+                          ? 'Total de Profesores'
+                          : 'Evaluaciones Pendientes'}
+                      </CardTitle>
+                      {user.type === 'student' ? (
+                        <ClipboardCheck className="h-6 w-6 text-red-600 ml-4" />
+                      ) : user.type === 'teacher' ? (
+                        <Star className="h-6 w-6 text-yellow-600 ml-4" />
+                      ) : user.type === 'coordinator' ? (
+                        <Users className="h-6 w-6 text-red-600 ml-4" />
+                      ) : (
+                        <ClipboardCheck className="h-6 w-6 text-red-600 ml-4" />
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      <div
+                        className={`text-3xl font-bold ${
+                          user.type === 'student'
+                            ? 'text-red-600'
+                            : user.type === 'teacher'
+                            ? 'text-yellow-600'
+                            : user.type === 'coordinator'
+                            ? 'text-red-600'
+                            : 'text-red-600'
+                        }`}
+                      >
+                        {user.type === 'student'
+                          ? userData.stats.evaluationsPending
+                          : user.type === 'teacher'
+                          ? userData.stats.averageRating
+                          : user.type === 'coordinator'
+                          ? userData.stats.totalTeachers
+                          : userData.stats.evaluationsPending}
+                        {user.type === 'teacher' && '/5.0'}
+                      </div>
+                      <p className="text-sm text-gray-500 mt-2 text-left">
+                        {user.type === 'student'
+                          ? 'Deben completarse pronto'
+                          : user.type === 'teacher'
+                          ? 'Última evaluación'
+                          : user.type === 'coordinator'
+                          ? 'En el departamento'
+                          : 'Deben completarse pronto'}
                       </p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-gray-500" />
-                      <p className="text-sm text-gray-600">{user.email}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-gray-500" />
-                      <p className="text-sm text-gray-600">+123 456 7890</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-gray-500" />
-                      <p className="text-sm text-gray-600">Facultad de Ingeniería</p>
-                    </div>
-                  </div>
-                </div>
-              </SectionCard>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Tarjeta 2 - Evaluaciones Completadas/Total Evaluaciones */}
+                <motion.div
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  transition={{ delay: 0.3 }}
+                >
+                  <Card className="bg-white shadow-md border border-gray-200 p-6">
+                    <CardHeader className="flex flex-row items-center justify-between pb-4">
+                      <CardTitle className="text-lg font-medium text-gray-900 text-left">
+                        {user.type === 'student'
+                          ? 'Evaluaciones Completadas'
+                          : user.type === 'teacher'
+                          ? 'Total Evaluaciones'
+                          : 'Evaluaciones Completadas'}
+                      </CardTitle>
+                      <Star className="h-6 w-6 text-green-600 ml-4" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-green-600">
+                        {user.type === 'student'
+                          ? userData.stats.evaluationsCompleted
+                          : user.type === 'teacher'
+                          ? userData.stats.totalEvaluations
+                          : userData.stats.evaluationsCompleted}
+                      </div>
+                      <p className="text-sm text-gray-500 mt-2 text-left">
+                        {user.type === 'student'
+                          ? 'Este período académico'
+                          : user.type === 'teacher'
+                          ? 'Evaluaciones recibidas'
+                          : 'En el sistema'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Tarjeta 3 - Cursos Actuales/Cursos Impartidos */}
+                <motion.div
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate="visible"
+                  transition={{ delay: 0.4 }}
+                >
+                  <Card className="bg-white shadow-md border border-gray-200 p-6">
+                    <CardHeader className="flex flex-row items-center justify-between pb-4">
+                      <CardTitle className="text-lg font-medium text-gray-900 text-left">
+                        {user.type === 'student'
+                          ? 'Cursos Matriculados'
+                          : user.type === 'teacher'
+                          ? 'Cursos Impartidos'
+                          : 'Cursos Matriculados'}
+                      </CardTitle>
+                      <BookOpen className="h-6 w-6 text-university-red ml-4" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-university-red">
+                        {user.type === 'student'
+                          ? userData.stats.currentCourses
+                          : user.type === 'teacher'
+                          ? userData.stats.coursesTeaching
+                          : userData.stats.pendingApprovals}
+                      </div>
+                      <p className="text-sm text-gray-500 mt-2 text-left">
+                        {user.type === 'student'
+                          ? 'Este semestre'
+                          : user.type === 'teacher'
+                          ? 'Este semestre'
+                          : 'Por revisar'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </div>
             </div>
           </div>
         </main>

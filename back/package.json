@@ -24,7 +24,8 @@
     "investigate": "ts-node src/investigate-users.ts",
     "debug-passwords": "ts-node src/debug-passwords.ts",
     "test-users": "ts-node src/test-user-creation.ts",
-    "test-endpoints": "ts-node src/test-endpoints.ts"
+    "test-endpoints": "ts-node src/test-endpoints.ts",
+    "seed": "ts-node src/scripts/seed-initial-data.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
