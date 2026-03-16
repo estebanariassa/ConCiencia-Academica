@@ -32,6 +32,8 @@ interface AuthContextType {
   loading: boolean
   isAuthenticated: boolean
   getDashboardPath: () => string
+  /** Calcula la ruta del dashboard para un usuario (p. ej. el de la respuesta de login). */
+  getDashboardPathForUser: (user: User) => string
   hasRole: (role: string) => boolean
   hasPermission: (permission: string) => boolean
   switchUserRole: (newRole: 'coordinador' | 'profesor') => void
@@ -208,6 +210,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return path
   }
 
+  const getDashboardPathForUser = (u: User) => {
+    if (u.dashboard) return u.dashboard
+    if (u.roles && u.roles.length > 0) {
+      const rolePriority = ['admin', 'coordinador', 'profesor', 'docente', 'estudiante']
+      const userTypeMapping: { [key: string]: string } = {
+        'estudiante': '/dashboard-estudiante',
+        'profesor': '/dashboard-profesor',
+        'docente': '/dashboard-profesor',
+        'coordinador': '/dashboard-coordinador',
+        'admin': '/dashboard-admin'
+      }
+      for (const role of rolePriority) {
+        if (u.roles.includes(role)) return userTypeMapping[role] || '/dashboard'
+      }
+    }
+    const userTypeMapping: { [key: string]: string } = {
+      'estudiante': '/dashboard-estudiante',
+      'profesor': '/dashboard-profesor',
+      'docente': '/dashboard-profesor',
+      'coordinador': '/dashboard-coordinador',
+      'admin': '/dashboard-admin'
+    }
+    const tipo = (u.tipo_usuario || '').toLowerCase()
+    return userTypeMapping[tipo] || '/dashboard'
+  }
+
   // Función para verificar si el usuario tiene un rol específico
   const hasRole = (role: string): boolean => {
     if (!user) return false
@@ -273,6 +301,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     loading,
     isAuthenticated: !!user,
     getDashboardPath,
+    getDashboardPathForUser,
     hasRole,
     hasPermission,
     switchUserRole

@@ -34,7 +34,7 @@ export default function Login() {
   const [showRoleSelection, setShowRoleSelection] = useState(false)
   const [userInfo, setUserInfo] = useState<any>(null)
   const navigate = useNavigate()
-  const { login, loginWithRole, getDashboardPath } = useAuth()
+  const { login, loginWithRole, getDashboardPath, getDashboardPathForUser } = useAuth()
 
   // Función para validar correo electrónico
   const validateEmail = (email: string) => {
@@ -83,7 +83,8 @@ export default function Login() {
       // Si estamos en modo selección de rol, hacer login con el rol seleccionado
       if (showRoleSelection && selectedRole) {
         await loginWithRole(email, password, selectedRole)
-        const dashboardPath = getDashboardPath()
+        const savedUser = JSON.parse(localStorage.getItem('user') || '{}')
+        const dashboardPath = getDashboardPathForUser(savedUser)
         navigate(dashboardPath)
         return
       }
@@ -102,8 +103,8 @@ export default function Login() {
         return
       }
       
-      // Redireccionar al dashboard correcto según el tipo de usuario
-      const dashboardPath = getDashboardPath()
+      // Redireccionar al dashboard correcto usando el usuario de la respuesta (evita estado desactualizado)
+      const dashboardPath = response && 'user' in response ? getDashboardPathForUser((response as any).user) : getDashboardPath()
       navigate(dashboardPath)
     } catch (error: any) {
       console.error('Error en login:', error)

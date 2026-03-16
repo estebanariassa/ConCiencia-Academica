@@ -77,6 +77,16 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Mapear tipo_usuario del backend (español) al tipo del frontend (inglés)
+  const normalizeUserType = (tipo: string | undefined): 'student' | 'teacher' | 'coordinator' | 'decano' => {
+    const t = (tipo || '').toLowerCase();
+    if (t === 'estudiante') return 'student';
+    if (t === 'profesor' || t === 'docente') return 'teacher';
+    if (t === 'coordinador') return 'coordinator';
+    if (t === 'admin') return 'decano';
+    return 'student';
+  };
+
   // Cargar user desde backend/localStorage si existe
   const storedUser = ((): User | null => {
     try {
@@ -86,7 +96,7 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
       return {
         id: parsed.id,
         name: `${parsed.nombre} ${parsed.apellido}`.trim(),
-        type: (parsed.tipo_usuario as any) ?? 'student',
+        type: normalizeUserType(parsed.tipo_usuario),
         email: parsed.email,
       } as User;
     } catch {
@@ -104,21 +114,32 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
       if (currentUser.type === 'student') {
         try {
           setLoading(true);
+          setError('');
           const [statsData, materiasData] = await Promise.all([
             fetchStudentStats(),
             fetchStudentEnrolledSubjects()
           ]);
-          
-          setStudentStats(statsData);
-          setMateriasMatriculadas(materiasData.materiasMatriculadas);
-          
-          console.log('✅ Frontend: Student data loaded:', {
-            stats: statsData,
-            materias: materiasData.materiasMatriculadas.length
+
+          setStudentStats({
+            evaluacionesCompletadas: Number(statsData?.evaluacionesCompletadas ?? 0),
+            evaluacionesPendientes: Number(statsData?.evaluacionesPendientes ?? 0),
+            materiasMatriculadas: Number(statsData?.materiasMatriculadas ?? 0),
+            promedioGeneral: Number(statsData?.promedioGeneral ?? 0),
+            progresoGeneral: Number(statsData?.progresoGeneral ?? 0)
           });
+          setMateriasMatriculadas(Array.isArray(materiasData?.materiasMatriculadas) ? materiasData.materiasMatriculadas : []);
+          console.log('✅ Frontend: Student data loaded');
         } catch (error: any) {
-          console.error('❌ Error loading student data:', error);
-          setError(error.response?.data?.error || 'Error al cargar los datos del estudiante');
+          console.warn('⚠️ Error loading student data, showing dashboard with zeros:', error?.response?.data?.error || error?.message);
+          setError('');
+          setStudentStats({
+            evaluacionesCompletadas: 0,
+            evaluacionesPendientes: 0,
+            materiasMatriculadas: 0,
+            promedioGeneral: 0,
+            progresoGeneral: 0
+          });
+          setMateriasMatriculadas([]);
         } finally {
           setLoading(false);
         }
@@ -286,6 +307,41 @@ export default function Dashboard({ user, onStartEvaluation, onViewReports }: Da
     visible: { opacity: 1, y: 0 }
   };
 
+  // Evitar pantalla en blanco: mostrar carga o error
+  if (loading && currentUser.type === 'student') {
+    return (
+      <div className="min-h-screen bg-gray-50 relative">
+        <div className="relative z-10">
+          <Header user={currentUser} />
+          <main className="max-w-[1700px] mx-auto p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <div className="inline-block h-10 w-10 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+              <p className="mt-4 text-gray-700">Cargando tu dashboard...</p>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && currentUser.type === 'student') {
+    return (
+      <div className="min-h-screen bg-gray-50 relative">
+        <div className="relative z-10">
+          <Header user={currentUser} />
+          <main className="max-w-[1700px] mx-auto p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
+            <div className="max-w-md w-full rounded-lg bg-white p-6 shadow-lg border border-gray-200">
+              <p className="text-red-600 font-medium">Error al cargar los datos</p>
+              <p className="mt-2 text-sm text-gray-600">{error}</p>
+              <Button className="mt-4" onClick={() => { setError(''); setLoading(true); window.location.reload(); }}>
+                Reintentar
+              </Button>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 relative">

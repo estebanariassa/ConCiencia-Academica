@@ -251,19 +251,36 @@ export class RoleService {
   // =====================================================
 
   /**
-   * Obtener el dashboard principal de un usuario basado en sus roles
+   * Obtener el dashboard principal de un usuario basado en sus roles.
+   * Si no tiene filas en usuario_roles, usa tipo_usuario de la tabla usuarios.
    */
   static async obtenerDashboardUsuario(usuarioId: string): Promise<string> {
     try {
       const roles = await this.obtenerRolesUsuario(usuarioId);
-      
-      // Prioridad de dashboards
+
+      // Prioridad de dashboards según tabla usuario_roles
       if (roles.includes('admin')) return '/dashboard-admin';
       if (roles.includes('decano')) return '/dashboard-decano';
       if (roles.includes('coordinador')) return '/dashboard-coordinador';
       if (roles.includes('profesor') || roles.includes('docente')) return '/dashboard-profesor';
       if (roles.includes('estudiante')) return '/dashboard-estudiante';
-      
+
+      // Fallback: usuario sin filas en usuario_roles → usar tipo_usuario de la tabla usuarios
+      const { data: usuario, error } = await supabaseAdmin
+        .from('usuarios')
+        .select('tipo_usuario')
+        .eq('id', usuarioId)
+        .single();
+
+      if (!error && usuario?.tipo_usuario) {
+        const t = (usuario.tipo_usuario || '').toLowerCase();
+        if (t === 'admin') return '/dashboard-admin';
+        if (t === 'decano') return '/dashboard-decano';
+        if (t === 'coordinador') return '/dashboard-coordinador';
+        if (t === 'profesor' || t === 'docente') return '/dashboard-profesor';
+        if (t === 'estudiante') return '/dashboard-estudiante';
+      }
+
       return '/dashboard'; // Dashboard por defecto
     } catch (error) {
       console.error('Error en obtenerDashboardUsuario:', error);
