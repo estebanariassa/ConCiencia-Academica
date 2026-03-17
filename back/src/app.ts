@@ -7,6 +7,8 @@ import evaluationRoutes from './routes/evaluationRoutes'
 import resultadosRoutes from './routes/resultados'
 import teachersRoutes from './routes/teachers'
 import courseRoutes from './routes/courseRoutes'
+import coordinadorRoutes from './routes/coordinador'
+import qrEvaluacionesRoutes from './routes/qrEvaluaciones'
 import passwordResetRoutes from './routes/passwordReset'
 import aiRoutes from './routes/aiRoutes'
 
@@ -30,6 +32,8 @@ app.use('/api/evaluations', evaluationRoutes)
 app.use('/api/resultados', resultadosRoutes)
 app.use('/api/teachers', teachersRoutes)
 app.use('/api/courses', courseRoutes)
+app.use('/api/coordinador', coordinadorRoutes)
+app.use('/api/qr-evaluaciones', qrEvaluacionesRoutes)
 app.use('/api/auth', passwordResetRoutes)
 app.use('/api/ai', aiRoutes)
 
