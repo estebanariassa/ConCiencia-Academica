@@ -2821,7 +2821,6 @@ router.get('/student-enrolled-subjects', authenticateToken, async (req: any, res
       .from('inscripciones')
       .select(`
         id,
-        fecha_inscripcion,
         grupo:grupos(
           id,
           numero_grupo,
@@ -2844,14 +2843,13 @@ router.get('/student-enrolled-subjects', authenticateToken, async (req: any, res
           ),
           periodo:periodos_academicos(
             id,
-            nombre,
-            codigo
+            ano,
+            semestre
           )
         )
       `)
       .eq('estudiante_id', estudiante.id)
       .eq('activa', true)
-      .order('fecha_inscripcion', { ascending: false })
 
     if (inscripcionesError) {
       console.log('⚠️ Backend: Error getting enrollments, returning empty list:', inscripcionesError.message);
@@ -2861,7 +2859,6 @@ router.get('/student-enrolled-subjects', authenticateToken, async (req: any, res
     // Formatear los datos
     const materiasMatriculadas = inscripciones?.map((inscripcion: any) => ({
       id: inscripcion.id,
-      fechaInscripcion: inscripcion.fecha_inscripcion,
       grupo: {
         id: inscripcion.grupo?.id,
         numeroGrupo: inscripcion.grupo?.numero_grupo,
