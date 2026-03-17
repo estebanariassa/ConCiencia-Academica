@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
 import Card, { CardHeader, CardContent, CardTitle, CardDescription } from '../components/Card'
 import Button from '../components/Button'
 import { CourseQrPoster } from '../components/CourseQrPoster'
 import apiClient from '../api/client'
+import { exportElementToPNG } from '../utils/export'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface CursoGrupo {
   id: number;
@@ -38,6 +41,12 @@ export default function ScheduleSurveys() {
   const [loadingCursos, setLoadingCursos] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [qrModalOpen, setQrModalOpen] = useState(false)
+  const [qrSearch, setQrSearch] = useState('')
+  const [qrPage, setQrPage] = useState(0)
+  const [generatingQrs, setGeneratingQrs] = useState(false)
+  const [qrTokensByGrupoId, setQrTokensByGrupoId] = useState<Record<number, string>>({})
+  const [tableSearch, setTableSearch] = useState('')
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -76,25 +85,131 @@ export default function ScheduleSurveys() {
     [cursos, selectedIds]
   )
 
+  const filteredCursosTable = useMemo(() => {
+    const q = tableSearch.trim().toLowerCase()
+    if (!q) return cursos
+    return cursos.filter(c =>
+      `${c.cursoNombre} ${c.cursoCodigo} ${c.grupo} ${c.profesorNombre}`.toLowerCase().includes(q)
+    )
+  }, [cursos, tableSearch])
+
+  const filteredSelectedCursos = useMemo(() => {
+    const q = qrSearch.trim().toLowerCase()
+    if (!q) return selectedCursos
+    return selectedCursos.filter(c =>
+      `${c.cursoNombre} ${c.cursoCodigo} ${c.grupo} ${c.profesorNombre}`.toLowerCase().includes(q)
+    )
+  }, [qrSearch, selectedCursos])
+
+  const perPage = 3
+  const totalPages = Math.max(1, Math.ceil(filteredSelectedCursos.length / perPage))
+  const pageCursos = filteredSelectedCursos.slice(qrPage * perPage, qrPage * perPage + perPage)
+
+  const visibleHaveTokens = useMemo(() => {
+    if (pageCursos.length === 0) return false
+    return pageCursos.every(c => !!qrTokensByGrupoId[c.id])
+  }, [pageCursos, qrTokensByGrupoId])
+
+  const buildQrUrl = (grupoId: number, cursoCodigo: string, grupo: string) => {
+    const token = qrTokensByGrupoId[grupoId]
+    if (token) return `${window.location.origin}/qr-evaluacion?token=${token}`
+    // Previsualización (dummy) si aún no hay token real
+    return `${window.location.origin}/qr-evaluacion?curso=${encodeURIComponent(cursoCodigo)}&grupo=${encodeURIComponent(grupo)}`
+  }
+
+  const ensureTokensForGrupoIds = async (grupoIds: number[]) => {
+    const missing = grupoIds.filter(id => !qrTokensByGrupoId[id])
+    if (missing.length === 0) return
+    const resp = await apiClient.post('/api/qr-evaluaciones/batch', { grupoIds: missing })
+    const created = (resp.data?.created || []) as Array<{ grupoId: number; token: string }>
+    if (created.length > 0) {
+      setQrTokensByGrupoId(prev => {
+        const next = { ...prev }
+        created.forEach(item => { next[Number(item.grupoId)] = item.token })
+        return next
+      })
+    }
+  }
+
+  const openQrModal = async () => {
+    if (selectedIds.length === 0) {
+      alert('Selecciona al menos un curso/grupo para generar QR.')
+      return
+    }
+    if (cursos.length === 0) {
+      alert('Primero carga los cursos para poder generar los QR.')
+      return
+    }
+    setQrModalOpen(true)
+    setQrSearch('')
+    setQrPage(0)
+
+    // Generar tokens reales si aún no existen (o si faltan algunos)
+    try {
+      setGeneratingQrs(true)
+      await ensureTokensForGrupoIds(selectedIds)
+    } catch (err) {
+      console.error('Error generando QRs (modal):', err)
+      // Dejamos el modal abierto con previsualización dummy
+    } finally {
+      setGeneratingQrs(false)
+    }
+  }
+
+  const downloadCurrentPage = async () => {
+    if (pageCursos.length === 0) return
+    if (generatingQrs || !visibleHaveTokens) {
+      alert('Aún se están generando los tokens reales. Espera un momento y vuelve a intentar.')
+      return
+    }
+    for (const c of pageCursos) {
+      const el = document.getElementById(`qr-poster-${c.id}`) as HTMLElement | null
+      if (!el) continue
+      const safeName = `${c.cursoCodigo || 'curso'}-grupo-${c.grupo || c.id}`.replace(/[^\w\-]+/g, '_')
+      // eslint-disable-next-line no-await-in-loop
+      await exportElementToPNG(el, `QR_${safeName}.png`)
+    }
+  }
+
+  const shareCurrentPage = async () => {
+    if (pageCursos.length === 0) return
+    if (generatingQrs || !visibleHaveTokens) {
+      alert('Aún se están generando los tokens reales. Espera un momento y vuelve a intentar.')
+      return
+    }
+    const urls = pageCursos.map(c => buildQrUrl(c.id, c.cursoCodigo, c.grupo))
+    const text = urls.join('\n')
+    try {
+      if ((navigator as any).share && urls.length === 1) {
+        await (navigator as any).share({
+          title: 'QR de evaluación',
+          text: 'Enlace del QR de evaluación:',
+          url: urls[0],
+        })
+        return
+      }
+    } catch (e) {
+      // si falla share, cae a copiar
+      console.warn('Share no disponible/falló, copiando al portapapeles:', e)
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      alert('Links copiados al portapapeles.')
+    } catch (e) {
+      console.warn('No se pudo copiar al portapapeles:', e)
+      alert('No se pudo compartir automáticamente. Copia los links desde el navegador.')
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.startDate || !form.endDate || !form.period) {
+      alert('Completa Fecha de inicio, Fecha de cierre y Período antes de programar.')
+      return
+    }
     setSubmitting(true)
     try {
       // 1) Aquí iría la llamada real a tu endpoint de programación de encuestas
-
-      // 2) Generar QRs para los cursos seleccionados (si hay selección)
-      if (selectedIds.length > 0) {
-        try {
-          await apiClient.post('/api/qr-evaluaciones/batch', {
-            grupoIds: selectedIds,
-            period: form.period,
-            startDate: form.startDate,
-            endDate: form.endDate,
-          })
-        } catch (err) {
-          console.error('Error generando QRs en batch:', err)
-        }
-      }
 
       setSubmitting(false)
       alert('Encuesta programada correctamente')
@@ -172,6 +287,29 @@ export default function ScheduleSurveys() {
                       <Button type="button" variant="outline" onClick={clearSelection} disabled={selectedIds.length === 0}>
                         Limpiar
                       </Button>
+                      <Button
+                        type="button"
+                        onClick={openQrModal}
+                        disabled={selectedIds.length === 0}
+                        className="bg-university-red hover:bg-red-700 text-white"
+                      >
+                        {generatingQrs ? 'Generando...' : 'Generar QR'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Buscador fuera del modal (tabla) */}
+                  <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                    <div className="flex-1">
+                      <input
+                        value={tableSearch}
+                        onChange={(e) => setTableSearch(e.target.value)}
+                        placeholder="Buscar en cursos por materia, código, grupo o docente..."
+                        className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                      />
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Mostrando {filteredCursosTable.length} de {cursos.length}
                     </div>
                   </div>
 
@@ -193,14 +331,16 @@ export default function ScheduleSurveys() {
                               Cargando cursos...
                             </td>
                           </tr>
-                        ) : cursos.length === 0 ? (
+                        ) : filteredCursosTable.length === 0 ? (
                           <tr>
                             <td colSpan={5} className="px-4 py-4 text-center text-gray-500">
-                              No hay cursos cargados. Haz clic en &quot;Cargar cursos&quot;.
+                              {cursos.length === 0
+                                ? 'No hay cursos cargados. Haz clic en "Cargar cursos".'
+                                : 'No hay resultados para tu búsqueda.'}
                             </td>
                           </tr>
                         ) : (
-                          cursos.map(curso => (
+                          filteredCursosTable.map(curso => (
                             <tr key={curso.id} className="border-t hover:bg-gray-50 transition-colors">
                               <td className="px-4 py-2">
                                 <input
@@ -220,36 +360,11 @@ export default function ScheduleSurveys() {
                       </tbody>
                     </table>
                   </div>
-
-                  {selectedCursos.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-md font-semibold text-gray-900">
-                        Previsualización de posters QR ({selectedCursos.length})
-                      </h4>
-                      <p className="text-xs text-gray-500">
-                        La URL final usará un token generado en el backend; esta vista muestra el diseño que verán los estudiantes.
-                      </p>
-                      <div className="flex flex-wrap gap-4">
-                        {selectedCursos.map(curso => {
-                          const previewUrl = `${window.location.origin}/qr-evaluacion?curso=${curso.cursoCodigo}&grupo=${curso.grupo}`
-                          return (
-                            <CourseQrPoster
-                              key={curso.id}
-                              url={previewUrl}
-                              nombreMateria={curso.cursoNombre}
-                              grupo={curso.grupo}
-                              nombreProfesor={curso.profesorNombre}
-                            />
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex gap-3 pt-4">
                   <Button type="submit" disabled={submitting} className="bg-red-600 hover:bg-red-700 text-white">
-                    {submitting ? 'Programando...' : 'Programar encuesta y QRs'}
+                    {submitting ? 'Programando...' : 'Programar encuesta'}
                   </Button>
                   <Button type="button" variant="outline" onClick={backToDashboard}>Cancelar</Button>
                 </div>
@@ -258,6 +373,162 @@ export default function ScheduleSurveys() {
           </Card>
         </main>
       </div>
+
+      {/* Modal de QRs */}
+      <AnimatePresence>
+      {qrModalOpen && (
+        <motion.div
+          className="fixed inset-0 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="absolute inset-0 bg-black bg-opacity-60"
+            onClick={() => setQrModalOpen(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          />
+
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <motion.div
+              className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden max-h-[86vh] flex flex-col"
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+            >
+              <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">Códigos QR de evaluación</p>
+                  <p className="text-sm text-gray-600">
+                    Mostrando {filteredSelectedCursos.length} seleccionado(s). Vista en carrusel de {perPage}.
+                  </p>
+                </div>
+                <Button variant="outline" onClick={() => setQrModalOpen(false)}>
+                  Cerrar
+                </Button>
+              </div>
+
+              <div className="p-4 sm:p-5 space-y-4 overflow-auto">
+                {/* Buscador */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                  <div className="flex-1">
+                    <input
+                      value={qrSearch}
+                      onChange={(e) => { setQrSearch(e.target.value); setQrPage(0) }}
+                      placeholder="Buscar por curso, código, grupo o docente..."
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    />
+                  </div>
+                  {/* Controles del carrusel */}
+                  <div className="flex gap-2 items-center">
+                    <button
+                      type="button"
+                      onClick={() => setQrPage(p => Math.max(0, p - 1))}
+                      disabled={qrPage <= 0}
+                      className="h-10 w-10 rounded-full border border-gray-300 bg-white shadow-sm flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+                      aria-label="Anterior"
+                      title="Anterior"
+                    >
+                      <ChevronLeft className="h-5 w-5 text-gray-700" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQrPage(p => Math.min(totalPages - 1, p + 1))}
+                      disabled={qrPage >= totalPages - 1}
+                      className="h-10 w-10 rounded-full border border-gray-300 bg-white shadow-sm flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+                      aria-label="Siguiente"
+                      title="Siguiente"
+                    >
+                      <ChevronRight className="h-5 w-5 text-gray-700" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Carrusel (paginación) */}
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-500">
+                    Página {Math.min(totalPages, qrPage + 1)} de {totalPages}
+                  </p>
+                  {generatingQrs && (
+                    <p className="text-xs text-gray-500">Generando tokens reales...</p>
+                  )}
+                </div>
+
+                {/* Carrusel centrado (como la referencia): flecha - cards - flecha */}
+                <div className="flex items-center justify-center gap-6 py-2">
+                  <button
+                    type="button"
+                    onClick={() => setQrPage(p => Math.max(0, p - 1))}
+                    disabled={qrPage <= 0}
+                    className="h-12 w-12 rounded-full border-2 border-gray-800 bg-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Anterior"
+                    title="Anterior"
+                  >
+                    <ChevronLeft className="h-6 w-6 text-gray-900" />
+                  </button>
+
+                  <div className="flex items-center justify-center gap-6">
+                    {pageCursos.length === 0 ? (
+                      <div className="text-center text-gray-500 py-8 w-[700px] max-w-full">
+                        No hay resultados para tu búsqueda.
+                      </div>
+                    ) : (
+                      pageCursos.map(c => {
+                        const url = buildQrUrl(c.id, c.cursoCodigo, c.grupo)
+                        return (
+                          <div key={c.id} id={`qr-poster-${c.id}`} className="flex">
+                            <CourseQrPoster
+                              url={url}
+                              nombreMateria={c.cursoNombre}
+                              grupo={c.grupo}
+                              nombreProfesor={c.profesorNombre}
+                            />
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setQrPage(p => Math.min(totalPages - 1, p + 1))}
+                    disabled={qrPage >= totalPages - 1}
+                    className="h-12 w-12 rounded-full border-2 border-gray-800 bg-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Siguiente"
+                    title="Siguiente"
+                  >
+                    <ChevronRight className="h-6 w-6 text-gray-900" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Footer con acciones */}
+              <div className="p-4 sm:p-5 border-t border-gray-100 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={shareCurrentPage}
+                  disabled={pageCursos.length === 0 || generatingQrs || !visibleHaveTokens}
+                >
+                  Compartir
+                </Button>
+                <Button
+                  type="button"
+                  onClick={downloadCurrentPage}
+                  disabled={pageCursos.length === 0 || generatingQrs || !visibleHaveTokens}
+                  className="bg-university-red hover:bg-red-700 text-white"
+                >
+                  Descargar
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+      </AnimatePresence>
     </div>
   )
 }
