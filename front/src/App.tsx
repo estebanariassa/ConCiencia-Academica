@@ -12,6 +12,7 @@ import DashboardAdmin from './pages/DashboardAdmin'
 import ProtectedRoute from './components/ProtectedRoute'
 import TeacherSelection from './pages/evaluation/TeacherSelection'
 import EvaluationForm from './pages/evaluation/EvaluationForm'
+import QrEvaluationEntry from './pages/QrEvaluationEntry'
 import ReportsPage from './pages/Reports/ReportsPage' // Nueva importación
 import ScheduleSurveys from './pages/ScheduleSurveys'
 import ManageProfessors from './pages/ManageProfessors'
@@ -58,6 +59,10 @@ function App() {
           element={
             user ? <Navigate to="/dashboard" replace /> : <ForgotPassword />
           } 
+        />
+        <Route
+          path="/qr-evaluacion"
+          element={<QrEvaluationEntry />}
         />
         <Route 
           path="/dashboard" 

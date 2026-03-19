@@ -16,14 +16,9 @@ export default function LikertScale({
   leftLabel = "En desacuerdo",
   rightLabel = "De acuerdo"
 }: LikertScaleProps) {
-  // Función para calcular el tamaño basado en la posición (más pequeño a la izquierda, más grande a la derecha)
-  const getCircleSize = (option: number, totalOptions: number) => {
-    // Tamaño base para móviles y desktop
-    const baseSize = window.innerWidth < 640 ? 36 : 48; // sm breakpoint
-    // Incremento por cada paso a la derecha
-    const increment = window.innerWidth < 640 ? 6 : 10;
-    // El tamaño será baseSize + (option - 1) * increment
-    return baseSize + (option - 1) * increment;
+  // Tamaño uniforme (y ligeramente más grande) para que todas las esferas se vean del mismo tamaño.
+  const getCircleSize = () => {
+    return window.innerWidth < 640 ? 42 : 52; // sm breakpoint
   };
 
   // Función para determinar el color basado en la posición
@@ -63,7 +58,7 @@ export default function LikertScale({
       <div className="flex justify-between items-center w-full px-1 sm:px-2">
         {Array.from({ length: options }, (_, i) => i + 1).map((option) => {
           const isSelected = value === option;
-          const size = getCircleSize(option, options);
+          const size = getCircleSize();
           const colorClass = getColorClass(option, isSelected, options);
           const checkSize = getCheckSize(size);
           

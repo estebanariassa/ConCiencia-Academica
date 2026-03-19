@@ -987,41 +987,53 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
 
     console.log('✅ Backend: Curso found:', curso);
 
-    // Determinar la carrera basada en el código del curso
+    // Determinar la carrera basada en el código del curso (si aplica)
     const codigoCurso = curso.codigo || '';
     const prefijo = codigoCurso.split('-')[0] || '';
-    
-    let carreraId: string | null = '1'; // Default a Sistemas
-    
+
+    let carreraIdFromCourseCode: number | null = null;
     switch (prefijo.toUpperCase()) {
       case 'SIS':
-        carreraId = '1'; // Ingeniería de Sistemas
+        carreraIdFromCourseCode = 1
         break;
       case 'CIV':
-        carreraId = '2'; // Ingeniería Civil
+        carreraIdFromCourseCode = 2
         break;
       case 'AMB':
-        carreraId = '3'; // Ingeniería Ambiental
+        carreraIdFromCourseCode = 3
         break;
       case 'ENE':
-        carreraId = '4'; // Ingeniería de Energías
+        carreraIdFromCourseCode = 4
         break;
       case 'TEL':
-        carreraId = '5'; // Ingeniería en Telecomunicaciones
+        carreraIdFromCourseCode = 5
         break;
       case 'FIN':
-        carreraId = '6'; // Ingeniería Financiera
+        carreraIdFromCourseCode = 6
         break;
       case 'IND':
-        carreraId = '7'; // Ingeniería Industrial
+        carreraIdFromCourseCode = 7
         break;
       default:
-        // Para cursos que no tienen prefijo específico, usar preguntas generales (tronco común)
-        carreraId = null;
+        carreraIdFromCourseCode = null
         break;
     }
 
-    console.log('🔍 Backend: Course code:', codigoCurso, '-> Career ID:', carreraId);
+    // Fallback: si el código del curso no permite inferir la carrera, usar la carrera del estudiante
+    let carreraId: number | null = carreraIdFromCourseCode
+    if (carreraId === null) {
+      const { data: estudianteRow, error: estudianteError } = await SupabaseDB.supabaseAdmin
+        .from('estudiantes')
+        .select('carrera_id')
+        .eq('usuario_id', user.id)
+        .single()
+
+      if (!estudianteError && estudianteRow?.carrera_id != null) {
+        carreraId = Number(estudianteRow.carrera_id)
+      }
+    }
+
+    console.log('🔍 Backend: Course code:', codigoCurso, '-> Career ID (resolved):', carreraId, '(fromCourseCode:', carreraIdFromCourseCode, ')');
 
     // Obtener preguntas específicas de la base de datos para esta carrera
     let query = SupabaseDB.supabaseAdmin
@@ -1038,7 +1050,7 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
       .order('orden', { ascending: true });
 
     if (carreraId) {
-      query = query.eq('id_carrera', parseInt(carreraId));
+      query = query.eq('id_carrera', carreraId);
     } else {
       query = query.is('id_carrera', null);
     }
@@ -1053,7 +1065,7 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
     // Si no hay preguntas específicas para esta carrera, obtener preguntas generales (sin carrera_id)
     let questions = preguntasDB || [];
     
-    if (questions.length === 0 && carreraId) {
+    if (questions.length === 0 && carreraIdFromCourseCode) {
       console.log('⚠️ Backend: No hay preguntas específicas para carrera', carreraId, ', obteniendo preguntas generales...');
       
       const { data: preguntasGenerales, error: preguntasGeneralesError } = await SupabaseDB.supabaseAdmin

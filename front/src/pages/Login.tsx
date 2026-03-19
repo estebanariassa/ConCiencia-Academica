@@ -104,8 +104,14 @@ export default function Login() {
       }
       
       // Redireccionar al dashboard correcto usando el usuario de la respuesta (evita estado desactualizado)
-      const dashboardPath = response && 'user' in response ? getDashboardPathForUser((response as any).user) : getDashboardPath()
-      navigate(dashboardPath)
+      const redirectTo = localStorage.getItem('redirectTo')
+      if (redirectTo) {
+        localStorage.removeItem('redirectTo')
+        navigate(redirectTo)
+      } else {
+        const dashboardPath = response && 'user' in response ? getDashboardPathForUser((response as any).user) : getDashboardPath()
+        navigate(dashboardPath)
+      }
     } catch (error: any) {
       console.error('Error en login:', error)
       

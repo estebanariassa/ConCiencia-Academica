@@ -28,30 +28,68 @@ router.post('/batch', authenticateToken, async (req: any, res) => {
       return res.status(400).json({ error: 'grupoIds debe contener números válidos.' })
     }
 
-    // Grupos con curso_id
+    // Grupos con curso_id (+ posibles columnas de profesor/asignación según esquema)
     const { data: grupos, error: gruposError } = await SupabaseDB.supabaseAdmin
       .from('grupos')
-      .select('id, curso_id')
+      .select('id, curso_id, profesor_id, asignacion_profesor_id')
       .in('id', ids)
 
-    if (gruposError) {
+    // Fallback si el esquema no tiene profesor_id / asignacion_profesor_id
+    if (gruposError && (gruposError.code === '42703' || String(gruposError?.message || '').includes('column'))) {
+      const respFallback = await SupabaseDB.supabaseAdmin
+        .from('grupos')
+        .select('id, curso_id')
+        .in('id', ids)
+      if (respFallback.error) {
+        console.error('Error grupos en batch (fallback):', respFallback.error)
+        return res.status(500).json({ error: 'Error obteniendo grupos', details: respFallback.error.message })
+      }
+      // @ts-ignore
+      ;(respFallback as any).data && (gruposError as any) // noop, solo para mantener estructura mental
+      // @ts-ignore
+      ;(grupos as any) // noop
+      // usaremos más abajo el resultado del fallback
+      // (nota: para simplicidad, reasignamos con una variable)
+      // eslint-disable-next-line no-inner-declarations
+      const gruposListFallback = respFallback.data || []
+      // Reemplazar el resultado original
+      // @ts-ignore
+      ;(req as any).__gruposListFallback = gruposListFallback
+    } else if (gruposError) {
       console.error('Error grupos en batch:', gruposError)
       return res.status(500).json({ error: 'Error obteniendo grupos', details: gruposError.message })
     }
 
-    const gruposList = grupos || []
+    // Tomar grupos desde fallback si aplica
+    // @ts-ignore
+    const gruposList = ((req as any).__gruposListFallback as any[]) || (grupos || [])
     const grupoById = new Map(gruposList.map((g: any) => [g.id, g]))
 
-    // Asignaciones profesor por grupo
-    const { data: asignaciones, error: asigError } = await SupabaseDB.supabaseAdmin
-      .from('asignaciones_profesor')
-      .select('id, grupo_id, profesor_id, curso_id')
-      .in('grupo_id', ids)
-      .eq('activa', true)
-
+    // Asignaciones profesor por grupo (tabla preferida) con fallback a cursos_profesor
+    let asignaciones: any[] = []
+    let asigError: any = null
+    try {
+      const respA = await SupabaseDB.supabaseAdmin
+        .from('asignaciones_profesor')
+        .select('id, grupo_id, profesor_id, curso_id')
+        .in('grupo_id', ids)
+        .eq('activa', true)
+      asignaciones = respA.data || []
+      asigError = respA.error || null
+    } catch (e) {
+      asigError = e
+    }
     if (asigError) {
-      console.error('Error asignaciones en batch:', asigError)
-      return res.status(500).json({ error: 'Error obteniendo asignaciones', details: asigError.message })
+      console.warn('Fallo asignaciones_profesor en batch; intentando cursos_profesor. Detalle:', asigError)
+      const respB = await SupabaseDB.supabaseAdmin
+        .from('cursos_profesor')
+        .select('id, grupo_id, profesor_id, curso_id')
+        .in('grupo_id', ids)
+      if (respB.error) {
+        console.error('Error cursos_profesor en batch:', respB.error)
+        return res.status(500).json({ error: 'Error obteniendo asignaciones', details: respB.error.message })
+      }
+      asignaciones = respB.data || []
     }
 
     const asignacionByGrupoId = new Map<number, any>()
@@ -60,15 +98,34 @@ router.post('/batch', authenticateToken, async (req: any, res) => {
     })
 
     const created: { grupoId: number; token: string }[] = []
+    const skipped: { grupoId: number; reason: string }[] = []
     const periodoId = req.body?.periodo_id != null ? Number(req.body.periodo_id) : null
 
     for (const grupoId of ids) {
       const grupo = grupoById.get(grupoId)
       if (!grupo) continue
       const asig = asignacionByGrupoId.get(grupoId)
-      const profesorId = asig?.profesor_id ?? null
+      // Resolver profesorId: asignación por grupo > grupo.profesor_id > asignacion_profesor_id
+      let profesorId = asig?.profesor_id ?? (grupo as any)?.profesor_id ?? null
       const cursoId = Number(grupo.curso_id ?? asig?.curso_id ?? 0)
       if (!cursoId) continue
+
+      // Si el esquema tiene asignacion_profesor_id, intentar resolverlo
+      if (!profesorId && (grupo as any)?.asignacion_profesor_id) {
+        const { data: asgRow, error: asgErr } = await SupabaseDB.supabaseAdmin
+          .from('asignaciones_profesor')
+          .select('id, profesor_id')
+          .eq('id', (grupo as any).asignacion_profesor_id)
+          .maybeSingle()
+        if (!asgErr && asgRow?.profesor_id) {
+          profesorId = asgRow.profesor_id
+        }
+      }
+
+      if (!profesorId) {
+        skipped.push({ grupoId, reason: 'No se pudo resolver profesor_id para este grupo (sin asignación).' })
+        continue
+      }
 
       const token = randomUUID()
 
@@ -94,7 +151,7 @@ router.post('/batch', authenticateToken, async (req: any, res) => {
       created.push({ grupoId, token })
     }
 
-    res.status(201).json({ created })
+    res.status(201).json({ created, skipped })
   } catch (error) {
     console.error('Error POST /qr-evaluaciones/batch:', error)
     res.status(500).json({ error: 'Error interno del servidor' })
@@ -114,7 +171,32 @@ router.get('/:token', async (req: any, res) => {
 
     const { data: row, error } = await SupabaseDB.supabaseAdmin
       .from('qr_evaluaciones')
-      .select('id, token, profesor_id, curso_id, grupo_id, periodo_id')
+      .select(`
+        id,
+        token,
+        profesor_id,
+        curso_id,
+        grupo_id,
+        periodo_id,
+        profesor:profesores(
+          id,
+          usuario:usuarios(
+            nombre,
+            apellido
+          )
+        ),
+        curso:cursos(
+          id,
+          nombre,
+          codigo
+        ),
+        grupo:grupos(
+          id,
+          numero_grupo,
+          horario,
+          aula
+        )
+      `)
       .eq('token', token)
       .eq('activo', true)
       .maybeSingle()
@@ -128,12 +210,19 @@ router.get('/:token', async (req: any, res) => {
       return res.status(404).json({ error: 'QR inválido o expirado.' })
     }
 
+    const profesorNombre = `${row.profesor?.usuario?.nombre || ''} ${row.profesor?.usuario?.apellido || ''}`.trim()
     res.json({
       profesorId: row.profesor_id,
       cursoId: row.curso_id,
       materiaId: row.curso_id,
       grupoId: row.grupo_id,
-      periodoId: row.periodo_id ?? null
+      periodoId: row.periodo_id ?? null,
+      profesorNombre: profesorNombre || null,
+      cursoNombre: row.curso?.nombre ?? null,
+      cursoCodigo: row.curso?.codigo ?? null,
+      grupoNumero: row.grupo?.numero_grupo ?? null,
+      grupoHorario: row.grupo?.horario ?? null,
+      grupoAula: row.grupo?.aula ?? null
     })
   } catch (error) {
     console.error('Error GET /qr-evaluaciones/:token:', error)

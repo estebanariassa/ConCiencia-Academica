@@ -122,12 +122,17 @@ export default function ScheduleSurveys() {
     if (missing.length === 0) return
     const resp = await apiClient.post('/api/qr-evaluaciones/batch', { grupoIds: missing })
     const created = (resp.data?.created || []) as Array<{ grupoId: number; token: string }>
+    const skipped = (resp.data?.skipped || []) as Array<{ grupoId: number; reason: string }>
     if (created.length > 0) {
       setQrTokensByGrupoId(prev => {
         const next = { ...prev }
         created.forEach(item => { next[Number(item.grupoId)] = item.token })
         return next
       })
+    }
+    if (skipped.length > 0) {
+      console.warn('QRs omitidos por falta de profesor_id:', skipped)
+      alert(`Se omitieron ${skipped.length} grupo(s) porque no tienen profesor asignado.`)
     }
   }
 

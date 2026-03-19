@@ -52,10 +52,42 @@ export default function EvaluationForm() {
         // Obtener preguntas según el curso (no la carrera del estudiante)
         if (course?.id) {
           const questionsData = await fetchEvaluationQuestions(String(course.id));
-          setQuestions(questionsData.questions);
-          setRatings(Array(questionsData.questions.length).fill(0));
-          setTextAnswers(Array(questionsData.questions.length).fill(''));
-          console.log('✅ Questions loaded for course:', questionsData.courseName, 'Code:', questionsData.courseCode, 'Career ID:', questionsData.carreraId, 'Count:', questionsData.questions.length);
+        const fetchedQuestions: EvaluationQuestion[] = questionsData.questions || [];
+
+        // Si el backend no encontró preguntas, usar fallback (evita pantalla en blanco)
+        if (fetchedQuestions.length === 0) {
+          const defaultQuestions: EvaluationQuestion[] = [
+            { id: '1', category: 'Claridad Expositiva', question: 'El profesor explica claramente los conceptos del curso', type: 'rating' },
+            { id: '2', category: 'Dominio del Tema', question: 'El profesor demuestra amplio conocimiento de la materia', type: 'rating' },
+            { id: '3', category: 'Disponibilidad', question: 'El profesor está disponible para resolver dudas', type: 'rating' },
+            { id: '4', category: 'Material de Clase', question: 'El material proporcionado es adecuado y útil', type: 'rating' },
+            { id: '5', category: 'Evaluación Justa', question: 'Las evaluaciones reflejan adecuadamente los contenidos', type: 'rating' },
+            { id: '6', category: 'Motivación', question: 'El profesor motiva a los estudiantes a participar', type: 'rating' },
+            { id: '7', category: 'Organización', question: 'Las clases están bien organizadas y estructuradas', type: 'rating' },
+            { id: '8', category: 'Retroalimentación', question: 'Proporciona retroalimentación útil sobre el progreso', type: 'rating' },
+            { id: '9', category: 'Respeto', question: 'Muestra respeto por las opiniones de los estudiantes', type: 'rating' },
+            { id: '10', category: 'Innovación', question: 'Utiliza métodos innovadores en la enseñanza', type: 'rating' }
+          ];
+
+          setQuestions(defaultQuestions);
+          setRatings(Array(defaultQuestions.length).fill(0));
+          setTextAnswers(Array(defaultQuestions.length).fill(''));
+        } else {
+          setQuestions(fetchedQuestions);
+          setRatings(Array(fetchedQuestions.length).fill(0));
+          setTextAnswers(Array(fetchedQuestions.length).fill(''));
+        }
+
+        console.log(
+          '✅ Questions loaded for course:',
+          questionsData.courseName,
+          'Code:',
+          questionsData.courseCode,
+          'Career ID:',
+          questionsData.carreraId,
+          'Count:',
+          fetchedQuestions.length
+        );
         } else {
           throw new Error('No course ID available');
         }
@@ -219,7 +251,8 @@ export default function EvaluationForm() {
   };
 
   const totalSteps = questions.length + 1; // Preguntas + sección de comentarios
-  const currentStep = showCommentsSection ? totalSteps : currentQuestion + 1;
+  // Modo “scroll”: no usamos navegación por pasos, así que dejamos el indicador como completo.
+  const currentStep = totalSteps;
 
   // Mostrar loading mientras se cargan las preguntas
   if (loading) {
@@ -269,11 +302,11 @@ export default function EvaluationForm() {
         />
 
         <div className="bg-white border-b border-gray-200 py-3">
-          <div className="max-w-4xl mx-auto px-4 lg:px-6">
-            <ProgressBar 
-              current={currentStep} 
-              total={totalSteps} 
-              label={showCommentsSection ? 'Comentarios' : `Pregunta ${currentQuestion + 1} de ${questions.length}`}
+              <div className="max-w-4xl mx-auto px-4 lg:px-6">
+            <ProgressBar
+              current={currentStep}
+              total={totalSteps}
+              label="Responde desplazándote y luego finaliza"
             />
           </div>
         </div>
@@ -347,116 +380,122 @@ export default function EvaluationForm() {
             </Card>
           </motion.div>
 
-          {!showCommentsSection ? (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="bg-white shadow-lg border border-gray-200 p-6">
-                <CardHeader className="pb-6">
-                  <CardTitle className="text-2xl font-bold text-gray-900">
-                    {questions[currentQuestion].category}
-                  </CardTitle>
-                  <CardDescription className="text-xl text-gray-700 mt-2">
-                    {questions[currentQuestion].question}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-8">
-                    {questions[currentQuestion].type === 'rating' ? (
-                      <>
-                        <LikertScale
-                          value={ratings[currentQuestion]}
-                          onChange={handleRatingSelect}
-                          options={5}
-                          leftLabel="En desacuerdo"
-                          rightLabel="De acuerdo"
-                        />
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            {/* Lista de preguntas (scroll) */}
+            <Card className="bg-white shadow-lg border border-gray-200 p-6">
+              <CardHeader className="pb-6">
+                <CardTitle className="text-2xl font-bold text-gray-900">
+                  Preguntas de evaluación
+                </CardTitle>
+                <CardDescription className="text-xl text-gray-700 mt-2">
+                  Desplázate, responde y al final finaliza la evaluación.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="max-h-[58vh] overflow-auto pr-2 space-y-8">
+                  {questions.map((q, idx) => {
+                    const rating = ratings[idx] ?? 0
+                    const text = textAnswers[idx] ?? ''
 
-                        {ratings[currentQuestion] > 0 && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className={`text-center p-6 rounded-2xl text-xl font-semibold border-2 ${
-                              ratings[currentQuestion] >= 4
-                                ? 'bg-green-50 text-green-800 border-green-200'
-                                : ratings[currentQuestion] >= 3
-                                ? 'bg-red-50 text-red-800 border-red-200'
-                                : 'bg-red-50 text-red-800 border-red-200'
-                            }`}
-                          >
-                            Has calificado: {ratings[currentQuestion]}/5
-                            <br />
-                            <span className="text-lg font-medium">
-                              {ratingLabels[ratings[currentQuestion] - 1]}
+                    return (
+                      <div key={q.id} className="space-y-4 pb-6 border-b border-gray-100">
+                        <div className="space-y-2">
+                          <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+                            <span className="text-university-red text-base font-extrabold">
+                              {idx + 1}
                             </span>
-                          </motion.div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                          <p className="text-red-800 text-sm font-medium flex items-center gap-2">
-                            <FaCommentDots className="text-red-600" />
-                            Esta es una pregunta abierta. Escribe tu respuesta en el campo de texto.
-                          </p>
+                            <span className="text-gray-900">{q.category}</span>
+                          </h3>
+                          <p className="text-lg text-gray-700">{q.question}</p>
                         </div>
-                        
-                        <textarea
-                          value={textAnswers[currentQuestion]}
-                          onChange={(e) => handleTextAnswerChange(e.target.value)}
-                          placeholder={questions[currentQuestion].options?.placeholder || "Escribe tu respuesta aquí..."}
-                          className="w-full h-32 p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-lg"
-                          maxLength={500}
-                        />
-                        
-                        <div className="text-right text-sm text-gray-500">
-                          {textAnswers[currentQuestion].length}/500 caracteres
-                        </div>
-                        
-                        {textAnswers[currentQuestion].trim() && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-red-50 border border-red-200 rounded-lg p-4"
-                          >
-                            <p className="text-red-800 text-sm font-medium flex items-center gap-2">
-                              <FaCheckCircle className="text-green-600" />
-                              Respuesta guardada 
-                            </p>
-                          </motion.div>
+
+                        {q.type === 'rating' ? (
+                          <>
+                            <LikertScale
+                              value={rating}
+                              onChange={(val) => {
+                                const next = [...ratings]
+                                next[idx] = val
+                                setRatings(next)
+                              }}
+                              options={5}
+                              leftLabel="En desacuerdo"
+                              rightLabel="De acuerdo"
+                            />
+
+                            {rating > 0 && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className={`mt-2 w-full flex justify-center`}
+                              >
+                                <div
+                                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border-2 ${
+                                    rating >= 4
+                                      ? 'bg-green-50 text-green-800 border-green-200'
+                                      : rating >= 3
+                                      ? 'bg-red-50 text-red-800 border-red-200'
+                                      : 'bg-red-50 text-red-800 border-red-200'
+                                  }`}
+                                >
+                                  <span>Has calificado {rating}/5</span>
+                                  <span className="font-bold">{ratingLabels[rating - 1]}</span>
+                                </div>
+                              </motion.div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                              <p className="text-red-800 text-sm font-medium flex items-center gap-2">
+                                <FaCommentDots className="text-red-600" />
+                                Esta es una pregunta abierta.
+                              </p>
+                            </div>
+
+                            <textarea
+                              value={text}
+                              onChange={(e) => {
+                                const next = [...textAnswers]
+                                next[idx] = e.target.value
+                                setTextAnswers(next)
+                              }}
+                              placeholder={q.options?.placeholder || 'Escribe tu respuesta aquí...'}
+                              className="w-full h-32 p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-lg"
+                              maxLength={500}
+                            />
+
+                            <div className="text-right text-sm text-gray-500">
+                              {text.length}/500 caracteres
+                            </div>
+
+                            {text.trim() && (
+                              <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-red-50 border border-red-200 rounded-lg p-4"
+                              >
+                                <p className="text-red-800 text-sm font-medium flex items-center gap-2">
+                                  <FaCheckCircle className="text-green-600" />
+                                  Respuesta guardada
+                                </p>
+                              </motion.div>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
 
-                  <div className="flex justify-between mt-12">
-                    <Button
-                      variant="outline"
-                      onClick={handlePrevious}
-                      disabled={currentQuestion === 0}
-                      className="px-8 py-4 text-lg border-2"
-                    >
-                      Anterior
-                    </Button>
-                    <Button
-                      onClick={handleNext}
-                      className="bg-university-red hover:bg-university-red px-8 py-4 text-lg"
-                    >
-                      {currentQuestion === questions.length - 1 ? 'Ir a comentarios' : 'Siguiente'}
-                      <ChevronRight className="h-6 w-6 ml-2" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
+            {/* Comentarios (siempre visible) */}
+            <div className="mt-6">
               <Card className="bg-white shadow-lg border border-gray-200 p-6">
                 <CardHeader className="pb-6">
                   <CardTitle className="text-2xl font-bold text-gray-900">
@@ -476,26 +515,18 @@ export default function EvaluationForm() {
                     />
                   </div>
 
-                  <div className="flex justify-between mt-12">
-                    <Button
-                      variant="outline"
-                      onClick={handleBackToQuestions}
-                      className="px-8 py-4 text-lg border-2"
-                    >
-                      Volver a Preguntas
-                    </Button>
+                  <div className="flex justify-end mt-8">
                     <Button
                       onClick={handleSubmit}
                       className="bg-university-red hover:bg-university-red px-8 py-4 text-lg"
                     >
                       Finalizar Evaluación
-                      <ChevronRight className="h-6 w-6 ml-2" />
                     </Button>
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
-          )}
+            </div>
+          </motion.div>
         </main>
       </div>
 
