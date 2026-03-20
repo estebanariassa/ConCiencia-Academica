@@ -73,7 +73,15 @@ export default function ScheduleSurveys() {
   }
 
   const selectAll = () => {
-    setSelectedIds(cursos.map(c => c.id))
+    const q = tableSearch.trim().toLowerCase()
+    const visible = !q
+      ? cursos
+      : cursos.filter(c =>
+        `${c.cursoNombre} ${c.cursoCodigo} ${c.grupo} ${c.profesorNombre}`.toLowerCase().includes(q)
+      )
+
+    // Evitar duplicados si por alguna razón vienen repetidos
+    setSelectedIds(Array.from(new Set(visible.map(c => c.id))))
   }
 
   const clearSelection = () => {
@@ -118,7 +126,8 @@ export default function ScheduleSurveys() {
   }
 
   const ensureTokensForGrupoIds = async (grupoIds: number[]) => {
-    const missing = grupoIds.filter(id => !qrTokensByGrupoId[id])
+    const uniqueGrupoIds = Array.from(new Set(grupoIds))
+    const missing = uniqueGrupoIds.filter(id => !qrTokensByGrupoId[id])
     if (missing.length === 0) return
     const resp = await apiClient.post('/api/qr-evaluaciones/batch', { grupoIds: missing })
     const created = (resp.data?.created || []) as Array<{ grupoId: number; token: string }>
@@ -137,7 +146,10 @@ export default function ScheduleSurveys() {
   }
 
   const openQrModal = async () => {
-    if (selectedIds.length === 0) {
+    const validSelected = selectedIds.filter(id => cursos.some(c => c.id === id))
+    const uniqueSelected = Array.from(new Set(validSelected))
+
+    if (uniqueSelected.length === 0) {
       alert('Selecciona al menos un curso/grupo para generar QR.')
       return
     }
@@ -152,7 +164,7 @@ export default function ScheduleSurveys() {
     // Generar tokens reales si aún no existen (o si faltan algunos)
     try {
       setGeneratingQrs(true)
-      await ensureTokensForGrupoIds(selectedIds)
+      await ensureTokensForGrupoIds(uniqueSelected)
     } catch (err) {
       console.error('Error generando QRs (modal):', err)
       // Dejamos el modal abierto con previsualización dummy

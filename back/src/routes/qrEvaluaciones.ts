@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { randomUUID } from 'crypto'
 import { SupabaseDB } from '../config/supabase-only'
 import { authenticateToken } from '../middleware/auth'
+import { RoleService } from '../services/roleService'
 
 const router = Router()
 
@@ -26,6 +27,18 @@ router.post('/batch', authenticateToken, async (req: any, res) => {
     const ids = grupoIds.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n))
     if (ids.length === 0) {
       return res.status(400).json({ error: 'grupoIds debe contener números válidos.' })
+    }
+
+    const isCoordinador = user?.roles?.includes('coordinador') || user?.tipo_usuario === 'coordinador'
+    let carreraId: number | null = null
+    if (isCoordinador) {
+      const coordinador = await RoleService.obtenerCoordinadorPorUsuario(user.id)
+      if (!coordinador?.carrera_id) {
+        return res.status(403).json({
+          error: 'Coordinador sin carrera asignada o no encontrado.',
+        })
+      }
+      carreraId = Number(coordinador.carrera_id)
     }
 
     // Grupos con curso_id (+ posibles columnas de profesor/asignación según esquema)
@@ -65,6 +78,25 @@ router.post('/batch', authenticateToken, async (req: any, res) => {
     const gruposList = ((req as any).__gruposListFallback as any[]) || (grupos || [])
     const grupoById = new Map(gruposList.map((g: any) => [g.id, g]))
 
+    // Seguridad: si el request viene de un coordinador, solo permitir grupos de su carrera
+    let allowedCursoIds: Set<number> | null = null
+    if (carreraId != null && gruposList.length > 0) {
+      const cursoIds = Array.from(new Set(gruposList.map((g: any) => Number(g.curso_id)).filter((n: number) => Number.isFinite(n))))
+      const { data: cursosOk, error: cursosErr } = await SupabaseDB.supabaseAdmin
+        .from('cursos')
+        .select('id')
+        .eq('carrera_id', carreraId)
+        .eq('activo', true)
+        .in('id', cursoIds)
+
+      if (cursosErr) {
+        console.error('Error verificando cursos por carreraId:', cursosErr)
+        return res.status(500).json({ error: 'Error verificando cursos', details: cursosErr.message })
+      }
+
+      allowedCursoIds = new Set((cursosOk || []).map((c: any) => Number(c.id)))
+    }
+
     // Asignaciones profesor por grupo (tabla preferida) con fallback a cursos_profesor
     let asignaciones: any[] = []
     let asigError: any = null
@@ -97,6 +129,23 @@ router.post('/batch', authenticateToken, async (req: any, res) => {
       asignacionByGrupoId.set(Number(a.grupo_id), a)
     })
 
+    // Idempotencia: si ya existe un QR activo para un grupo_id, reutilizar ese token.
+    const { data: existentes, error: existentesErr } = await SupabaseDB.supabaseAdmin
+      .from('qr_evaluaciones')
+      .select('grupo_id, token, profesor_id')
+      .eq('activo', true)
+      .in('grupo_id', ids)
+
+    if (existentesErr) {
+      console.error('Error buscando QRs existentes:', existentesErr)
+      return res.status(500).json({ error: 'Error verificando QRs existentes', details: existentesErr.message })
+    }
+
+    const existingByGrupoId = new Map<number, any>()
+    ;(existentes || []).forEach((r: any) => {
+      existingByGrupoId.set(Number(r.grupo_id), r)
+    })
+
     const created: { grupoId: number; token: string }[] = []
     const skipped: { grupoId: number; reason: string }[] = []
     const periodoId = req.body?.periodo_id != null ? Number(req.body.periodo_id) : null
@@ -104,6 +153,21 @@ router.post('/batch', authenticateToken, async (req: any, res) => {
     for (const grupoId of ids) {
       const grupo = grupoById.get(grupoId)
       if (!grupo) continue
+
+      if (allowedCursoIds) {
+        const cursoIdGrupo = Number((grupo as any).curso_id)
+        if (!allowedCursoIds.has(cursoIdGrupo)) {
+          skipped.push({ grupoId, reason: 'El grupo no pertenece a tu carrera.' })
+          continue
+        }
+      }
+
+      const existing = existingByGrupoId.get(grupoId)
+      if (existing?.token && existing?.profesor_id) {
+        created.push({ grupoId, token: existing.token })
+        continue
+      }
+
       const asig = asignacionByGrupoId.get(grupoId)
       // Resolver profesorId: asignación por grupo > grupo.profesor_id > asignacion_profesor_id
       let profesorId = asig?.profesor_id ?? (grupo as any)?.profesor_id ?? null
