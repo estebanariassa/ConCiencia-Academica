@@ -18,6 +18,7 @@ import ScheduleSurveys from './pages/ScheduleSurveys'
 import ManageProfessors from './pages/ManageProfessors'
 import SurveyResults from './pages/SurveyResults'
 import SurveyView from './pages/SurveyView'
+import EvaluationGoodbye from './pages/EvaluationGoodbye'
 import { User, Teacher, Course } from './types'
 import { useAuth } from './context/AuthContext'
 
@@ -141,6 +142,10 @@ function App() {
             <EvaluationFormWrapper />
           } 
         />
+        <Route
+          path="/evaluate/goodbye"
+          element={<EvaluationGoodbyeWrapper />}
+        />
         {/* Nueva ruta para reportes */}
         <Route 
           path="/reports" 
@@ -230,6 +235,15 @@ function EvaluationFormWrapper() {
     return <Navigate to="/login" replace />
   }
   return <EvaluationForm />
+}
+
+function EvaluationGoodbyeWrapper() {
+  const { user: authUser } = useAuth()
+
+  if (!authUser) {
+    return <Navigate to="/login" replace />
+  }
+  return <EvaluationGoodbye />
 }
 
 function ReportsPageWrapper() {

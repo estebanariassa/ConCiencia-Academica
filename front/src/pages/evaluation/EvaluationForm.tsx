@@ -220,8 +220,7 @@ export default function EvaluationForm() {
 
       console.log('✅ Evaluación enviada exitosamente:', result)
       setShowConfirmation(false)
-      alert('¡Evaluación completada exitosamente!')
-      navigate('/dashboard')
+      navigate('/evaluate/goodbye', { replace: true })
     } catch (e: any) {
       console.error('❌ Error enviando evaluación:', e)
       
