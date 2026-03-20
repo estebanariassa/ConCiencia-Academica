@@ -780,9 +780,18 @@ router.get('/:profesorId/stats/historical', authenticateToken, async (req: any, 
   }
 })
 
+// ID de profesor: en muchas BD es entero (serial); en otras puede ser UUID.
+const teacherIdSchema = z.union([
+  z.string().uuid('ID de profesor inválido'),
+  z
+    .string()
+    .regex(/^\d+$/, 'ID de profesor inválido')
+    .refine((s) => parseInt(s, 10) > 0, 'ID de profesor inválido'),
+])
+
 // Schema de validación para evaluaciones
 const evaluationSchema = z.object({
-  teacherId: z.string().uuid('ID de profesor inválido'),
+  teacherId: teacherIdSchema,
   courseId: z.union([
     z.string().uuid('ID de curso inválido (UUID)'),
     z.string().transform(val => parseInt(val, 10)).pipe(z.number().int().positive('ID de curso inválido (número)'))

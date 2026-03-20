@@ -250,9 +250,12 @@ export default function EvaluationForm() {
     setShowConfirmation(false);
   };
 
-  const totalSteps = questions.length + 1; // Preguntas + sección de comentarios
-  // Modo “scroll”: no usamos navegación por pasos, así que dejamos el indicador como completo.
-  const currentStep = totalSteps;
+  // Progreso real por respuestas contestadas (modo scroll)
+  const totalSteps = Math.max(questions.length, 1);
+  const currentStep = questions.reduce((acc, q, idx) => {
+    if (q.type === 'rating') return acc + ((ratings[idx] ?? 0) > 0 ? 1 : 0);
+    return acc + ((textAnswers[idx] ?? '').trim() ? 1 : 0);
+  }, 0);
 
   // Mostrar loading mientras se cargan las preguntas
   if (loading) {
@@ -306,7 +309,7 @@ export default function EvaluationForm() {
             <ProgressBar
               current={currentStep}
               total={totalSteps}
-              label="Responde desplazándote y luego finaliza"
+              label={`Responde desplazándote y luego finaliza (${currentStep}/${questions.length})`}
             />
           </div>
         </div>
