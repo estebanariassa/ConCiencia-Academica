@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { SupabaseDB } from '../config/supabase-only'
 import { authenticateToken } from '../middleware/auth'
 import { RoleService } from '../services/roleService'
+import { sendMail } from '../mailer'
 
 const router = Router()
 
@@ -219,6 +220,154 @@ router.post('/batch', authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Error POST /qr-evaluaciones/batch:', error)
     res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+/**
+ * POST /qr-evaluaciones/share-email
+ * Body: { to: string, subject: string, message?: string, grupoIds: number[] }
+ * Envía por correo los links de QR de los grupos seleccionados.
+ */
+router.post('/share-email', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    const isAdmin = user?.tipo_usuario === 'admin' || user?.roles?.includes('admin')
+    const isCoordinador = user?.tipo_usuario === 'coordinador' || user?.roles?.includes('coordinador')
+    if (!isAdmin && !isCoordinador) {
+      return res.status(403).json({ error: 'Solo coordinadores o administradores pueden compartir QRs por correo.' })
+    }
+
+    const { to, subject, message, grupoIds } = req.body || {}
+    const email = String(to || '').trim()
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email || !emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Correo de destino inválido.' })
+    }
+
+    const mailSubject = String(subject || '').trim()
+    if (!mailSubject) {
+      return res.status(400).json({ error: 'El asunto es requerido.' })
+    }
+
+    if (!Array.isArray(grupoIds) || grupoIds.length === 0) {
+      return res.status(400).json({ error: 'Se requiere grupoIds (array de IDs de grupo).' })
+    }
+    const ids = Array.from(new Set(grupoIds.map((id: any) => Number(id)).filter((n: number) => Number.isFinite(n))))
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'grupoIds debe contener números válidos.' })
+    }
+
+    let carreraId: number | null = null
+    if (isCoordinador) {
+      const coordinador = await RoleService.obtenerCoordinadorPorUsuario(user.id)
+      if (!coordinador?.carrera_id) {
+        return res.status(403).json({ error: 'Coordinador sin carrera asignada o no encontrado.' })
+      }
+      carreraId = Number(coordinador.carrera_id)
+    }
+
+    const { data: rows, error: rowsError } = await SupabaseDB.supabaseAdmin
+      .from('qr_evaluaciones')
+      .select(`
+        grupo_id,
+        token,
+        curso_id,
+        curso:cursos(id, nombre, codigo, carrera_id),
+        grupo:grupos(id, numero_grupo),
+        profesor:profesores(id, usuario:usuarios(nombre, apellido))
+      `)
+      .eq('activo', true)
+      .in('grupo_id', ids)
+
+    if (rowsError) {
+      console.error('Error consultando QRs para share-email:', rowsError)
+      return res.status(500).json({ error: 'Error consultando QRs', details: rowsError.message })
+    }
+
+    const rowsList = rows || []
+    if (rowsList.length === 0) {
+      return res.status(404).json({ error: 'No hay QRs activos para los grupos seleccionados.' })
+    }
+
+    const filteredRows = carreraId == null
+      ? rowsList
+      : rowsList.filter((r: any) => {
+          const curso = Array.isArray(r.curso) ? r.curso[0] : r.curso
+          return Number(curso?.carrera_id) === carreraId
+        })
+
+    if (filteredRows.length === 0) {
+      return res.status(403).json({ error: 'Los grupos seleccionados no pertenecen a tu carrera.' })
+    }
+
+    const appBaseUrl =
+      String(process.env.FRONTEND_URL || process.env.VITE_PUBLIC_APP_URL || 'http://localhost:5173').replace(/\/+$/, '')
+
+    const links = filteredRows.map((r: any) => {
+      const curso = Array.isArray(r.curso) ? r.curso[0] : r.curso
+      const grupo = Array.isArray(r.grupo) ? r.grupo[0] : r.grupo
+      const profesor = Array.isArray(r.profesor) ? r.profesor[0] : r.profesor
+      const usuario = Array.isArray(profesor?.usuario) ? profesor?.usuario[0] : profesor?.usuario
+      const profesorNombre = `${String(usuario?.nombre || '')} ${String(usuario?.apellido || '')}`.trim() || 'Docente'
+      return {
+        grupoId: Number(r.grupo_id),
+        url: `${appBaseUrl}/qr-evaluacion?token=${encodeURIComponent(String(r.token))}`,
+        cursoNombre: String(curso?.nombre || 'Curso'),
+        cursoCodigo: String(curso?.codigo || ''),
+        grupoNumero: String(grupo?.numero_grupo ?? r.grupo_id),
+        profesorNombre
+      }
+    })
+
+    const textBody =
+      `${String(message || '').trim()}\n\n` +
+      links
+        .map((l, idx) => `${idx + 1}. ${l.cursoNombre} (${l.cursoCodigo}) - Grupo ${l.grupoNumero} - ${l.profesorNombre}\n${l.url}`)
+        .join('\n\n')
+
+    const htmlItems = links
+      .map(
+        (l, idx) =>
+          `<li style="margin-bottom:12px">
+            <strong>${idx + 1}. ${l.cursoNombre} (${l.cursoCodigo})</strong><br/>
+            Grupo: ${l.grupoNumero}<br/>
+            Docente: ${l.profesorNombre}<br/>
+            <a href="${l.url}" target="_blank" rel="noreferrer">${l.url}</a>
+          </li>`
+      )
+      .join('')
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; color: #111827;">
+        <p>${String(message || '').trim() || 'Compartimos los códigos QR de evaluación para los siguientes grupos:'}</p>
+        <ol>${htmlItems}</ol>
+      </div>
+    `
+
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS || !process.env.SMTP_FROM) {
+      return res.status(503).json({
+        error: 'Servicio de correo no configurado. Faltan variables SMTP en el backend.'
+      })
+    }
+
+    await sendMail({
+      to: email,
+      subject: mailSubject,
+      text: textBody,
+      html: htmlBody
+    })
+
+    res.json({
+      message: 'Correo enviado correctamente',
+      sentTo: email,
+      totalLinks: links.length
+    })
+  } catch (error: any) {
+    console.error('Error POST /qr-evaluaciones/share-email:', error)
+    res.status(500).json({
+      error: 'Error enviando el correo',
+      details: error?.message || 'Error interno del servidor'
+    })
   }
 })
 

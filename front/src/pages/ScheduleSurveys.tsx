@@ -47,6 +47,11 @@ export default function ScheduleSurveys() {
   const [generatingQrs, setGeneratingQrs] = useState(false)
   const [qrTokensByGrupoId, setQrTokensByGrupoId] = useState<Record<number, string>>({})
   const [tableSearch, setTableSearch] = useState('')
+  const [emailModalOpen, setEmailModalOpen] = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailTo, setEmailTo] = useState('')
+  const [emailSubject, setEmailSubject] = useState('Encuestas de evaluación temprana - Códigos QR')
+  const [emailMessage, setEmailMessage] = useState('Hola,\n\nTe comparto los códigos QR para responder las encuestas de evaluación temprana.\n\nSaludos.')
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -108,6 +113,11 @@ export default function ScheduleSurveys() {
       `${c.cursoNombre} ${c.cursoCodigo} ${c.grupo} ${c.profesorNombre}`.toLowerCase().includes(q)
     )
   }, [qrSearch, selectedCursos])
+
+  const emailPreviewCursos = useMemo(
+    () => selectedCursos.filter(c => !!qrTokensByGrupoId[c.id]),
+    [selectedCursos, qrTokensByGrupoId]
+  )
 
   const perPage = 3
   const totalPages = Math.max(1, Math.ceil(filteredSelectedCursos.length / perPage))
@@ -188,33 +198,57 @@ export default function ScheduleSurveys() {
     }
   }
 
-  const shareCurrentPage = async () => {
-    if (pageCursos.length === 0) return
-    if (generatingQrs || !visibleHaveTokens) {
-      alert('Aún se están generando los tokens reales. Espera un momento y vuelve a intentar.')
+  const openEmailShareModal = async () => {
+    if (selectedCursos.length === 0) {
+      alert('Selecciona al menos un curso/grupo para compartir.')
       return
     }
-    const urls = pageCursos.map(c => buildQrUrl(c.id, c.cursoCodigo, c.grupo))
-    const text = urls.join('\n')
+    const ids = selectedCursos.map(c => c.id)
     try {
-      if ((navigator as any).share && urls.length === 1) {
-        await (navigator as any).share({
-          title: 'QR de evaluación',
-          text: 'Enlace del QR de evaluación:',
-          url: urls[0],
-        })
-        return
-      }
+      setGeneratingQrs(true)
+      await ensureTokensForGrupoIds(ids)
+      setEmailModalOpen(true)
     } catch (e) {
-      // si falla share, cae a copiar
-      console.warn('Share no disponible/falló, copiando al portapapeles:', e)
+      console.error('No se pudieron asegurar tokens para compartir por correo:', e)
+      alert('No se pudieron generar/validar los tokens para compartir.')
+    } finally {
+      setGeneratingQrs(false)
     }
+  }
+
+  const sendShareEmail = async () => {
+    const to = emailTo.trim()
+    const subject = emailSubject.trim()
+    const grupoIds = emailPreviewCursos.map(c => c.id)
+    if (!to) {
+      alert('Ingresa un correo de destino.')
+      return
+    }
+    if (!subject) {
+      alert('Ingresa un asunto para el correo.')
+      return
+    }
+    if (grupoIds.length === 0) {
+      alert('No hay QRs disponibles para enviar.')
+      return
+    }
+
     try {
-      await navigator.clipboard.writeText(text)
-      alert('Links copiados al portapapeles.')
-    } catch (e) {
-      console.warn('No se pudo copiar al portapapeles:', e)
-      alert('No se pudo compartir automáticamente. Copia los links desde el navegador.')
+      setSendingEmail(true)
+      await apiClient.post('/api/qr-evaluaciones/share-email', {
+        to,
+        subject,
+        message: emailMessage,
+        grupoIds
+      })
+      setEmailModalOpen(false)
+      alert('Correo enviado correctamente.')
+    } catch (e: any) {
+      console.error('Error enviando correo de QRs:', e)
+      const msg = e?.response?.data?.error || e?.response?.data?.details || e?.message || 'No se pudo enviar el correo.'
+      alert(String(msg))
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -418,7 +452,7 @@ export default function ScheduleSurveys() {
             >
               <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-lg font-semibold text-gray-900">Códigos QR de evaluación</p>
+                  <p className="text-lg font-semibold text-gray-900">Códigos QR de evaluación temprana</p>
                   <p className="text-sm text-gray-600">
                     Mostrando {filteredSelectedCursos.length} seleccionado(s). Vista en carrusel de {perPage}.
                   </p>
@@ -527,8 +561,8 @@ export default function ScheduleSurveys() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={shareCurrentPage}
-                  disabled={pageCursos.length === 0 || generatingQrs || !visibleHaveTokens}
+                  onClick={openEmailShareModal}
+                  disabled={selectedCursos.length === 0 || generatingQrs}
                 >
                   Compartir
                 </Button>
@@ -545,6 +579,111 @@ export default function ScheduleSurveys() {
           </div>
         </motion.div>
       )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {emailModalOpen && (
+          <motion.div
+            className="fixed inset-0 z-[60]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="absolute inset-0 bg-black bg-opacity-60"
+              onClick={() => !sendingEmail && setEmailModalOpen(false)}
+            />
+
+            <div className="absolute inset-0 flex items-center justify-center p-4">
+              <motion.div
+                className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden max-h-[86vh] flex flex-col"
+                initial={{ opacity: 0, y: 20, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.98 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+              >
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">Compartir QRs por correo</p>
+                    <p className="text-sm text-gray-600">
+                      Define destinatario y asunto antes de enviar.
+                    </p>
+                  </div>
+                  <Button variant="outline" onClick={() => setEmailModalOpen(false)} disabled={sendingEmail}>
+                    Cerrar
+                  </Button>
+                </div>
+
+                <div className="p-5 space-y-4 overflow-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Correo destino</label>
+                      <input
+                        type="email"
+                        value={emailTo}
+                        onChange={(e) => setEmailTo(e.target.value)}
+                        placeholder="ejemplo@universidad.edu.co"
+                        className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Asunto</label>
+                      <input
+                        value={emailSubject}
+                        onChange={(e) => setEmailSubject(e.target.value)}
+                        placeholder="Asunto del correo"
+                        className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Mensaje</label>
+                    <textarea
+                      value={emailMessage}
+                      onChange={(e) => setEmailMessage(e.target.value)}
+                      rows={4}
+                      className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    />
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-sm font-medium text-gray-800 mb-2">
+                      QRs que se enviarán ({emailPreviewCursos.length})
+                    </p>
+                    {emailPreviewCursos.length === 0 ? (
+                      <p className="text-sm text-gray-500">No hay QRs listos para enviar.</p>
+                    ) : (
+                      <div className="max-h-52 overflow-auto space-y-2">
+                        {emailPreviewCursos.map((c) => (
+                          <div key={c.id} className="text-sm text-gray-700 border border-gray-200 bg-white rounded-md p-2">
+                            <p className="font-medium">{c.cursoNombre} ({c.cursoCodigo})</p>
+                            <p>Grupo: {c.grupo} | Docente: {c.profesorNombre}</p>
+                            <p className="text-xs text-gray-500 break-all">{buildQrUrl(c.id, c.cursoCodigo, c.grupo)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+                  <Button variant="outline" onClick={() => setEmailModalOpen(false)} disabled={sendingEmail}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={sendShareEmail}
+                    disabled={sendingEmail || emailPreviewCursos.length === 0}
+                    className="bg-university-red hover:bg-red-700 text-white"
+                  >
+                    {sendingEmail ? 'Enviando...' : 'Enviar correo'}
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   )
