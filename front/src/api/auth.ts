@@ -73,6 +73,12 @@ export const authApi = {
 
   isAuthenticated: () => {
     return !!localStorage.getItem('token')
+  },
+
+  /** Perfil vía middleware JWT (`GET /api/auth/profile`). */
+  getProfile: async () => {
+    const { data } = await apiClient.get('/api/auth/profile')
+    return data
   }
 }
 

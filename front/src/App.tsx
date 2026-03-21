@@ -19,6 +19,9 @@ import ManageProfessors from './pages/ManageProfessors'
 import SurveyResults from './pages/SurveyResults'
 import SurveyView from './pages/SurveyView'
 import EvaluationGoodbye from './pages/EvaluationGoodbye'
+import ForbiddenPage from './pages/ForbiddenPage'
+import AdminUsersPage from './pages/AdminUsersPage'
+import ProfilePage from './pages/ProfilePage'
 import { User, Teacher, Course } from './types'
 import { useAuth } from './context/AuthContext'
 
@@ -60,6 +63,23 @@ function App() {
           element={
             user ? <Navigate to="/dashboard" replace /> : <ForgotPassword />
           } 
+        />
+        <Route path="/forbidden" element={<ForbiddenPage />} />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminUsersPage />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/qr-evaluacion"

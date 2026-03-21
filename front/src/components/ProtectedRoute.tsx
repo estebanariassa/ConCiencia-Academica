@@ -5,45 +5,54 @@ import { useAuth } from '../context/AuthContext';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   fallback?: React.ReactNode;
+  /** Si se define, el usuario debe tener al menos uno de estos roles (según `hasRole`). */
+  allowedRoles?: string[];
+  /** Ruta si el usuario está autenticado pero sin rol permitido (403). Por defecto `/forbidden`. */
+  forbiddenRedirect?: string;
 }
 
-export default function ProtectedRoute({ children, fallback }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+export default function ProtectedRoute({
+  children,
+  fallback,
+  allowedRoles,
+  forbiddenRedirect = '/forbidden'
+}: ProtectedRouteProps) {
+  const { user, loading, hasRole } = useAuth();
   const navigate = useNavigate();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // Verificar si hay token en localStorage
-        const token = localStorage.getItem('token');
-        const savedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
 
-        if (!token || !savedUser) {
-          console.log('🔒 No hay token o usuario guardado, redirigiendo al login');
-          navigate('/login', { replace: true });
-          return;
-        }
+    if (!token || !savedUser) {
+      setIsChecking(false);
+      navigate('/login', { replace: true });
+      return;
+    }
 
-        // Verificar que el usuario existe en el contexto
-        if (!user && !loading) {
-          console.log('🔒 Usuario no encontrado en contexto, redirigiendo al login');
-          navigate('/login', { replace: true });
-          return;
-        }
+    if (loading) {
+      return;
+    }
 
-        console.log('✅ Usuario autenticado correctamente');
-        setIsChecking(false);
-      } catch (error) {
-        console.error('❌ Error verificando autenticación:', error);
-        navigate('/login', { replace: true });
-      }
-    };
+    if (!user) {
+      setIsChecking(false);
+      navigate('/login', { replace: true });
+      return;
+    }
 
-    checkAuth();
+    setIsChecking(false);
   }, [user, loading, navigate]);
 
-  // Mostrar loading mientras se verifica la autenticación
+  useEffect(() => {
+    if (loading || isChecking || !user || !allowedRoles?.length) return;
+
+    const ok = allowedRoles.some((r) => hasRole(r));
+    if (!ok) {
+      navigate(forbiddenRedirect, { replace: true });
+    }
+  }, [user, loading, isChecking, allowedRoles, hasRole, navigate, forbiddenRedirect]);
+
   if (loading || isChecking) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -55,15 +64,24 @@ export default function ProtectedRoute({ children, fallback }: ProtectedRoutePro
     );
   }
 
-  // Si no hay usuario, mostrar fallback o redirigir
   if (!user) {
     if (fallback) {
       return <>{fallback}</>;
     }
-    return null; // El useEffect ya maneja la redirección
+    return null;
   }
 
-  // Usuario autenticado, mostrar contenido
+  if (allowedRoles?.length) {
+    const ok = allowedRoles.some((r) => hasRole(r));
+    if (!ok) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <p className="text-gray-600">Redirigiendo…</p>
+        </div>
+      );
+    }
+  }
+
   return <>{children}</>;
 }
 

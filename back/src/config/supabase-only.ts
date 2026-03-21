@@ -83,6 +83,17 @@ export class SupabaseDB {
     return count || 0
   }
 
+  /** Listado para administración: sin columna `password`. */
+  static async listUsersSummary() {
+    const { data, error } = await supabaseAdmin
+      .from('usuarios')
+      .select('id, email, nombre, apellido, tipo_usuario, activo, created_at')
+      .order('email')
+
+    if (error) throw error
+    return data ?? []
+  }
+
   // Evaluaciones
   static async createEvaluation(evaluationData: any) {
     const { data, error } = await supabaseAdmin

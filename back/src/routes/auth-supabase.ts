@@ -1,8 +1,12 @@
 import { Router } from 'express'
-import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { z } from 'zod'
 import { SupabaseDB } from '../config/supabase-only'
+import { authenticateToken, requireRole } from '../middleware/auth'
+import {
+  hashPassword,
+  verifyStoredPassword
+} from '../utils/passwordSecurity'
 
 const router = Router()
 
@@ -11,7 +15,7 @@ const registerSchema = z.object({
   nombre: z.string().min(2),
   apellido: z.string().min(2),
   tipo_usuario: z.enum(['estudiante', 'profesor', 'docente', 'coordinador', 'admin', 'decano']),
-  password: z.string().min(6),
+  password: z.string().min(8),
   // Campos opcionales para profesores
   codigo_profesor: z.string().optional(),
   departamento: z.string().optional(),
@@ -38,8 +42,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'El email ya está registrado' })
     }
 
-    // Hash de la contraseña
-    const hashedPassword = await bcrypt.hash(validatedData.password, 10)
+    const hashedPassword = await hashPassword(validatedData.password)
 
     // Crear usuario con inserción automática en tabla específica
     const user = await SupabaseDB.createUserWithType({
@@ -88,42 +91,48 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const validatedData = loginSchema.parse(req.body)
-    
-    console.log(`🔍 Intentando login para: ${validatedData.email}`)
-    
-    // Buscar usuario
+
     const user = await SupabaseDB.findUserByEmail(validatedData.email)
 
     if (!user) {
-      console.log(`❌ Usuario no encontrado: ${validatedData.email}`)
       return res.status(401).json({ error: 'Credenciales inválidas' })
     }
 
     if (!user.activo) {
-      console.log(`❌ Usuario inactivo: ${validatedData.email}`)
       return res.status(401).json({ error: 'Credenciales inválidas' })
     }
 
-    console.log(`✅ Usuario encontrado: ${user.nombre} ${user.apellido} (${user.tipo_usuario})`)
+    const passwordCheck = await verifyStoredPassword(
+      validatedData.password,
+      user.password
+    )
 
-    // Obtener roles múltiples del usuario
+    if (!passwordCheck.ok) {
+      return res.status(401).json({ error: 'Credenciales inválidas' })
+    }
+
+    if (passwordCheck.migratePlaintextToHash) {
+      try {
+        const hashedPassword = await hashPassword(passwordCheck.migratePlaintextToHash)
+        await SupabaseDB.updateUser(user.id, { password: hashedPassword })
+      } catch (updateError) {
+        console.error('Error migrando contraseña a bcrypt:', updateError)
+      }
+    }
+
     const { RoleService } = await import('../services/roleService')
     const roles = await RoleService.obtenerRolesUsuario(user.id)
-    console.log(`🎭 Roles del usuario: ${roles.join(', ')}`)
 
-    // Verificar tipo de usuario válido (tanto en tipo_usuario como en roles)
     const validUserTypes = ['estudiante', 'profesor', 'docente', 'coordinador', 'admin', 'decano']
-    const tieneRolValido = validUserTypes.includes(user.tipo_usuario) || 
-                          roles.some(rol => validUserTypes.includes(rol))
-    
+    const tieneRolValido =
+      validUserTypes.includes(user.tipo_usuario) ||
+      roles.some((rol) => validUserTypes.includes(rol))
+
     if (!tieneRolValido) {
-      console.log(`❌ Tipo de usuario inválido: ${user.tipo_usuario}, roles: ${roles.join(', ')}`)
       return res.status(401).json({ error: 'Tipo de usuario no válido' })
     }
 
-    // Si el usuario tiene múltiples roles, devolver información para selección
     if (roles.length > 1) {
-      console.log(`🎭 Usuario con múltiples roles: ${user.nombre} ${user.apellido}, roles: ${roles.join(', ')}`)
       return res.status(200).json({
         message: 'Usuario con múltiples roles detectado',
         user: {
@@ -140,39 +149,6 @@ router.post('/login', async (req, res) => {
       })
     }
 
-    // Verificar contraseña
-    let isValidPassword = false
-    
-    // Primero intentar con bcrypt (contraseña hasheada)
-    if (user.password.startsWith('$2b$') || user.password.startsWith('$2a$')) {
-      isValidPassword = await bcrypt.compare(validatedData.password, user.password)
-      console.log(`🔐 Verificación con bcrypt: ${isValidPassword}`)
-    } else {
-      // Si no está hasheada, comparar en texto plano (para compatibilidad)
-      isValidPassword = user.password === validatedData.password
-      console.log(`🔐 Verificación en texto plano: ${isValidPassword}`)
-      
-      // Si la contraseña es correcta pero no está hasheada, la hasheamos automáticamente
-      if (isValidPassword) {
-        console.log(`🔧 Hasheando contraseña para: ${validatedData.email}`)
-        const hashedPassword = await bcrypt.hash(validatedData.password, 10)
-        
-        // Actualizar la contraseña hasheada en la base de datos
-        try {
-          await SupabaseDB.updateUser(user.id, { password: hashedPassword })
-          console.log(`✅ Contraseña hasheada y actualizada para: ${validatedData.email}`)
-        } catch (updateError) {
-          console.error(`⚠️ Error actualizando contraseña hasheada:`, updateError)
-          // Continuar con el login aunque no se haya actualizado
-        }
-      }
-    }
-    
-    if (!isValidPassword) {
-      console.log(`❌ Contraseña incorrecta para: ${validatedData.email}`)
-      return res.status(401).json({ error: 'Credenciales inválidas' })
-    }
-
     // Generar JWT
     const token = jwt.sign(
       { userId: user.id, email: user.email, tipo_usuario: user.tipo_usuario },
@@ -184,50 +160,33 @@ router.post('/login', async (req, res) => {
     const dashboard = await RoleService.obtenerDashboardUsuario(user.id)
     const permisos = await RoleService.obtenerPermisosUsuario(user.id)
 
-    // Adjuntar información de coordinador (carrera_id) si aplica
     let coordinadorInfo: any = null
     try {
       if (roles.includes('coordinador')) {
-        console.log('🔍 Usuario es coordinador, buscando info...')
-        const { RoleService } = await import('../services/roleService')
         const info = await RoleService.obtenerCoordinadorPorUsuario(user.id)
-        console.log('🔍 Info coordinador obtenida:', info)
         if (info) {
           coordinadorInfo = { carrera_id: info.carrera_id ?? null }
-          console.log('🔍 coordinadorInfo asignado:', coordinadorInfo)
-        } else {
-          console.log('❌ No se encontró info del coordinador para usuario:', user.id)
         }
       }
     } catch (e) {
-      console.warn('❌ Error obteniendo info del coordinador:', e)
+      console.warn('Error obteniendo info del coordinador:', e)
     }
 
-    // Adjuntar información de decano (facultad_id) si aplica
     let decanoInfo: any = null
     try {
       if (roles.includes('decano')) {
-        console.log('🔍 Usuario es decano, buscando info...')
-        const { RoleService } = await import('../services/roleService')
         const info = await RoleService.obtenerDecanoPorUsuario(user.id)
-        console.log('🔍 Info decano obtenida:', info)
         if (info) {
-          decanoInfo = { 
+          decanoInfo = {
             facultad_id: info.facultad_id ?? null,
             facultad_nombre: info.facultades?.nombre ?? null,
             fecha_nombramiento: info.fecha_nombramiento
           }
-          console.log('🔍 decanoInfo asignado:', decanoInfo)
-        } else {
-          console.log('❌ No se encontró info del decano para usuario:', user.id)
         }
       }
     } catch (e) {
-      console.warn('❌ Error obteniendo info del decano:', e)
+      console.warn('Error obteniendo info del decano:', e)
     }
-    
-    console.log(`📍 Dashboard asignado: ${dashboard}`)
-    console.log(`🔑 Permisos: ${permisos.join(', ')}`)
 
     // Determinar el tipo de usuario para la respuesta
     let userTypeDisplay = user.tipo_usuario
@@ -270,8 +229,6 @@ router.post('/login', async (req, res) => {
       additionalInfo.role_description = 'Estudiante del sistema'
     }
 
-    console.log(`🎉 Login exitoso para ${userTypeDisplay}: ${user.email}`)
-
     res.json({
       message: 'Login exitoso',
       token,
@@ -299,45 +256,36 @@ router.post('/login', async (req, res) => {
 router.post('/login-with-role', async (req, res) => {
   try {
     const { email, password, selectedRole } = req.body
-    
-    console.log(`🔍 Login con rol específico para: ${email}, rol: ${selectedRole}`)
-    
-    // Buscar usuario
+
     const user = await SupabaseDB.findUserByEmail(email)
 
     if (!user) {
-      console.log(`❌ Usuario no encontrado: ${email}`)
       return res.status(401).json({ error: 'Credenciales inválidas' })
     }
 
     if (!user.activo) {
-      console.log(`❌ Usuario inactivo: ${email}`)
       return res.status(401).json({ error: 'Credenciales inválidas' })
     }
 
-    // Obtener roles múltiples del usuario
+    const passwordCheck = await verifyStoredPassword(password, user.password)
+
+    if (!passwordCheck.ok) {
+      return res.status(401).json({ error: 'Credenciales inválidas' })
+    }
+
+    if (passwordCheck.migratePlaintextToHash) {
+      try {
+        const hashedPassword = await hashPassword(passwordCheck.migratePlaintextToHash)
+        await SupabaseDB.updateUser(user.id, { password: hashedPassword })
+      } catch (updateError) {
+        console.error('Error migrando contraseña a bcrypt:', updateError)
+      }
+    }
+
     const { RoleService } = await import('../services/roleService')
     const roles = await RoleService.obtenerRolesUsuario(user.id)
-    
-    // Verificar que el usuario tiene el rol seleccionado
+
     if (!roles.includes(selectedRole)) {
-      console.log(`❌ Usuario no tiene el rol seleccionado: ${selectedRole}, roles disponibles: ${roles.join(', ')}`)
-      return res.status(401).json({ error: 'Rol no válido para este usuario' })
-    }
-
-    // Verificar contraseña
-    let isValidPassword = false
-    
-    // Primero intentar con bcrypt (contraseña hasheada)
-    if (user.password && user.password.startsWith('$2')) {
-      isValidPassword = await bcrypt.compare(password, user.password)
-    } else {
-      // Fallback para contraseñas en texto plano (solo para desarrollo)
-      isValidPassword = user.password === password
-    }
-
-    if (!isValidPassword) {
-      console.log(`❌ Contraseña incorrecta para: ${email}`)
       return res.status(401).json({ error: 'Credenciales inválidas' })
     }
 
@@ -373,8 +321,6 @@ router.post('/login-with-role', async (req, res) => {
         break
     }
 
-    console.log(`✅ Login exitoso con rol ${selectedRole} para: ${user.nombre} ${user.apellido}`)
-
     res.json({
       token,
       user: {
@@ -391,6 +337,35 @@ router.post('/login-with-role', async (req, res) => {
 
   } catch (error) {
     console.error('Error en login con rol:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// GET /auth/profile — sesión actual (middleware JWT). Preferible para nuevas integraciones.
+router.get('/profile', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'No autenticado' })
+    }
+
+    const u = await SupabaseDB.findUserById(req.user.id)
+    if (!u) {
+      return res.status(404).json({ error: 'Usuario no encontrado' })
+    }
+
+    res.json({
+      id: u.id,
+      email: u.email,
+      nombre: u.nombre,
+      apellido: u.apellido,
+      tipo_usuario: u.tipo_usuario,
+      activo: u.activo,
+      created_at: u.created_at,
+      roles: req.user.roles,
+      permisos: req.user.permisos
+    })
+  } catch (e) {
+    console.error('GET /auth/profile:', e)
     res.status(500).json({ error: 'Error interno del servidor' })
   }
 })
@@ -486,8 +461,8 @@ router.get('/me', async (req, res) => {
   }
 })
 
-// POST /auth/create-user - Crear usuario con hash automático (para administradores)
-router.post('/create-user', async (req, res) => {
+// POST /auth/create-user - Crear usuario con hash automático (solo administradores)
+router.post('/create-user', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const { 
       email, 
@@ -504,19 +479,22 @@ router.post('/create-user', async (req, res) => {
       semestre
     } = req.body
     
-    // Validación básica
     if (!email || !password || !nombre || !apellido || !tipo_usuario) {
       return res.status(400).json({ error: 'Todos los campos son requeridos' })
     }
-    
-    // Verificar si el usuario ya existe
+
+    if (typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({
+        error: 'La contraseña debe tener al menos 8 caracteres'
+      })
+    }
+
     const existingUser = await SupabaseDB.findUserByEmail(email)
     if (existingUser) {
       return res.status(400).json({ error: 'El email ya está registrado' })
     }
-    
-    // Hash automático de la contraseña
-    const hashedPassword = await bcrypt.hash(password, 10)
+
+    const hashedPassword = await hashPassword(password)
     
     // Crear usuario con inserción automática en tabla específica
     const user = await SupabaseDB.createUserWithType({
@@ -543,10 +521,6 @@ router.post('/create-user', async (req, res) => {
         apellido: user.apellido,
         tipo_usuario: user.tipo_usuario,
         activo: user.activo
-      },
-      loginCredentials: {
-        email: email,
-        password: password // Mostrar la contraseña original para referencia
       }
     })
   } catch (error) {

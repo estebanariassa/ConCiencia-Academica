@@ -1114,7 +1114,7 @@ router.get('/evaluation-questions/:courseId', authenticateToken, async (req: any
       courseId: parseInt(courseId),
       courseCode: curso.codigo,
       courseName: curso.nombre,
-      carreraId: carreraId ? parseInt(carreraId) : null,
+      carreraId: carreraId != null ? Number(carreraId) : null,
       questions: questionsFormatted
     })
 

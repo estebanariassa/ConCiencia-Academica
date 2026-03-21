@@ -274,19 +274,31 @@ router.get('/:token', async (req: any, res) => {
       return res.status(404).json({ error: 'QR inválido o expirado.' })
     }
 
-    const profesorNombre = `${row.profesor?.usuario?.nombre || ''} ${row.profesor?.usuario?.apellido || ''}`.trim()
+    // Supabase puede tipar relaciones anidadas como objeto o arreglo de un elemento
+    const r = row as Record<string, unknown>
+    const prof = r.profesor as Record<string, unknown> | Record<string, unknown>[] | null | undefined
+    const profOne = Array.isArray(prof) ? prof[0] : prof
+    const usu = profOne?.usuario as Record<string, unknown> | Record<string, unknown>[] | undefined
+    const usuOne = Array.isArray(usu) ? usu[0] : usu
+    const curso = r.curso as Record<string, unknown> | Record<string, unknown>[] | undefined
+    const cursoOne = Array.isArray(curso) ? curso[0] : curso
+    const grupo = r.grupo as Record<string, unknown> | Record<string, unknown>[] | undefined
+    const grupoOne = Array.isArray(grupo) ? grupo[0] : grupo
+
+    const profesorNombre =
+      `${String(usuOne?.nombre ?? '')} ${String(usuOne?.apellido ?? '')}`.trim()
     res.json({
-      profesorId: row.profesor_id,
-      cursoId: row.curso_id,
-      materiaId: row.curso_id,
-      grupoId: row.grupo_id,
-      periodoId: row.periodo_id ?? null,
+      profesorId: r.profesor_id,
+      cursoId: r.curso_id,
+      materiaId: r.curso_id,
+      grupoId: r.grupo_id,
+      periodoId: r.periodo_id ?? null,
       profesorNombre: profesorNombre || null,
-      cursoNombre: row.curso?.nombre ?? null,
-      cursoCodigo: row.curso?.codigo ?? null,
-      grupoNumero: row.grupo?.numero_grupo ?? null,
-      grupoHorario: row.grupo?.horario ?? null,
-      grupoAula: row.grupo?.aula ?? null
+      cursoNombre: (cursoOne?.nombre as string | undefined) ?? null,
+      cursoCodigo: (cursoOne?.codigo as string | undefined) ?? null,
+      grupoNumero: (grupoOne?.numero_grupo as string | number | undefined) ?? null,
+      grupoHorario: (grupoOne?.horario as string | undefined) ?? null,
+      grupoAula: (grupoOne?.aula as string | undefined) ?? null
     })
   } catch (error) {
     console.error('Error GET /qr-evaluaciones/:token:', error)

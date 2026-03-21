@@ -1,23 +1,78 @@
-# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,react
-# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,react
+# =============================================================================
+# ConCiencia Académica — raíz del monorepo (front + back)
+# =============================================================================
 
-### react ###
-.DS_*
+# --- Dependencias ---
+node_modules/
+jspm_packages/
+.pnp
+.pnp.js
+
+# --- Variables de entorno y secretos (nunca subir) ---
+.env
+.env.*
+!.env.example
+!**/env.example
+*.pem
+*.key
+
+# --- Builds y compilados ---
+dist/
+build/
+out/
+.next/
+.nuxt/
+*.tsbuildinfo
+.cache/
+.parcel-cache/
+.turbo/
+.vercel/
+.netlify/
+
+# --- Backend (Node/TS) ---
+back/dist/
+back/coverage/
+
+# --- Frontend (Vite/React) ---
+front/dist/
+front/build/
+front/.vite/
+*.local
+
+# --- Tests y cobertura ---
+coverage/
+.nyc_output/
+*.lcov
+
+# --- Logs y temporales ---
+logs/
 *.log
-logs
-**/*.backup.*
-**/*.back.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
 
-node_modules
-bower_components
+# --- Sistema operativo ---
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-*.sublime*
+# --- IDE / editores ---
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.vsix
+.ionide/
 
-psd
-thumb
-sketch
-
-### VisualStudioCode ###
+# VS Code: ignorar casi todo el folder; permitir utilidades compartidas
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
@@ -25,16 +80,21 @@ sketch
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 
-# Local History for Visual Studio Code
+# Historial local de extensiones
 .history/
 
-# Built Visual Studio Code Extensions
-*.vsix
+# --- Diseño / binarios pesados (ajusta si versionas assets) ---
+*.psd
+*.sketch
+thumb/
+# CSV de importación masiva en la raíz de back/ (datos locales; quita esta línea si quieres versionarlos)
+/back/*.csv
 
-### VisualStudioCode Patch ###
-# Ignore all local history of files
-.history
-.ionide
-.env
+# --- Backups ---
+**/*.backup.*
+**/*.back.*
+*.bak
 
-# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,react
+# --- Otros ---
+*.orig
+**/.eslintcache

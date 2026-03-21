@@ -24,27 +24,28 @@ apiClient.interceptors.request.use(
   }
 )
 
-// Interceptor para manejar respuestas y errores
+// Interceptor: 401 = no autenticado → limpiar sesión y login. 403 = prohibido (rol), no limpiar token.
 apiClient.interceptors.response.use(
-  (response) => {
-    return response
-  },
+  (response) => response,
   (error) => {
-    // Solo redirigir al login si es un error de autenticación real
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      // Verificar si el error es por token expirado o inválido
-      const token = localStorage.getItem('token');
-      if (!token) {
-        // No hay token, redirigir al login
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
+    const status = error.response?.status as number | undefined
+
+    if (status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      const path = window.location.pathname || ''
+      const publicPaths = ['/login', '/forgot-password', '/qr-evaluacion']
+      const isPublic = publicPaths.some((p) => path === p || path.startsWith(p + '/'))
+      if (!isPublic) {
         window.location.href = '/login'
-      } else {
-        // Hay token pero el servidor lo rechaza, podría ser un problema temporal
-        console.warn('⚠️ Error de autenticación con token presente:', error.response?.status);
-        // No redirigir automáticamente, dejar que el componente maneje el error
       }
     }
+
+    if (status === 403) {
+      // Permisos insuficientes: la vista puede redirigir a /forbidden
+      console.warn('403 — permisos insuficientes:', error.response?.data)
+    }
+
     return Promise.reject(error)
   }
 )

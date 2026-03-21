@@ -83,9 +83,15 @@ export default function Login() {
       // Si estamos en modo selección de rol, hacer login con el rol seleccionado
       if (showRoleSelection && selectedRole) {
         await loginWithRole(email, password, selectedRole)
-        const savedUser = JSON.parse(localStorage.getItem('user') || '{}')
-        const dashboardPath = getDashboardPathForUser(savedUser)
-        navigate(dashboardPath)
+        const redirectTo = localStorage.getItem('redirectTo')
+        if (redirectTo) {
+          localStorage.removeItem('redirectTo')
+          navigate(redirectTo)
+        } else {
+          const savedUser = JSON.parse(localStorage.getItem('user') || '{}')
+          const dashboardPath = getDashboardPathForUser(savedUser)
+          navigate(dashboardPath)
+        }
         return
       }
 

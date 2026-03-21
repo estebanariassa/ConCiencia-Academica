@@ -1,8 +1,7 @@
 import { Router } from 'express'
 import { supabaseAdmin } from '../config/supabaseClient'
-import { authenticateToken } from '../middleware/auth'
 import crypto from 'crypto'
-import bcrypt from 'bcrypt'
+import { hashPassword } from '../utils/passwordSecurity'
 
 const router = Router()
 
@@ -48,7 +47,6 @@ router.post('/forgot-password', async (req, res) => {
       })
     }
 
-    console.log('🔐 Solicitando reset de contraseña para:', email)
 
     // Verificar que el usuario existe
     const { data: user, error: userError } = await supabaseAdmin
@@ -59,14 +57,11 @@ router.post('/forgot-password', async (req, res) => {
       .single()
 
     if (userError || !user) {
-      console.log('❌ Usuario no encontrado:', email)
-      // Por seguridad, no revelamos si el email existe o no
+      // No revelar si el correo existe
       return res.status(200).json({ 
         message: 'Si el correo electrónico existe en nuestro sistema, recibirás un enlace de recuperación' 
       })
     }
-
-    console.log('✅ Usuario encontrado:', user)
 
     // Generar token de reset
     const resetToken = generateResetToken()
@@ -89,20 +84,18 @@ router.post('/forgot-password', async (req, res) => {
       })
     }
 
-    // En un entorno de producción, aquí enviarías el email
-    // Por ahora, solo logueamos el token para desarrollo
-    console.log('📧 Token de reset generado:', resetToken)
-    console.log('🔗 Enlace de reset:', `${process.env.FRONTEND_URL || 'http://localhost:3000'}/forgot-password?token=${resetToken}&email=${encodeURIComponent(email)}`)
+    // TODO: enviar correo con enlace (nodemailer); nunca devolver el token en JSON en producción.
 
-    // TODO: Implementar envío de email real
-    // await sendPasswordResetEmail(user.email, user.nombre, resetToken)
+    const debugReset =
+      process.env.PASSWORD_RESET_DEBUG_RESPONSE === 'true' &&
+      process.env.NODE_ENV !== 'production'
 
-    res.status(200).json({ 
-      message: 'Si el correo electrónico existe en nuestro sistema, recibirás un enlace de recuperación',
-      // Solo en desarrollo
-      ...(process.env.NODE_ENV === 'development' && {
+    res.status(200).json({
+      message:
+        'Si el correo electrónico existe en nuestro sistema, recibirás un enlace de recuperación',
+      ...(debugReset && {
         resetToken,
-        resetLink: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/forgot-password?token=${resetToken}&email=${encodeURIComponent(email)}`
+        resetLink: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/forgot-password?token=${resetToken}&email=${encodeURIComponent(email)}`
       })
     })
 
@@ -126,7 +119,6 @@ router.get('/validate-reset-token/:token', async (req, res) => {
       })
     }
 
-    console.log('🔐 Validando token de reset:', token, 'para:', email)
 
     // Buscar el token en la base de datos
     const { data: tokenData, error: tokenError } = await supabaseAdmin
@@ -138,7 +130,6 @@ router.get('/validate-reset-token/:token', async (req, res) => {
       .single()
 
     if (tokenError || !tokenData) {
-      console.log('❌ Token no encontrado o ya usado:', token)
       return res.status(400).json({ 
         error: 'Token inválido o ya utilizado' 
       })
@@ -149,13 +140,10 @@ router.get('/validate-reset-token/:token', async (req, res) => {
     const expirationDate = new Date(tokenData.expires_at)
 
     if (now > expirationDate) {
-      console.log('❌ Token expirado:', token)
       return res.status(400).json({ 
         error: 'El token ha expirado. Solicita uno nuevo.' 
       })
     }
-
-    console.log('✅ Token válido:', token)
 
     res.status(200).json({ 
       message: 'Token válido',
@@ -222,8 +210,6 @@ router.post('/reset-password', async (req, res) => {
       })
     }
 
-    console.log('🔐 Reseteando contraseña para:', email)
-
     // Buscar y validar el token
     const { data: tokenData, error: tokenError } = await supabaseAdmin
       .from('password_reset_tokens')
@@ -234,7 +220,6 @@ router.post('/reset-password', async (req, res) => {
       .single()
 
     if (tokenError || !tokenData) {
-      console.log('❌ Token no encontrado o ya usado:', token)
       return res.status(400).json({ 
         error: 'Token inválido o ya utilizado' 
       })
@@ -245,7 +230,6 @@ router.post('/reset-password', async (req, res) => {
     const expirationDate = new Date(tokenData.expires_at)
 
     if (now > expirationDate) {
-      console.log('❌ Token expirado:', token)
       return res.status(400).json({ 
         error: 'El token ha expirado. Solicita uno nuevo.' 
       })
@@ -260,15 +244,12 @@ router.post('/reset-password', async (req, res) => {
       .single()
 
     if (userError || !user) {
-      console.log('❌ Usuario no encontrado:', email)
       return res.status(400).json({ 
         error: 'Usuario no encontrado' 
       })
     }
 
-    // Hashear la nueva contraseña
-    const saltRounds = 12
-    const hashedPassword = await bcrypt.hash(newPassword, saltRounds)
+    const hashedPassword = await hashPassword(newPassword)
 
     // Actualizar la contraseña del usuario
     const { error: updateError } = await supabaseAdmin
@@ -296,8 +277,6 @@ router.post('/reset-password', async (req, res) => {
       console.error('❌ Error al marcar token como usado:', markUsedError)
       // No es crítico, solo logueamos el error
     }
-
-    console.log('✅ Contraseña actualizada exitosamente para:', email)
 
     res.status(200).json({ 
       message: 'Contraseña actualizada exitosamente'

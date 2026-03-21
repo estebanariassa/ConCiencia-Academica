@@ -11,6 +11,7 @@ import coordinadorRoutes from './routes/coordinador'
 import qrEvaluacionesRoutes from './routes/qrEvaluaciones'
 import passwordResetRoutes from './routes/passwordReset'
 import aiRoutes from './routes/aiRoutes'
+import usersRoutes from './routes/usersRoutes'
 
 dotenv.config()
 
@@ -36,6 +37,7 @@ app.use('/api/coordinador', coordinadorRoutes)
 app.use('/api/qr-evaluaciones', qrEvaluacionesRoutes)
 app.use('/api/auth', passwordResetRoutes)
 app.use('/api/ai', aiRoutes)
+app.use('/api/users', usersRoutes)
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
