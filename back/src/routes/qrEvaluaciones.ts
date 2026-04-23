@@ -455,4 +455,136 @@ router.get('/:token', async (req: any, res) => {
   }
 })
 
+/**
+ * POST /qr-evaluaciones/:token/auto-enroll
+ * Requiere JWT de estudiante. Matricula al estudiante autenticado en el grupo del QR
+ * si aún no tiene una inscripción activa.
+ */
+router.post('/:token/auto-enroll', authenticateToken, async (req: any, res) => {
+  try {
+    const { token } = req.params
+    const user = req.user
+
+    if (!token) {
+      return res.status(400).json({ error: 'Token requerido.' })
+    }
+
+    if (!user || user.tipo_usuario !== 'estudiante') {
+      return res.status(403).json({ error: 'Solo los estudiantes pueden matricularse por QR.' })
+    }
+
+    // Resolver estudiante por usuario autenticado
+    const { data: estudiante, error: estudianteError } = await SupabaseDB.supabaseAdmin
+      .from('estudiantes')
+      .select('id')
+      .eq('usuario_id', user.id)
+      .single()
+
+    if (estudianteError || !estudiante) {
+      return res.status(404).json({ error: 'No se encontró registro de estudiante para este usuario.' })
+    }
+
+    // Resolver QR activo y grupo destino
+    const { data: qrRow, error: qrError } = await SupabaseDB.supabaseAdmin
+      .from('qr_evaluaciones')
+      .select('id, token, grupo_id, activo')
+      .eq('token', token)
+      .eq('activo', true)
+      .maybeSingle()
+
+    if (qrError) {
+      console.error('Error en auto-enroll (qr lookup):', qrError)
+      return res.status(500).json({ error: 'Error resolviendo el QR.' })
+    }
+
+    if (!qrRow?.grupo_id) {
+      return res.status(404).json({ error: 'QR inválido o expirado.' })
+    }
+
+    const grupoId = Number(qrRow.grupo_id)
+
+    // Buscar inscripción existente
+    const { data: inscExistente, error: inscExistenteError } = await SupabaseDB.supabaseAdmin
+      .from('inscripciones')
+      .select('id, activa')
+      .eq('estudiante_id', estudiante.id)
+      .eq('grupo_id', grupoId)
+      .maybeSingle()
+
+    if (inscExistenteError) {
+      console.error('Error en auto-enroll (existing enrollment):', inscExistenteError)
+      return res.status(500).json({ error: 'Error validando inscripción existente.' })
+    }
+
+    if (inscExistente?.id) {
+      if (inscExistente.activa === true) {
+        return res.json({
+          enrolled: false,
+          alreadyEnrolled: true,
+          estudianteId: estudiante.id,
+          grupoId
+        })
+      }
+
+      // Intentar reactivar inscripción previa
+      const { error: reactivateError } = await SupabaseDB.supabaseAdmin
+        .from('inscripciones')
+        .update({ activa: true })
+        .eq('id', inscExistente.id)
+
+      if (reactivateError) {
+        console.error('Error reactivando inscripción:', reactivateError)
+        return res.status(500).json({ error: 'No se pudo reactivar la inscripción existente.' })
+      }
+
+      return res.json({
+        enrolled: true,
+        reactivated: true,
+        estudianteId: estudiante.id,
+        grupoId
+      })
+    }
+
+    // Crear inscripción nueva (fallback si el esquema no usa columna activa)
+    let insertError: any = null
+    const insertPayload: any = {
+      estudiante_id: estudiante.id,
+      grupo_id: grupoId,
+      activa: true
+    }
+
+    const respInsert = await SupabaseDB.supabaseAdmin
+      .from('inscripciones')
+      .insert([insertPayload])
+      .select('id')
+      .maybeSingle()
+
+    insertError = respInsert.error
+
+    if (insertError && (insertError.code === '42703' || String(insertError?.message || '').includes('activa'))) {
+      const respInsertFallback = await SupabaseDB.supabaseAdmin
+        .from('inscripciones')
+        .insert([{ estudiante_id: estudiante.id, grupo_id: grupoId }])
+        .select('id')
+        .maybeSingle()
+      insertError = respInsertFallback.error
+    }
+
+    if (insertError) {
+      console.error('Error creando inscripción automática por QR:', insertError)
+      return res.status(500).json({ error: 'No se pudo crear la inscripción automática.' })
+    }
+
+    return res.status(201).json({
+      enrolled: true,
+      created: true,
+      estudianteId: estudiante.id,
+      grupoId
+    })
+  } catch (error) {
+    console.error('Error POST /qr-evaluaciones/:token/auto-enroll:', error)
+    return res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
 export default router

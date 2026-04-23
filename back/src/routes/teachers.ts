@@ -2936,23 +2936,8 @@ router.get('/teacher-stats/:teacherId', authenticateToken, async (req: any, res)
       .single()
 
     if (profesorError || !profesor) {
-      console.log('❌ Backend: Error finding teacher, returning mock data:', profesorError);
-      
-      // Retornar datos de ejemplo si el profesor no existe
-      const mockStats = {
-        calificacionPromedio: 0,
-        totalEvaluaciones: 0,
-        cursosImpartidos: 0,
-        evaluacionesPorCurso: [],
-        isMockData: true,
-        debug: { 
-          teacherId, 
-          error: profesorError 
-        }
-      };
-      
-      console.log('✅ Backend: Returning mock teacher stats:', mockStats);
-      return res.json(mockStats);
+      console.log('❌ Backend: Error finding teacher:', profesorError);
+      return res.status(404).json({ error: 'Profesor no encontrado' })
     }
 
     console.log('✅ Backend: Profesor found:', profesor);
@@ -2960,60 +2945,110 @@ router.get('/teacher-stats/:teacherId', authenticateToken, async (req: any, res)
     // Obtener evaluaciones completadas del profesor
     const { data: evaluacionesCompletadas, error: completadasError } = await SupabaseDB.supabaseAdmin
       .from('evaluaciones')
-      .select('id, calificacion_promedio')
+      .select('id, calificacion_promedio, grupo_id')
       .eq('profesor_id', profesor.id)
       .eq('completada', true)
 
     if (completadasError) {
       console.log('❌ Backend: Error getting completed evaluations:', completadasError);
+      return res.status(500).json({ error: 'Error obteniendo evaluaciones completadas', details: completadasError.message })
     }
 
-    // Obtener cursos impartidos por el profesor
-    const { data: cursosImpartidos, error: cursosError } = await SupabaseDB.supabaseAdmin
+    const evaluacionesArray = Array.isArray(evaluacionesCompletadas) ? evaluacionesCompletadas : []
+    const grupoIds = Array.from(new Set(evaluacionesArray.map((e: any) => e.grupo_id).filter(Boolean)))
+
+    // Resolver curso por cada grupo evaluado para agrupar correctamente por curso
+    const { data: gruposEvaluados, error: gruposError } = await SupabaseDB.supabaseAdmin
+      .from('grupos')
+      .select('id, curso_id')
+      .in('id', grupoIds.length ? grupoIds : [-1])
+
+    if (gruposError) {
+      console.log('❌ Backend: Error getting groups for evaluations:', gruposError);
+      return res.status(500).json({ error: 'Error obteniendo grupos de evaluaciones', details: gruposError.message })
+    }
+
+    const grupoToCurso = new Map<any, any>()
+    ;(gruposEvaluados || []).forEach((g: any) => {
+      grupoToCurso.set(g.id, g.curso_id)
+    })
+
+    const cursoIdsFromEvals = Array.from(
+      new Set((gruposEvaluados || []).map((g: any) => g.curso_id).filter(Boolean))
+    )
+
+    // Obtener cursos activos impartidos por el profesor para la card de cursos
+    const { data: asignacionesActivas, error: cursosError } = await SupabaseDB.supabaseAdmin
       .from('asignaciones_profesor')
-      .select(`
-        id,
-        curso:cursos(
-          id,
-          nombre,
-          codigo
-        )
-      `)
+      .select('curso_id, grupo_id')
       .eq('profesor_id', profesor.id)
-      .eq('activa', true)
+      // Incluye asignaciones activas y también registros donde "activa" viene nulo
+      // para no perder grupos/cursos válidos por inconsistencias históricas.
+      .neq('activa', false)
 
     if (cursosError) {
       console.log('❌ Backend: Error getting teacher courses:', cursosError);
+      return res.status(500).json({ error: 'Error obteniendo cursos del profesor', details: cursosError.message })
     }
 
+    const cursosActivosSet = new Set((asignacionesActivas || []).map((a: any) => a.curso_id).filter(Boolean))
+    const gruposActivosSet = new Set((asignacionesActivas || []).map((a: any) => a.grupo_id).filter(Boolean))
+
+    const cursoIdsToFetch = Array.from(new Set([...cursoIdsFromEvals, ...Array.from(cursosActivosSet)]))
+    const { data: cursosInfo, error: cursosInfoError } = await SupabaseDB.supabaseAdmin
+      .from('cursos')
+      .select('id, nombre, codigo')
+      .in('id', cursoIdsToFetch.length ? cursoIdsToFetch : [-1])
+
+    if (cursosInfoError) {
+      console.log('❌ Backend: Error getting courses info:', cursosInfoError);
+      return res.status(500).json({ error: 'Error obteniendo información de cursos', details: cursosInfoError.message })
+    }
+
+    const cursoById = new Map<any, any>()
+    ;(cursosInfo || []).forEach((c: any) => cursoById.set(c.id, c))
+
     // Calcular promedio general
-    const promedioGeneral = evaluacionesCompletadas && evaluacionesCompletadas.length > 0
-      ? evaluacionesCompletadas.reduce((sum, e) => sum + (e.calificacion_promedio || 0), 0) / evaluacionesCompletadas.length
+    const promedioGeneral = evaluacionesArray.length > 0
+      ? evaluacionesArray.reduce((sum: number, e: any) => sum + (e.calificacion_promedio || 0), 0) / evaluacionesArray.length
       : 0
 
-    // Obtener evaluaciones por curso
-    const evaluacionesPorCurso = cursosImpartidos?.map((asignacion: any) => {
-      const evaluacionesDelCurso = evaluacionesCompletadas?.filter((e: any) => 
-        // Aquí necesitaríamos una relación para obtener el curso de cada evaluación
-        // Por ahora usamos datos básicos
-        true
-      ) || []
+    // Agrupar evaluaciones por curso de forma real
+    const perCourseAccumulator = new Map<any, { total: number; sum: number }>()
+    evaluacionesArray.forEach((e: any) => {
+      const cursoId = grupoToCurso.get(e.grupo_id)
+      if (!cursoId) return
+      const current = perCourseAccumulator.get(cursoId) || { total: 0, sum: 0 }
+      current.total += 1
+      current.sum += Number(e.calificacion_promedio || 0)
+      perCourseAccumulator.set(cursoId, current)
+    })
 
+    // Incluir TODOS los cursos del docente (asignados + evaluados),
+    // para que en frontend se puedan seleccionar aunque tengan 0 encuestas.
+    const evaluacionesPorCurso = cursoIdsToFetch.map((cursoId: any) => {
+      const curso = cursoById.get(cursoId)
+      const values = perCourseAccumulator.get(cursoId) || { total: 0, sum: 0 }
       return {
-        curso_id: asignacion.curso?.id,
-        nombre: asignacion.curso?.nombre,
-        codigo: asignacion.curso?.codigo,
-        total: evaluacionesDelCurso.length,
-        promedio: evaluacionesDelCurso.length > 0 
-          ? evaluacionesDelCurso.reduce((sum: number, e: any) => sum + (e.calificacion_promedio || 0), 0) / evaluacionesDelCurso.length
-          : 0
+        curso_id: cursoId,
+        nombre: curso?.nombre || 'Curso',
+        codigo: curso?.codigo || 'N/A',
+        total: values.total,
+        encuestasRespondidas: values.total,
+        promedio: values.total > 0 ? Number((values.sum / values.total).toFixed(2)) : 0
       }
-    }) || []
+    })
+    .sort((a, b) => b.total - a.total)
+
+    // Conteo robusto: prioriza asignaciones activas, pero usa evaluaciones como respaldo si faltan relaciones
+    const cursosImpartidos = Math.max(cursosActivosSet.size, evaluacionesPorCurso.length)
+    const totalGruposImpartidos = gruposActivosSet.size
 
     const stats = {
       calificacionPromedio: Number(promedioGeneral.toFixed(2)),
-      totalEvaluaciones: evaluacionesCompletadas?.length || 0,
-      cursosImpartidos: cursosImpartidos?.length || 0,
+      totalEvaluaciones: evaluacionesArray.length,
+      cursosImpartidos,
+      totalGruposImpartidos,
       evaluacionesPorCurso: evaluacionesPorCurso
     }
 
@@ -3314,13 +3349,26 @@ router.get('/period-category-stats', authenticateToken, async (req: any, res) =>
       return res.json([])
     }
 
-    // 4) Respuestas por evaluación (valor por pregunta)
-    const { data: respuestas, error: respError } = await SupabaseDB.supabaseAdmin
-      .from('respuestas_evaluacion')
-      .select('evaluacion_id, pregunta_id, valor')
-      .in('evaluacion_id', evaluacionIds)
-    if (respError) {
-      return res.status(500).json({ error: 'Error obteniendo respuestas', details: respError })
+    // 4) Respuestas por evaluación (rating por pregunta)
+    // Compatibilidad: prioriza respuesta_rating y, si falla por esquema antiguo, intenta con valor.
+    let respuestas: any[] = []
+    {
+      const { data, error } = await SupabaseDB.supabaseAdmin
+        .from('respuestas_evaluacion')
+        .select('evaluacion_id, pregunta_id, respuesta_rating')
+        .in('evaluacion_id', evaluacionIds)
+      if (!error) {
+        respuestas = Array.isArray(data) ? data : []
+      } else {
+        const fallback = await SupabaseDB.supabaseAdmin
+          .from('respuestas_evaluacion')
+          .select('evaluacion_id, pregunta_id, valor')
+          .in('evaluacion_id', evaluacionIds)
+        if (fallback.error) {
+          return res.status(500).json({ error: 'Error obteniendo respuestas', details: fallback.error })
+        }
+        respuestas = Array.isArray(fallback.data) ? fallback.data : []
+      }
     }
 
     const preguntaIds = Array.from(new Set(((respuestas as any[]) || []).map((r: any) => r.pregunta_id)))
@@ -3330,7 +3378,7 @@ router.get('/period-category-stats', authenticateToken, async (req: any, res) =>
 
     // 5) Mapeo pregunta -> categoria_id
     const { data: catPreg, error: catPregError } = await SupabaseDB.supabaseAdmin
-      .from('categorias_preguntas')
+      .from('preguntas_evaluacion')
       .select('id, categoria_id')
       .in('id', preguntaIds)
     if (catPregError) {
@@ -3342,7 +3390,7 @@ router.get('/period-category-stats', authenticateToken, async (req: any, res) =>
     // 6) Info de categorías
     const categoriaIds = Array.from(new Set(((catPreg as any[]) || []).map((cp: any) => cp.categoria_id).filter(Boolean)))
     const { data: categorias } = await SupabaseDB.supabaseAdmin
-      .from('categorias')
+      .from('categorias_pregunta')
       .select('id, nombre')
       .in('id', categoriaIds.length ? categoriaIds : [-1])
     const categoriaInfo: any = {}
@@ -3354,7 +3402,9 @@ router.get('/period-category-stats', authenticateToken, async (req: any, res) =>
       const catId = preguntaToCategoria[r.pregunta_id]
       if (!catId) return
       if (!acumulado[catId]) acumulado[catId] = { sum: 0, count: 0 }
-      acumulado[catId].sum += (r.valor || 0)
+      const rating = Number(r.respuesta_rating ?? r.valor ?? 0)
+      if (!Number.isFinite(rating) || rating <= 0) return
+      acumulado[catId].sum += rating
       acumulado[catId].count += 1
     })
 

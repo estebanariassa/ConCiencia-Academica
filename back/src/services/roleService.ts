@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../config/supabaseClient';
+import { hashPassword } from '../utils/passwordSecurity';
 
 export interface UserRole {
   id: number;
@@ -141,12 +142,14 @@ export class RoleService {
     departamento?: string;
   }): Promise<{ success: boolean; usuario_id?: string; error?: string }> {
     try {
+      const hashedPassword = await hashPassword(coordinadorData.password);
+
       // 1. Crear usuario
       const { data: usuario, error: usuarioError } = await supabaseAdmin
         .from('usuarios')
         .insert({
           email: coordinadorData.email,
-          password: coordinadorData.password, // Se hashea automáticamente
+          password: hashedPassword,
           nombre: coordinadorData.nombre,
           apellido: coordinadorData.apellido,
           tipo_usuario: 'profesor', // Tipo principal

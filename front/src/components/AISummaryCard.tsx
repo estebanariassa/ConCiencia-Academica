@@ -26,6 +26,8 @@ export default function AISummaryCard({ texts, title, description, endpoint, par
     summary: string; 
     topics: string[]; 
     textsCount?: number;
+    ratingsCount?: number;
+    analysisSource?: 'open_text' | 'quantitative_fallback';
     acosoDetectado?: boolean;
     mensajeAcoso?: string;
   } | null>(null)
@@ -175,7 +177,7 @@ export default function AISummaryCard({ texts, title, description, endpoint, par
             )}
           </div>
         )}
-        {result && result.textsCount === 0 && (
+        {result && result.textsCount === 0 && result.analysisSource !== 'quantitative_fallback' && (
           <div className="text-sm text-amber-600 mb-4 p-3 bg-amber-50 border border-amber-200 rounded">
             <p className="font-semibold mb-2">⚠️ No se encontraron respuestas abiertas</p>
             <p className="mb-2">{result.summary}</p>
@@ -194,9 +196,13 @@ export default function AISummaryCard({ texts, title, description, endpoint, par
             )}
           </div>
         )}
-        {result && result.textsCount > 0 && (
+        {result && (result.textsCount > 0 || result.analysisSource === 'quantitative_fallback') && (
           <div className="space-y-3">
-            {result.textsCount !== undefined && (
+            {result.analysisSource === 'quantitative_fallback' ? (
+              <p className="text-xs text-blue-600">
+                ✅ Resumen cualitativo generado desde {result.ratingsCount ?? 0} respuestas cuantitativas (sin texto abierto suficiente)
+              </p>
+            ) : result.textsCount !== undefined && (
               <p className="text-xs text-gray-500">
                 ✅ Analizadas {result.textsCount} respuestas abiertas
               </p>

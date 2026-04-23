@@ -8,7 +8,7 @@ interface CalendarProps {
 }
 
 const Calendar = ({ onClose }: CalendarProps) => {
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 8, 1)); // Septiembre 2025
+  const [currentDate, setCurrentDate] = useState(new Date()); // Mes/año actual
 
   // Fechas importantes
   const surveyStart = new Date(2025, 8, 16); // 16 de septiembre
@@ -65,7 +65,7 @@ const renderDays = () => {
 
     let content: number | null = null;
     let dayClass =
-      "calendar-day text-center p-4 rounded-lg text-gray-700 text-xl font-semibold flex items-center justify-center h-28";
+      "calendar-day text-center rounded-lg text-gray-700 text-sm sm:text-base font-semibold flex items-center justify-center min-h-[44px] sm:min-h-[56px] md:min-h-[68px]";
     let tooltip = "";
 
     if (dayNumber > 0 && dayNumber <= daysInMonth) {
@@ -73,11 +73,11 @@ const renderDays = () => {
 
       if (isSameDay(dayDate, surveyStart)) {
         dayClass =
-          "calendar-day tooltip text-center p-4 rounded-lg bg-blue-100 text-blue-700 font-bold border-2 border-blue-400 text-xl flex items-center justify-center h-28";
+          "calendar-day tooltip text-center rounded-lg bg-blue-100 text-blue-700 font-bold border-2 border-blue-300 text-sm sm:text-base flex items-center justify-center min-h-[44px] sm:min-h-[56px] md:min-h-[68px]";
         tooltip = "Apertura de la encuesta";
       } else if (isSameDay(dayDate, surveyEnd)) {
         dayClass =
-          "calendar-day tooltip text-center p-4 rounded-lg bg-red-100 text-red-700 font-bold border-2 border-red-400 text-xl flex items-center justify-center h-28";
+          "calendar-day tooltip text-center rounded-lg bg-red-100 text-red-700 font-bold border-2 border-red-300 text-sm sm:text-base flex items-center justify-center min-h-[44px] sm:min-h-[56px] md:min-h-[68px]";
         tooltip = "Cierre de la encuesta";
       }
     }
@@ -97,52 +97,51 @@ const renderDays = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 overflow-auto"
+      className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-3 sm:p-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.9 }}
         animate={{ scale: 1 }}
         exit={{ scale: 0.9 }}
-        className="bg-white rounded-2xl shadow-2xl p-10 w-[100vw] h-[100vh] max-w-[900px] max-h-[600px] relative mx-auto my-auto overflow-auto"
+        className="bg-white rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 w-full max-w-5xl max-h-[90vh] relative mx-auto my-auto overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
-        style={{ minWidth: "900px" }}
       >
         {/* Header del calendario */}
-        <div className="flex items-center mb-8">
-          <h2 className="text-4xl font-bold text-gray-900">
+        <div className="flex items-center gap-2 sm:gap-4 mb-5 sm:mb-6">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 capitalize">
             {formatMonthYear(currentDate)}
           </h2>
 
           {/* Flechas + botón de cerrar alineados */}
-          <div className="flex items-center space-x-4 ml-auto">
+          <div className="flex items-center gap-2 sm:gap-3 ml-auto">
             <button
               onClick={() => navigateMonth(-1)}
-              className="p-4 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors bg-white shadow-md"
+              className="p-2 sm:p-3 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors bg-white shadow-md"
             >
-              <ChevronLeft className="h-7 w-7" />
+              <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
             <button
               onClick={() => navigateMonth(1)}
-              className="p-4 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors bg-white shadow-md"
+              className="p-2 sm:p-3 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors bg-white shadow-md"
             >
-              <ChevronRight className="h-7 w-7" />
+              <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
             </button>
             <button
               onClick={onClose}
-              className="p-4 rounded-full hover:bg-gray-100 bg-white shadow-md"
+              className="p-2 sm:p-3 rounded-full hover:bg-gray-100 bg-white shadow-md"
             >
-              <X className="h-7 w-7 text-gray-600" />
+              <X className="h-5 w-5 sm:h-6 sm:w-6 text-gray-600" />
             </button>
           </div>
         </div>
 
         {/* Días de la semana */}
-        <div className="grid grid-cols-7 gap-4 mb-6">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-3 mb-3 sm:mb-4">
           {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
             <div
               key={day}
-              className="text-center text-lg font-bold text-gray-700 py-2"
+              className="text-center text-xs sm:text-sm md:text-base font-bold text-gray-700 py-1 sm:py-2"
             >
               {day}
             </div>
@@ -150,19 +149,19 @@ const renderDays = () => {
         </div>
 
         {/* Días del mes */}
-        <div className="grid grid-cols-7 gap-4">{renderDays()}</div>
+        <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-3">{renderDays()}</div>
 
         {/* Leyenda */}
-        <div className="flex justify-center mt-10 space-x-12 pt-6 border-t border-gray-200">
+        <div className="flex flex-col sm:flex-row justify-center mt-6 sm:mt-8 gap-3 sm:gap-8 pt-4 sm:pt-6 border-t border-gray-200">
           <div className="flex items-center">
-            <div className="w-6 h-6 rounded-full bg-blue-500 mr-3"></div>
-            <span className="text-lg font-semibold text-gray-800">
+            <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-blue-500 mr-2"></div>
+            <span className="text-sm sm:text-base font-semibold text-gray-800">
               Apertura de encuesta
             </span>
           </div>
           <div className="flex items-center">
-            <div className="w-6 h-6 rounded-full bg-red-500 mr-3"></div>
-            <span className="text-lg font-semibold text-gray-800">
+            <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-500 mr-2"></div>
+            <span className="text-sm sm:text-base font-semibold text-gray-800">
               Cierre de encuesta
             </span>
           </div>

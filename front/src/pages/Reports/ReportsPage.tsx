@@ -1,13 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchTeacherHistoricalStats, fetchTeacherId, fetchTeacherStats, fetchTeacherPeriodStats, fetchTeacherPeriodCategoryStats } from '../../api/teachers';
-import { 
-  mockTrendData, 
-  mockDistributionData, 
-  mockCategoryData, 
-  mockCompetencyData, 
-  getMockDataWithIndicator 
-} from '../../data/mockData';
-import { debugRadarData } from '../../utils/debugRadar';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -56,7 +48,6 @@ import {
 const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
 import { exportElementToPDF, exportElementToPNG, exportObjectsToExcel } from '../../utils/export';
 import AISummaryCard from '../../components/AISummaryCard';
-import { apiClient } from '../../api/client';
 
 interface ReportsPageProps {
   user: User;
@@ -65,50 +56,15 @@ interface ReportsPageProps {
 export default function ReportsPage({ user }: ReportsPageProps) {
   const navigate = useNavigate();
   const reportRef = useRef<HTMLDivElement | null>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState('2025-2');
+  const [selectedPeriod, setSelectedPeriod] = useState('2026-1');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedCourse, setSelectedCourse] = useState('all');
-  const [selectedSubject, setSelectedSubject] = useState('all');
   const [teacherId, setTeacherId] = useState<string>('');
   const [teacherStats, setTeacherStats] = useState<any>(null); // histórico o base si no hay histórico
   const [baseTeacherStats, setBaseTeacherStats] = useState<any>(null); // SIEMPRE: stats globales del profesor
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [historicalData, setHistoricalData] = useState<any[]>([]);
-  const [availableSubjects, setAvailableSubjects] = useState<any[]>([]);
-  const [usedFallbackFromStats, setUsedFallbackFromStats] = useState(false);
-
-  // Cargar materias disponibles del profesor
-  useEffect(() => {
-    const loadAvailableSubjects = async () => {
-      console.log('🔍 Loading subjects for user:', { id: user?.id, type: user?.type });
-      
-      if (!user?.id || user.type !== 'teacher') {
-        console.log('❌ User not eligible for subject selection:', { id: user?.id, type: user?.type });
-        return;
-      }
-
-      try {
-        // Simular carga de materias - en un caso real, esto vendría del backend
-        const subjects = [
-          { id: 'all', name: 'Todas las materias', code: 'ALL' },
-          { id: '1', name: 'Programación I', code: 'PROG-101' },
-          { id: '2', name: 'Estructuras de Datos', code: 'ED-201' },
-          { id: '3', name: 'Bases de Datos', code: 'BD-301' },
-          { id: '4', name: 'Ingeniería de Software', code: 'IS-401' },
-          { id: '5', name: 'Algoritmos Avanzados', code: 'AA-501' }
-        ];
-        
-        setAvailableSubjects(subjects);
-        console.log('✅ Available subjects loaded:', subjects);
-      } catch (error) {
-        console.error('❌ Error loading available subjects:', error);
-        setAvailableSubjects([{ id: 'all', name: 'Todas las materias', code: 'ALL' }]);
-      }
-    };
-
-    loadAvailableSubjects();
-  }, [user?.id, user?.type]);
 
   // Cargar estadísticas del profesor (cards = base stats; gráficas: histórico con fallback)
   useEffect(() => {
@@ -140,10 +96,8 @@ export default function ReportsPage({ user }: ReportsPageProps) {
         // Gráficas: usar histórico si hay datos, si no usar base
         if (!historical || (historical.totalEvaluaciones ?? 0) === 0) {
           setTeacherStats(baseStats);
-          setUsedFallbackFromStats(true);
         } else {
           setTeacherStats(historical);
-          setUsedFallbackFromStats(false);
         }
       } catch (error) {
         console.error('❌ Error loading teacher stats for reports:', error);
@@ -162,7 +116,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
       if (!teacherId) return;
 
       try {
-        const periods = ['2023-1', '2023-2', '2024-1', '2024-2', '2025-1', '2025-2'];
+        const periods = ['2024-1', '2024-2', '2025-1', '2025-2', '2026-1', '2026-2'];
         const historicalPromises = periods.map(async (period) => {
           try {
             const stats = await fetchTeacherHistoricalStats(teacherId, period);
@@ -217,47 +171,40 @@ export default function ReportsPage({ user }: ReportsPageProps) {
     ? categoryStats.map((c: any) => ({ category: c.nombre, rating: c.promedio }))
     : [];
 
-  // Usar datos de ejemplo si no hay datos reales
-  const categoryDataWithMock = getMockDataWithIndicator(realCategoryData, mockCategoryData);
-  const trendDataWithMock = getMockDataWithIndicator(historicalData, mockTrendData);
-  const competencyDataWithMock = getMockDataWithIndicator([], mockCompetencyData);
+  const categoryData = realCategoryData;
+  const trendData = historicalData;
 
-  const categoryData = categoryDataWithMock.data;
-  const trendData = trendDataWithMock.data;
-  const competencyData = competencyDataWithMock.data;
-  const isUsingMockData = categoryDataWithMock.isMock || trendDataWithMock.isMock;
-
-  // Radar: usar datos reales de categorías si están disponibles, sino usar mock
+  // Radar usando solo datos reales por categoría
   const realRadarData = categoryStats.length > 0
     ? categoryStats
         .slice(0, 6) // Limitar a 6 categorías para mejor visualización
         .map((c: any) => ({
-          subject: c.nombre?.substring(0, 12) || `Cat.${c.categoriaId}`, // Acortar nombres
+          subject: c.nombre || `Cat.${c.categoriaId}`,
           A: Number(c.promedio) || 0,
           fullMark: 5
         }))
         .filter((d: any) => d.A > 0) // Solo categorías con datos
     : [];
 
-  const radarData = realRadarData.length > 0 ? realRadarData : debugRadarData();
-  
-  // Debug: verificar datos del radar
-  console.log('🔍 Radar data (real):', realRadarData);
-  console.log('🔍 Radar data (final):', radarData);
-  console.log('🔍 Category stats:', categoryStats);
+  const radarData = realRadarData;
 
-  // Distribución de calificaciones (usar datos de ejemplo si no hay datos reales)
-  const realDistributionData = baseTeacherStats?.totalEvaluaciones > 0 ? [
-    { name: '5 Estrellas', value: Math.round((baseTeacherStats.totalEvaluaciones * 0.35)), color: '#10B981' },
-    { name: '4 Estrellas', value: Math.round((baseTeacherStats.totalEvaluaciones * 0.28)), color: '#3B82F6' },
-    { name: '3 Estrellas', value: Math.round((baseTeacherStats.totalEvaluaciones * 0.20)), color: '#F59E0B' },
-    { name: '2 Estrellas', value: Math.round((baseTeacherStats.totalEvaluaciones * 0.12)), color: '#EF4444' },
-    { name: '1 Estrella', value: Math.round((baseTeacherStats.totalEvaluaciones * 0.05)), color: '#6B7280' }
-  ] : [];
-
-  // Usar datos reales de distribución si están disponibles, sino datos de ejemplo
-  const distributionDataWithMock = getMockDataWithIndicator(realDistributionData, mockDistributionData);
-  const distributionData = distributionDataWithMock.data;
+  // Distribución calculada desde cursos del período (ponderada por total de encuestas)
+  const distributionBuckets = [
+    { name: '5 Estrellas', value: 0, color: '#10B981' },
+    { name: '4 Estrellas', value: 0, color: '#3B82F6' },
+    { name: '3 Estrellas', value: 0, color: '#F59E0B' },
+    { name: '2 Estrellas', value: 0, color: '#EF4444' },
+    { name: '1 Estrella', value: 0, color: '#6B7280' }
+  ]
+  ;(baseTeacherStats?.evaluacionesPorCurso || []).forEach((curso: any) => {
+    const total = Number(curso?.total || 0)
+    const promedio = Number(curso?.promedio || 0)
+    if (total <= 0) return
+    const bucket = Math.max(1, Math.min(5, Math.round(promedio)))
+    const index = 5 - bucket
+    distributionBuckets[index].value += total
+  })
+  const distributionData = distributionBuckets.filter((b) => b.value > 0)
 
   const departmentData: any[] = [];
   
@@ -271,12 +218,23 @@ export default function ReportsPage({ user }: ReportsPageProps) {
     }
   }, [teacherId, user.id, periodoId, loadingStats, user.type])
 
-  // Cards SIEMPRE desde stats base (independientes del histórico)
-  const mockStats = {
+  // Cards basadas en datos reales del período
+  const previousPeriod = (() => {
+    const [yearStr, semStr] = selectedPeriod.split('-')
+    const year = Number(yearStr)
+    const sem = Number(semStr)
+    if (sem === 2) return `${year}-1`
+    return `${year - 1}-2`
+  })()
+  const currentTrend = trendData.find((t: any) => t.period === selectedPeriod)?.rating || 0
+  const prevTrend = trendData.find((t: any) => t.period === previousPeriod)?.rating || 0
+  const improvement = prevTrend > 0 ? Number((((currentTrend - prevTrend) / prevTrend) * 100).toFixed(1)) : 0
+
+  const summaryStats = {
     totalEvaluations: baseTeacherStats?.totalEvaluaciones || 0,
     averageRating: baseTeacherStats?.calificacionPromedio || 0,
-    responseRate: 0, // TODO: Calcular tasa de respuesta real
-    improvement: 0 // TODO: Calcular mejora real
+    responseRate: Number(baseTeacherStats?.tasaRespuesta || 0),
+    improvement
   };
 
   return (
@@ -333,6 +291,8 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                    onChange={(e) => handlePeriodChange(e.target.value)}
                    className="w-32 rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-red-500 focus:outline-none focus:ring-red-500 sm:text-sm"
                  >
+                   <option value="2026-1">2026-1</option>
+                   <option value="2026-2">2026-2</option>
                    <option value="2025-2">2025-2</option>
                    <option value="2025-1">2025-1</option>
                    <option value="2024-2">2024-2</option>
@@ -343,23 +303,17 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                  
                  {user.type === 'teacher' && (
                    <select 
-                     value={selectedSubject} 
-                     onChange={(e) => setSelectedSubject(e.target.value)}
+                     value={selectedCourse} 
+                     onChange={(e) => setSelectedCourse(e.target.value)}
                      className="w-56 rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-red-500 focus:outline-none focus:ring-red-500 sm:text-sm"
                    >
-                     {availableSubjects.map((subject) => (
-                       <option key={subject.id} value={subject.id}>
-                         {subject.code} - {subject.name}
+                     <option value="all">Todas las materias</option>
+                     {(baseTeacherStats?.evaluacionesPorCurso || []).map((curso: any) => (
+                       <option key={curso.curso_id} value={curso.curso_id}>
+                         {(curso.codigo || 'CURSO')} - {curso.nombre}
                        </option>
                      ))}
                    </select>
-                 )}
-                 
-                 {/* Debug info */}
-                 {process.env.NODE_ENV === 'development' && (
-                   <div className="text-xs text-gray-500">
-                     User type: {user.type} | Subjects: {availableSubjects.length}
-                   </div>
                  )}
                  
                 {/* Selector de curso disponible también para profesores */}
@@ -426,7 +380,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                    <CardDescription>Este período académico</CardDescription>
                  </CardHeader>
                  <CardContent>
-                   <div className="text-4xl font-bold text-red-600 mb-2">{mockStats.totalEvaluations}</div>
+                  <div className="text-4xl font-bold text-red-600 mb-2">{summaryStats.totalEvaluations}</div>
                    <p className="text-sm text-gray-600">Evaluaciones completadas</p>
                  </CardContent>
                </Card>
@@ -446,10 +400,10 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                    <CardDescription>Promedio general de todas las evaluaciones</CardDescription>
                  </CardHeader>
                  <CardContent>
-                   <div className="text-4xl font-bold text-yellow-600 mb-2">{mockStats.averageRating}/5.0</div>
+                  <div className="text-4xl font-bold text-yellow-600 mb-2">{summaryStats.averageRating}/5.0</div>
                    <div className="flex items-center gap-1 text-sm text-green-600">
                      <TrendingUp className="h-4 w-4" />
-                     +{mockStats.improvement}% vs período anterior
+                    {summaryStats.improvement >= 0 ? '+' : ''}{summaryStats.improvement}% vs período anterior
                    </div>
                  </CardContent>
                </Card>
@@ -469,7 +423,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                    <CardDescription>De estudiantes elegibles</CardDescription>
                  </CardHeader>
                  <CardContent>
-                   <div className="text-4xl font-bold text-blue-600 mb-2">{mockStats.responseRate}%</div>
+                  <div className="text-4xl font-bold text-blue-600 mb-2">{summaryStats.responseRate}%</div>
                    <p className="text-sm text-gray-600">Estudiantes que respondieron</p>
                  </CardContent>
                </Card>
@@ -532,14 +486,19 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={350}>
-                      <BarChart data={categoryData}>
+                      <BarChart
+                        data={categoryData}
+                        margin={{ top: 10, right: 20, left: 20, bottom: 35 }}
+                      >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis 
                           dataKey="category" 
-                          angle={-45}
+                          interval={0}
+                          angle={-30}
                           textAnchor="end"
-                          height={80}
-                          fontSize={12}
+                          height={105}
+                          tickMargin={10}
+                          fontSize={11}
                         />
                         <YAxis domain={[0, 5]} />
                         <Tooltip />
@@ -673,18 +632,26 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                           data={distributionData}
                           cx="50%"
                           cy="50%"
-                          outerRadius={140}
+                          outerRadius={120}
                           dataKey="value"
-                          label={({ name, percent }: any) => {
-                            const p = typeof percent === 'number' ? percent : 0
-                            return `${name ?? ''}: ${(p * 100).toFixed(0)}%`
-                          }}
+                          label={false}
+                          labelLine={false}
                         >
                           {distributionData.map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
                         <Tooltip />
+                        <Legend
+                          verticalAlign="bottom"
+                          height={48}
+                          formatter={(value: any, entry: any) => {
+                            const total = distributionData.reduce((sum: number, item: any) => sum + (item.value || 0), 0)
+                            const current = Number(entry?.payload?.value || 0)
+                            const pct = total > 0 ? Math.round((current / total) * 100) : 0
+                            return `${value}: ${pct}%`
+                          }}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   )}
@@ -799,7 +766,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   </Button>
                   <Button variant="outline" className="w-full" onClick={() => {
                     const sheets = [
-                      { name: 'Resumen', rows: [mockStats] },
+                      { name: 'Resumen', rows: [summaryStats] },
                       { name: 'Categorias', rows: categoryData },
                       { name: 'Tendencia', rows: trendData },
                       { name: 'Distribucion', rows: distributionData }

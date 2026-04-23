@@ -5,6 +5,7 @@ export type AiSummaryResult = {
   topics: string[]
   acosoDetectado?: boolean
   mensajeAcoso?: string
+  analysisSource?: 'open_text' | 'quantitative_fallback'
 }
 
 export type SummaryContext = 'profesor' | 'coordinador' | 'decano'
@@ -25,6 +26,48 @@ const SPANISH_STOPWORDS = new Set<string>([
   'a','acaba','ahi','al','algo','algun','alguna','algunas','alguno','algunos','alla','alli','ambos','ante','antes','aquel','aquella','aquellas','aquello','aquellos','aqui','asi','aun','aunque','bajo','bastante','bien','cabe','cada','casi','cierto','cierta','ciertas','cierto','ciertos','como','con','contra','cual','cuales','cualquier','cualquiera','cualquieras','cuan','cuando','cuanta','cuantas','cuanto','cuantos','de','debe','deben','debido','decir','del','demasiada','demasiadas','demasiado','demasiados','dentro','deprisa','desde','despues','detras','dia','dias','dice','dicen','dicho','dicha','dichas','dichos','donde','dos','el','ella','ellas','ello','ellos','empleais','emplean','emplear','empleo','en','encima','entonces','entre','era','eramos','eran','eras','eres','es','esa','esas','ese','eso','esos','esta','estaba','estaban','estado','estados','estais','estamos','estan','estar','este','esto','estos','estoy','fin','fue','fueron','fui','fuimos','gueno','ha','hace','haceis','hacemos','hacen','hacer','haces','hacia','han','hasta','hay','incluso','intenta','intentais','intentamos','intentan','intentar','intentas','ir','jamas','junto','juntos','la','largo','las','le','les','llegar','lo','los','mas','me','menos','mi','mia','mias','mientras','mio','mios','mis','misma','mismas','mismo','mismos','modo','mucha','muchas','muchisima','muchisimas','muchisimo','muchisimos','mucho','muchos','muy','nada','ni','ningun','ninguna','ningunas','ninguno','ningunos','no','nos','nosotras','nosotros','nuestra','nuestras','nuestro','nuestros','nunca','os','otra','otras','otro','otros','para','parecer','pero','poca','pocas','poco','pocos','podeis','podemos','poder','podria','podriais','podriamos','podrian','podrias','por','por que','porque','primero','puede','pueden','pues','que','querer','quien','quienes','quiza','quizas','sabe','sabeis','sabemos','saben','saber','sabes','se','segun','ser','si','siempre','siendo','sin','sino','so','sobre','sois','solamente','solo','somos','son','soy','su','sus','suya','suyas','suyo','suyos','tal','tales','tambien','tampoco','tan','tanta','tantas','tanto','tantos','te','teneis','tenemos','tener','tengo','tenido','tiene','tienen','toda','todas','todavia','todo','todos','tras','tu','tus','tuya','tuyas','tuyo','tuyos','ultima','ultimas','ultimo','ultimos','un','una','unas','uno','unos','usa','usais','usamos','usan','usar','usas','usted','ustedes','va','vais','valor','vamos','van','varias','varios','vaya','verdad','verdadera','verdadero','vosotras','vosotros','voy','ya','yo'
 ])
 
+// Palabras de bajo valor semántico que suelen aparecer en comentarios
+// y no aportan como "tema" (verbos comodín, conectores, relleno).
+const LOW_SIGNAL_WORDS = new Set<string>([
+  'sean', 'sea', 'sido', 'siendo', 'tenga', 'tengan', 'tener', 'tiene', 'tienen',
+  'haya', 'hayan', 'hacer', 'hacen', 'hace', 'pueda', 'pueden', 'podria', 'podrian',
+  'debe', 'deben', 'seria', 'serian', 'cosa', 'cosas', 'tema', 'temas', 'parte',
+  'veces', 'vez', 'bastante', 'muy', 'mas', 'menos', 'buena', 'bueno', 'buenos',
+  'buenas', 'mejor', 'mejora', 'mejorar', 'depronto', 'pronto', 'algo', 'nada'
+])
+
+// Léxico académico/pedagógico para priorizar temas útiles en el contexto de evaluación docente.
+const ACADEMIC_PRIORITY_TERMS = new Set<string>([
+  'metodologia', 'metodologías', 'metodo', 'didactica', 'didáctica', 'pedagogia', 'pedagogía',
+  'claridad', 'explicacion', 'explicaciones', 'comunicacion', 'comunicación', 'retroalimentacion',
+  'retroalimentación', 'evaluacion', 'evaluaciones', 'calificacion', 'calificaciones',
+  'aprendizaje', 'competencia', 'competencias', 'contenido', 'contenidos', 'material',
+  'materiales', 'ejemplo', 'ejemplos', 'practica', 'práctica', 'practicas', 'prácticas',
+  'participacion', 'participación', 'interaccion', 'interacción', 'disponibilidad',
+  'organizacion', 'organización', 'puntualidad', 'respeto', 'motivacion', 'motivación',
+  'dinamica', 'dinámica', 'ritmo', 'acompanamiento', 'acompañamiento', 'asesoria', 'asesoría',
+  'expresion', 'expresión', 'coherencia', 'dominio', 'conocimiento', 'planeacion', 'planeación'
+])
+
+function isUsefulTopicToken(token: string): boolean {
+  if (!token) return false
+  if (token.length < 4) return false
+  if (SPANISH_STOPWORDS.has(token)) return false
+  if (LOW_SIGNAL_WORDS.has(token)) return false
+  if (/^\d+$/.test(token)) return false
+  return true
+}
+
+function getTopicPriority(term: string): number {
+  const normalized = normalizeText(term)
+  const tokens = normalized.split(/\s+/).filter(Boolean)
+  // Priorizar n-gramas que contengan al menos un término académico
+  if (tokens.some((t) => ACADEMIC_PRIORITY_TERMS.has(t))) return 2
+  // Prioridad media a términos razonables de longitud mayor
+  if (tokens.every((t) => t.length >= 5)) return 1
+  return 0
+}
+
 function extractTopKeywords(texts: string[], maxTerms: number = 10): string[] {
   const counts = new Map<string, number>()
   for (const raw of texts) {
@@ -36,8 +79,7 @@ function extractTopKeywords(texts: string[], maxTerms: number = 10): string[] {
 
     // unigrams
     for (const t of tokens) {
-      if (t.length < 3) continue
-      if (SPANISH_STOPWORDS.has(t)) continue
+      if (!isUsefulTopicToken(t)) continue
       counts.set(t, (counts.get(t) || 0) + 1)
     }
 
@@ -46,15 +88,18 @@ function extractTopKeywords(texts: string[], maxTerms: number = 10): string[] {
       const a = tokens[i]
       const b = tokens[i + 1]
       if (!a || !b) continue
-      if (SPANISH_STOPWORDS.has(a) || SPANISH_STOPWORDS.has(b)) continue
-      if (a.length < 3 || b.length < 3) continue
+      if (!isUsefulTopicToken(a) || !isUsefulTopicToken(b)) continue
       const bigram = `${a} ${b}`
       counts.set(bigram, (counts.get(bigram) || 0) + 1)
     }
   }
 
   return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => {
+      const priorityDiff = getTopicPriority(b[0]) - getTopicPriority(a[0])
+      if (priorityDiff !== 0) return priorityDiff
+      return b[1] - a[1]
+    })
     .slice(0, maxTerms)
     .map(([term]) => term)
 }
@@ -103,6 +148,68 @@ function generateSmartSummary(responses: string[]): string {
 }
 
 export class AiService {
+  static summarizeFromRatings(ratings: number[], context: SummaryContext = 'profesor'): AiSummaryResult {
+    if (!Array.isArray(ratings) || ratings.length === 0) {
+      return {
+        summary: 'No hay respuestas cuantitativas suficientes para generar un resumen.',
+        topics: [],
+        analysisSource: 'quantitative_fallback'
+      }
+    }
+
+    const valid = ratings
+      .map((r) => Number(r))
+      .filter((r) => Number.isFinite(r) && r >= 1 && r <= 5)
+
+    if (valid.length === 0) {
+      return {
+        summary: 'No hay respuestas cuantitativas válidas para generar un resumen.',
+        topics: [],
+        analysisSource: 'quantitative_fallback'
+      }
+    }
+
+    const avg = valid.reduce((a, b) => a + b, 0) / valid.length
+    const dist = { e1: 0, e2: 0, e3: 0, e4: 0, e5: 0 }
+    valid.forEach((v) => {
+      const rounded = Math.round(v)
+      if (rounded === 1) dist.e1++
+      else if (rounded === 2) dist.e2++
+      else if (rounded === 3) dist.e3++
+      else if (rounded === 4) dist.e4++
+      else dist.e5++
+    })
+
+    const topBucket = Object.entries(dist).sort((a, b) => b[1] - a[1])[0]?.[0] || 'e3'
+    const pct = (n: number) => Math.round((n / valid.length) * 100)
+    const positive = dist.e4 + dist.e5
+    const low = dist.e1 + dist.e2
+
+    const contextText =
+      context === 'coordinador'
+        ? 'de los docentes de la carrera'
+        : context === 'decano'
+          ? 'de los docentes de la facultad'
+          : 'del docente'
+
+    let tone = 'La percepción general es intermedia.'
+    if (avg >= 4.3) tone = 'La percepción general es muy positiva.'
+    else if (avg >= 3.7) tone = 'La percepción general es positiva con oportunidades de mejora.'
+    else if (avg < 3.0) tone = 'La percepción general sugiere áreas de mejora importantes.'
+
+    const summary = `No se encontraron respuestas abiertas suficientes, así que se generó un resumen cualitativo a partir de ${valid.length} respuestas cuantitativas ${contextText}. Promedio general: ${avg.toFixed(2)}/5. ${tone} Predominan las valoraciones ${topBucket.replace('e', '')} estrellas (${pct(dist[topBucket as keyof typeof dist])}%). Valoraciones altas (4-5): ${pct(positive)}%; valoraciones bajas (1-2): ${pct(low)}%.`
+
+    const topics = [
+      `promedio ${avg.toFixed(2)}/5`,
+      `${pct(positive)}% valoraciones altas`,
+      `${pct(low)}% valoraciones bajas`,
+      'analisis cuantitativo',
+      'sin respuestas abiertas'
+    ]
+
+    return { summary, topics, analysisSource: 'quantitative_fallback' }
+  }
+
   static async summarizeOpenResponses(responses: string[], context: SummaryContext = 'profesor'): Promise<AiSummaryResult> {
     // Extraer temas por frecuencia local (SIEMPRE funciona, gratis)
     const topics = extractTopKeywords(responses, 10)
@@ -277,7 +384,8 @@ ${joined}`
       summary, 
       topics,
       acosoDetectado,
-      mensajeAcoso: acosoDetectado ? mensajeAcoso : undefined
+      mensajeAcoso: acosoDetectado ? mensajeAcoso : undefined,
+      analysisSource: 'open_text'
     }
   }
 }

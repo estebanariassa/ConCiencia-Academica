@@ -37,6 +37,10 @@ export default function QrEvaluationEntry() {
         const resp = await apiClient.get(`/api/qr-evaluaciones/${token}`)
         const data = resp.data || {}
 
+        // Auto-matrícula del estudiante en el grupo asociado al QR.
+        // Si ya estaba inscrito, el backend devuelve alreadyEnrolled=true.
+        await apiClient.post(`/api/qr-evaluaciones/${token}/auto-enroll`)
+
         // Construir objetos mínimos para EvaluationForm (usa teacher/course/group desde location.state)
         const teacher = {
           id: data.profesorId,
