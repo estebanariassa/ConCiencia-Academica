@@ -522,6 +522,167 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
       .filter((c) => c.promedio > 0)
       .sort((a, b) => b.promedio - a.promedio)
 
+    // Filas detalladas para exportación Excel (curso/grupo/docente + categorías)
+    const groupById = new Map<number, any>()
+    gruposArray.forEach((g: any) => groupById.set(Number(g.id), g))
+
+    const teacherIdsForExport = Array.from(new Set(evalsArray.map((e: any) => String(e.profesor_id)).filter(Boolean)))
+    const { data: teacherRowsForExport } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id, usuario:usuarios(nombre, apellido)')
+      .in('id', teacherIdsForExport.length ? teacherIdsForExport : ['-1'])
+    const teacherNameByIdForExport = new Map<string, string>()
+    ;(Array.isArray(teacherRowsForExport) ? teacherRowsForExport : []).forEach((t: any) => {
+      const nombre = `${t?.usuario?.nombre || ''} ${t?.usuario?.apellido || ''}`.trim() || `Docente ${t.id}`
+      teacherNameByIdForExport.set(String(t.id), nombre)
+    })
+
+    const groupIdsForEnroll = Array.from(new Set(evalsArray.map((e: any) => Number(e.grupo_id)).filter(Boolean)))
+    const { data: enrollments } = await SupabaseDB.supabaseAdmin
+      .from('inscripciones')
+      .select('id, grupo_id')
+      .in('grupo_id', groupIdsForEnroll.length ? groupIdsForEnroll : [-1])
+    const enrolledByGroup = new Map<number, number>()
+    ;(Array.isArray(enrollments) ? enrollments : []).forEach((i: any) => {
+      const gid = Number(i.grupo_id)
+      enrolledByGroup.set(gid, (enrolledByGroup.get(gid) || 0) + 1)
+    })
+
+    const keyFor = (profesorId: string, grupoId: number) => `${profesorId}::${grupoId}`
+    const rowAgg = new Map<string, {
+      profesorId: string
+      grupoId: number
+      cursoNombre: string
+      grupo: string
+      estudiantes: number
+      evaluadoresSet: Set<string>
+      sumPromedio: number
+      countPromedio: number
+    }>()
+    evalsArray.forEach((e: any) => {
+      const profesorId = String(e.profesor_id || '')
+      const grupoId = Number(e.grupo_id || 0)
+      if (!profesorId || !grupoId) return
+      const group = groupById.get(grupoId)
+      const cursoNombre = courseNameById.get(Number(group?.curso_id)) || `Curso ${group?.curso_id || ''}`.trim()
+      const key = keyFor(profesorId, grupoId)
+      const prev = rowAgg.get(key) || {
+        profesorId,
+        grupoId,
+        cursoNombre,
+        grupo: String(group?.numero_grupo ?? grupoId),
+        estudiantes: Number(enrolledByGroup.get(grupoId) || 0),
+        evaluadoresSet: new Set<string>(),
+        sumPromedio: 0,
+        countPromedio: 0
+      }
+      if (e?.estudiante_id) prev.evaluadoresSet.add(String(e.estudiante_id))
+      const p = Number(e.calificacion_promedio || 0)
+      if (Number.isFinite(p) && p > 0) {
+        prev.sumPromedio += p
+        prev.countPromedio += 1
+      }
+      rowAgg.set(key, prev)
+    })
+
+    const evalIdsForCategory = evalsArray.map((e: any) => e.id).filter(Boolean)
+    const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+      const out: T[][] = []
+      for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+      return out
+    }
+    let responseRows: any[] = []
+    for (const chunk of chunkArray(evalIdsForCategory, 150)) {
+      const { data, error } = await SupabaseDB.supabaseAdmin
+        .from('respuestas_evaluacion')
+        .select('evaluacion_id, pregunta_id, respuesta_rating')
+        .in('evaluacion_id', chunk)
+      if (!error) {
+        responseRows.push(...(Array.isArray(data) ? data : []))
+      } else {
+        const fallback = await SupabaseDB.supabaseAdmin
+          .from('respuestas_evaluacion')
+          .select('evaluacion_id, pregunta_id, valor')
+          .in('evaluacion_id', chunk)
+        responseRows.push(...(Array.isArray(fallback.data) ? fallback.data : []))
+      }
+    }
+
+    const evalToKey = new Map<string, string>()
+    evalsArray.forEach((e: any) => {
+      const profesorId = String(e.profesor_id || '')
+      const grupoId = Number(e.grupo_id || 0)
+      if (!profesorId || !grupoId) return
+      evalToKey.set(String(e.id), keyFor(profesorId, grupoId))
+    })
+
+    const questionIds = Array.from(new Set(responseRows.map((r: any) => String(r.pregunta_id)).filter(Boolean)))
+    let questionRows: any[] = []
+    for (const chunk of chunkArray(questionIds, 200)) {
+      const { data } = await SupabaseDB.supabaseAdmin
+        .from('preguntas_evaluacion')
+        .select('id, categoria_id')
+        .in('id', chunk)
+      questionRows.push(...(Array.isArray(data) ? data : []))
+    }
+    const questionToCategory = new Map<string, string>()
+    questionRows.forEach((q: any) => {
+      if (q?.id == null || q?.categoria_id == null) return
+      questionToCategory.set(String(q.id), String(q.categoria_id))
+    })
+
+    const categoryIds = Array.from(new Set(questionRows.map((q: any) => String(q.categoria_id)).filter(Boolean)))
+    let categoryRows: any[] = []
+    for (const chunk of chunkArray(categoryIds, 200)) {
+      const { data } = await SupabaseDB.supabaseAdmin
+        .from('categorias_pregunta')
+        .select('id, nombre')
+        .in('id', chunk)
+      categoryRows.push(...(Array.isArray(data) ? data : []))
+    }
+    const categoryNameById = new Map<string, string>()
+    categoryRows.forEach((c: any) => categoryNameById.set(String(c.id), String(c.nombre || `Categoría ${c.id}`)))
+
+    const catAggByRow = new Map<string, Map<string, { sum: number; count: number }>>()
+    responseRows.forEach((r: any) => {
+      const rowKey = evalToKey.get(String(r.evaluacion_id))
+      if (!rowKey) return
+      const catId = questionToCategory.get(String(r.pregunta_id))
+      if (!catId) return
+      const rating = Number(r.respuesta_rating ?? r.valor ?? 0)
+      if (!Number.isFinite(rating) || rating <= 0) return
+      const byCat = catAggByRow.get(rowKey) || new Map<string, { sum: number; count: number }>()
+      const prev = byCat.get(catId) || { sum: 0, count: 0 }
+      prev.sum += rating
+      prev.count += 1
+      byCat.set(catId, prev)
+      catAggByRow.set(rowKey, byCat)
+    })
+
+    const reportRows = Array.from(rowAgg.entries()).map(([key, base]) => {
+      const row: any = {
+        DOCENTE: teacherNameByIdForExport.get(base.profesorId) || `Docente ${base.profesorId}`,
+        ASIGNATURA: base.cursoNombre,
+        GRUPO: base.grupo,
+        ESTUDIANTES: base.estudiantes,
+        ESTUDIANTES_EVALUADORES: base.evaluadoresSet.size,
+      }
+      const byCat = catAggByRow.get(key) || new Map<string, { sum: number; count: number }>()
+      byCat.forEach((values, catId) => {
+        const catName = (categoryNameById.get(catId) || `Categoria_${catId}`).toUpperCase().replace(/\s+/g, '_')
+        row[catName] = values.count > 0 ? Number((values.sum / values.count).toFixed(2)) : null
+      })
+      row.PROMEDIO = base.countPromedio > 0 ? Number((base.sumPromedio / base.countPromedio).toFixed(2)) : null
+      return row
+    })
+      .sort((a, b) => {
+        const byTeacher = String(a.DOCENTE).localeCompare(String(b.DOCENTE), 'es')
+        if (byTeacher !== 0) return byTeacher
+        const byCourse = String(a.ASIGNATURA).localeCompare(String(b.ASIGNATURA), 'es')
+        if (byCourse !== 0) return byCourse
+        return String(a.GRUPO).localeCompare(String(b.GRUPO), 'es')
+      })
+
     const buildCategoryStats = async (evals: any[]) => {
       if (!Array.isArray(evals) || !evals.length) {
         return [] as Array<{ categoriaId: string; nombre: string; promedio: number }>
@@ -714,6 +875,7 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
       categoryStats,
       teacherAverages,
       courseAverages,
+      reportRows,
       debug: process.env.NODE_ENV === 'development' ? {
         period,
         periodId,
@@ -725,6 +887,205 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
     })
   } catch (error) {
     console.error('Error GET /coordinador/reports-overview:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+/**
+ * GET /coordinador/profesor-stats/:profesorId
+ * Estadísticas de evaluación de un docente de la carrera del coordinador.
+ */
+router.get('/profesor-stats/:profesorId', authenticateToken, async (req: any, res) => {
+  try {
+    const user = req.user
+    if (!user?.roles?.includes('coordinador') && user?.tipo_usuario !== 'coordinador') {
+      return res.status(403).json({ error: 'Solo coordinadores pueden acceder a esta información.' })
+    }
+
+    const coordinador = await RoleService.obtenerCoordinadorPorUsuario(user.id)
+    if (!coordinador?.carrera_id) {
+      return res.status(400).json({ error: 'No se encontró carrera asociada al coordinador' })
+    }
+
+    const carreraId = Number(coordinador.carrera_id)
+    const profesorId = String(req.params.profesorId)
+    const period = String(req.query?.period || '').trim()
+    const [yearStr, semesterStr] = period.split('-')
+    const year = Number(yearStr)
+    const semester = Number(semesterStr)
+    const hasValidPeriod = Number.isFinite(year) && Number.isFinite(semester) && (semester === 1 || semester === 2)
+    const dateStart = hasValidPeriod ? `${year}-${semester === 1 ? '01' : '07'}-01` : '2020-01-01'
+    const dateEnd = hasValidPeriod ? `${year}-${semester === 1 ? '06-30' : '12-31'}` : '2030-12-31'
+
+    const { data: profesor, error: profesorError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id, usuario:usuarios(nombre, apellido, email)')
+      .eq('id', profesorId)
+      .eq('carrera_id', carreraId)
+      .eq('activo', true)
+      .maybeSingle()
+
+    if (profesorError) {
+      return res.status(500).json({ error: 'Error obteniendo docente', details: profesorError.message })
+    }
+    if (!profesor) {
+      return res.status(404).json({ error: 'Docente no encontrado en la carrera del coordinador' })
+    }
+
+    let periodId: number | null = null
+    if (hasValidPeriod) {
+      const { data: periodRow } = await SupabaseDB.supabaseAdmin
+        .from('periodos_academicos')
+        .select('id')
+        .eq('ano', year)
+        .eq('semestre', semester)
+        .maybeSingle()
+      periodId = periodRow?.id ? Number(periodRow.id) : null
+    }
+
+    let evalsArray: any[] = []
+    if (periodId != null) {
+      const { data, error } = await SupabaseDB.supabaseAdmin
+        .from('evaluaciones')
+        .select('id, profesor_id, calificacion_promedio, grupo_id, estudiante_id, fecha_creacion')
+        .eq('profesor_id', profesorId)
+        .eq('completada', true)
+        .eq('periodo_id', periodId)
+      if (error) return res.status(500).json({ error: 'Error obteniendo evaluaciones', details: error.message })
+      evalsArray = Array.isArray(data) ? data : []
+    }
+
+    if (evalsArray.length === 0) {
+      const { data, error } = await SupabaseDB.supabaseAdmin
+        .from('evaluaciones')
+        .select('id, profesor_id, calificacion_promedio, grupo_id, estudiante_id, fecha_creacion')
+        .eq('profesor_id', profesorId)
+        .eq('completada', true)
+        .gte('fecha_creacion', dateStart)
+        .lte('fecha_creacion', dateEnd)
+      if (error) return res.status(500).json({ error: 'Error obteniendo evaluaciones por fecha', details: error.message })
+      evalsArray = Array.isArray(data) ? data : []
+    }
+
+    const totalEvaluaciones = evalsArray.length
+    const promedio = totalEvaluaciones > 0
+      ? Number((evalsArray.reduce((sum: number, e: any) => sum + Number(e.calificacion_promedio || 0), 0) / totalEvaluaciones).toFixed(2))
+      : 0
+    const estudiantesEvaluadores = new Set(evalsArray.map((e: any) => e.estudiante_id).filter(Boolean)).size
+
+    const grupoIds = Array.from(new Set(evalsArray.map((e: any) => e.grupo_id).filter(Boolean)))
+    const { data: grupos } = await SupabaseDB.supabaseAdmin
+      .from('grupos')
+      .select('id, curso_id, numero_grupo')
+      .in('id', grupoIds.length ? grupoIds : [-1])
+    const grupoToCurso = new Map<number, any>()
+    ;(Array.isArray(grupos) ? grupos : []).forEach((g: any) => grupoToCurso.set(Number(g.id), g))
+
+    const cursoIds = Array.from(new Set((Array.isArray(grupos) ? grupos : []).map((g: any) => g.curso_id).filter(Boolean)))
+    const { data: cursos } = await SupabaseDB.supabaseAdmin
+      .from('cursos')
+      .select('id, nombre, codigo')
+      .in('id', cursoIds.length ? cursoIds : [-1])
+    const cursoById = new Map<number, any>()
+    ;(Array.isArray(cursos) ? cursos : []).forEach((c: any) => cursoById.set(Number(c.id), c))
+
+    const courseAgg = new Map<number, { sum: number; count: number; nombre: string; codigo: string }>()
+    evalsArray.forEach((e: any) => {
+      const grupo = grupoToCurso.get(Number(e.grupo_id))
+      const curso = cursoById.get(Number(grupo?.curso_id))
+      const cursoId = Number(curso?.id || grupo?.curso_id || 0)
+      const rating = Number(e.calificacion_promedio || 0)
+      if (!cursoId || !Number.isFinite(rating) || rating <= 0) return
+      const prev = courseAgg.get(cursoId) || { sum: 0, count: 0, nombre: curso?.nombre || `Curso ${cursoId}`, codigo: curso?.codigo || '' }
+      prev.sum += rating
+      prev.count += 1
+      courseAgg.set(cursoId, prev)
+    })
+    const courses = Array.from(courseAgg.entries()).map(([cursoId, values]) => ({
+      cursoId,
+      nombre: values.nombre,
+      codigo: values.codigo,
+      totalEvaluaciones: values.count,
+      promedio: values.count > 0 ? Number((values.sum / values.count).toFixed(2)) : 0
+    }))
+
+    const evalIds = evalsArray.map((e: any) => e.id).filter(Boolean)
+    const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+      const out: T[][] = []
+      for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+      return out
+    }
+
+    let responses: any[] = []
+    for (const chunk of chunkArray(evalIds, 150)) {
+      const { data, error } = await SupabaseDB.supabaseAdmin
+        .from('respuestas_evaluacion')
+        .select('evaluacion_id, pregunta_id, respuesta_rating')
+        .in('evaluacion_id', chunk)
+      if (!error) responses.push(...(Array.isArray(data) ? data : []))
+    }
+
+    const questionIds = Array.from(new Set(responses.map((r: any) => String(r.pregunta_id)).filter(Boolean)))
+    let questions: any[] = []
+    for (const chunk of chunkArray(questionIds, 200)) {
+      const { data } = await SupabaseDB.supabaseAdmin
+        .from('preguntas_evaluacion')
+        .select('id, categoria_id')
+        .in('id', chunk)
+      questions.push(...(Array.isArray(data) ? data : []))
+    }
+    const questionToCategory = new Map<string, string>()
+    questions.forEach((q: any) => {
+      if (q?.id == null || q?.categoria_id == null) return
+      questionToCategory.set(String(q.id), String(q.categoria_id))
+    })
+
+    const categoryIds = Array.from(new Set(questions.map((q: any) => String(q.categoria_id)).filter(Boolean)))
+    let categories: any[] = []
+    for (const chunk of chunkArray(categoryIds, 200)) {
+      const { data } = await SupabaseDB.supabaseAdmin
+        .from('categorias_pregunta')
+        .select('id, nombre')
+        .in('id', chunk)
+      categories.push(...(Array.isArray(data) ? data : []))
+    }
+    const categoryNameById = new Map<string, string>()
+    categories.forEach((c: any) => categoryNameById.set(String(c.id), String(c.nombre || `Categoría ${c.id}`)))
+
+    const catAgg = new Map<string, { sum: number; count: number }>()
+    responses.forEach((r: any) => {
+      const catId = questionToCategory.get(String(r.pregunta_id))
+      if (!catId) return
+      const rating = Number(r.respuesta_rating ?? 0)
+      if (!Number.isFinite(rating) || rating <= 0) return
+      const prev = catAgg.get(catId) || { sum: 0, count: 0 }
+      prev.sum += rating
+      prev.count += 1
+      catAgg.set(catId, prev)
+    })
+    const categoriesStats = Array.from(catAgg.entries()).map(([categoriaId, values]) => ({
+      categoriaId,
+      nombre: categoryNameById.get(categoriaId) || `Categoría ${categoriaId}`,
+      promedio: values.count > 0 ? Number((values.sum / values.count).toFixed(2)) : 0
+    }))
+
+    res.json({
+      profesor: {
+        id: profesor.id,
+        nombre: `${(profesor as any)?.usuario?.nombre || ''} ${(profesor as any)?.usuario?.apellido || ''}`.trim(),
+        email: (profesor as any)?.usuario?.email || ''
+      },
+      summary: {
+        totalEvaluaciones,
+        promedio,
+        estudiantesEvaluadores,
+        totalCursos: courses.length
+      },
+      courses,
+      categories: categoriesStats
+    })
+  } catch (error) {
+    console.error('Error GET /coordinador/profesor-stats/:profesorId:', error)
     res.status(500).json({ error: 'Error interno del servidor' })
   }
 })

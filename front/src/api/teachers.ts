@@ -415,6 +415,7 @@ export interface CoordinatorReportsOverviewResponse {
     promedio: number;
     totalEvaluaciones: number;
   }>;
+  reportRows: Array<Record<string, string | number | null>>;
   trend: Array<{
     period: string;
     rating: number;
@@ -457,6 +458,19 @@ export async function fetchCoordinatorReportsOverview(period: string): Promise<C
   } catch (error) {
     console.error('❌ Error fetching coordinator reports overview:', error)
     throw new Error('Error al cargar los reportes del coordinador')
+  }
+}
+
+export async function fetchCoordinatorProfessorStats(profesorId: string | number, period: string): Promise<any> {
+  try {
+    const query = new URLSearchParams()
+    if (period) query.set('period', String(period))
+    const url = `/api/coordinador/profesor-stats/${profesorId}${query.toString() ? `?${query.toString()}` : ''}`
+    const response = await apiClient.get(url)
+    return response.data
+  } catch (error) {
+    console.error('❌ Error fetching coordinator professor stats:', error)
+    throw new Error('Error al cargar estadísticas del docente')
   }
 }
 

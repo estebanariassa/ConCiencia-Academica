@@ -46,7 +46,7 @@ import {
 
 // Importar la imagen de fondo
 const fondo = new URL('../../assets/fondo.webp', import.meta.url).href;
-import { exportElementToPDF, exportElementToPNG, exportObjectsToExcel } from '../../utils/export';
+import { exportElementToPDF, exportElementToPNG, exportObjectsToExcel, exportCoordinatorReportExcel } from '../../utils/export';
 import AISummaryCard from '../../components/AISummaryCard';
 
 interface ReportsPageProps {
@@ -783,6 +783,13 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                     Reporte PDF
                   </Button>
                   <Button variant="outline" className="w-full" onClick={() => {
+                    if (user.type === 'coordinator') {
+                      const rows = coordinatorOverview?.reportRows || []
+                      if (rows.length > 0) {
+                        exportCoordinatorReportExcel(rows, `reporte-coordinador-${selectedPeriod}.xlsx`)
+                        return
+                      }
+                    }
                     const sheets = [
                       { name: 'Resumen', rows: [summaryStats] },
                       { name: 'Categorias', rows: categoryData },
