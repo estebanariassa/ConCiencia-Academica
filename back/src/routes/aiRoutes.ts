@@ -360,10 +360,11 @@ ORDER BY e.id, re.id;`
 })
 
 // GET /api/ai/summarize/by-career?periodo_id=... (para coordinadores)
-// Lógica simplificada:
+// Lógica:
 // 1. Obtener carrera_id del coordinador
-// 2. Filtrar evaluaciones donde carrera_id = carrera_id del coordinador
-// 3. De esas evaluaciones, obtener respuestas_evaluacion con respuesta_texto válido
+// 2. Obtener profesores activos de esa carrera
+// 3. Filtrar evaluaciones por esos profesores (opcionalmente por período)
+// 4. Obtener respuestas_evaluacion con respuesta_texto válido
 router.get('/summarize/by-career', authenticateToken, requireRole(['coordinador', 'decano', 'admin']), async (req: any, res) => {
   try {
     const { periodo_id } = req.query as any
@@ -388,10 +389,15 @@ router.get('/summarize/by-career', authenticateToken, requireRole(['coordinador'
     
     // Paso 2: Convertir periodo_id si viene en formato YYYY-X
     let periodoIdNum: number | undefined = undefined
+    let periodoDateRange: { gte: string; lte: string } | null = null
     if (periodo_id) {
       const periodoStr = String(periodo_id)
       if (periodoStr.includes('-')) {
         const [year, sem] = periodoStr.split('-')
+        periodoDateRange = {
+          gte: `${year}-${sem === '1' ? '01' : '07'}-01`,
+          lte: `${year}-${sem === '1' ? '06-30' : '12-31'}`
+        }
         const { data: periodos } = await SupabaseDB.supabaseAdmin
           .from('periodos_academicos')
           .select('id')
@@ -407,49 +413,211 @@ router.get('/summarize/by-career', authenticateToken, requireRole(['coordinador'
       }
     }
     
-    // Paso 3: Usar la vista SQL que centraliza todos los JOINs y filtros
-    // La vista 'vista_respuestas_abiertas_validas' ya tiene todos los filtros aplicados
-    // Esto busca TODAS las respuestas válidas de TODOS los profesores de la carrera
-    let vistaQuery = SupabaseDB.supabaseAdmin
-      .from('vista_respuestas_abiertas_validas')
-      .select('respuesta_texto, respuesta_rating, profesor_id, evaluacion_id')
-      .eq('carrera_id', carreraId)  // ← Filtro directo por carrera_id
-    
+    // Paso 3: profesores activos de la carrera
+    const { data: profesores, error: profError } = await SupabaseDB.supabaseAdmin
+      .from('profesores')
+      .select('id, usuario:usuarios(nombre, apellido)')
+      .eq('carrera_id', carreraId)
+      .eq('activo', true)
+
+    if (profError) {
+      console.error('❌ [by-career] Error buscando profesores por carrera:', profError)
+      throw profError
+    }
+
+    const profesorIds = (profesores || []).map((p: any) => p.id).filter(Boolean)
+    const profesorNombreById = new Map<string, string>()
+    ;(profesores || []).forEach((p: any) => {
+      const nombre = `${p?.usuario?.nombre || ''} ${p?.usuario?.apellido || ''}`.trim() || `Docente ${p.id}`
+      profesorNombreById.set(String(p.id), nombre)
+    })
+    if (profesorIds.length === 0) {
+      return res.json({
+        textsCount: 0,
+        summary: 'No se encontraron profesores activos en esta carrera.',
+        topics: []
+      })
+    }
+
+    // Paso 4: evaluaciones de esos profesores
+    let evaluacionesQuery = SupabaseDB.supabaseAdmin
+      .from('evaluaciones')
+      .select('id, profesor_id, calificacion_promedio')
+      .in('profesor_id', profesorIds)
+      .eq('completada', true)
+
     if (periodoIdNum) {
-      vistaQuery = vistaQuery.eq('periodo_id', periodoIdNum)
+      evaluacionesQuery = evaluacionesQuery.eq('periodo_id', periodoIdNum)
     }
-    
-    // Obtener todas las respuestas válidas directamente de la vista
-    // La vista ya tiene aplicados los filtros: IS NOT NULL, TRIM <> '', LENGTH > 3
-    const { data: respuestas, error: respError } = await vistaQuery
-    
-    if (respError) {
-      console.error('❌ [by-career] Error buscando respuestas en la vista:', respError)
-      throw respError
+
+    const { data: evaluaciones, error: evalError } = await evaluacionesQuery
+    if (evalError) {
+      console.error('❌ [by-career] Error buscando evaluaciones:', evalError)
+      throw evalError
     }
-    
-    console.log(`✅ [by-career] Encontradas ${respuestas?.length || 0} respuestas válidas de la carrera ${carreraId}`)
-    
-    if (!respuestas || respuestas.length === 0) {
-      // Generar SQL de debug que muestra cómo buscar por carrera_id (no por profesor_id)
-      let sqlWhere = `WHERE 
-  carrera_id = ${carreraId}`
-      if (periodoIdNum) {
-        sqlWhere += `\n  AND periodo_id = ${periodoIdNum}`
+
+    let evalsArray: any[] = Array.isArray(evaluaciones) ? evaluaciones : []
+
+    // Fallback: si vino periodo_id pero no hay evaluaciones, intentar por fecha_creacion
+    // porque en algunos datos históricos periodo_id viene nulo/inconsistente.
+    if (evalsArray.length === 0 && periodoDateRange) {
+      const { data: evalsByDate, error: evalByDateError } = await SupabaseDB.supabaseAdmin
+        .from('evaluaciones')
+        .select('id, profesor_id, calificacion_promedio')
+        .in('profesor_id', profesorIds)
+        .eq('completada', true)
+        .gte('fecha_creacion', periodoDateRange.gte)
+        .lte('fecha_creacion', periodoDateRange.lte)
+
+      if (evalByDateError) {
+        console.error('❌ [by-career] Error en fallback por fecha:', evalByDateError)
+      } else {
+        evalsArray = Array.isArray(evalsByDate) ? evalsByDate : []
+        console.log(`ℹ️ [by-career] Fallback por fecha aplicado, evaluaciones encontradas: ${evalsArray.length}`)
       }
-      
+    }
+
+    const evaluacionIds = evalsArray.map((e: any) => e.id).filter(Boolean)
+    if (evaluacionIds.length === 0) {
+      return res.json({
+        textsCount: 0,
+        summary: 'No se encontraron evaluaciones para esta carrera en el período seleccionado.',
+        topics: []
+      })
+    }
+
+    // Paso 5: respuestas abiertas válidas (en lotes para evitar Bad Request por query grande)
+    const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+      const out: T[][] = []
+      for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+      return out
+    }
+
+    let respuestas: any[] = []
+    for (const chunk of chunkArray(evaluacionIds, 150)) {
+      const { data: chunkData, error: chunkError } = await SupabaseDB.supabaseAdmin
+        .from('respuestas_evaluacion')
+        .select('evaluacion_id, respuesta_texto')
+        .in('evaluacion_id', chunk)
+        .not('respuesta_texto', 'is', null)
+      if (chunkError) {
+        console.error('❌ [by-career] Error buscando respuestas abiertas (chunk):', chunkError)
+        throw chunkError
+      }
+      respuestas.push(...(Array.isArray(chunkData) ? chunkData : []))
+    }
+
+    const evalToProfesor = new Map<string, string>()
+    ;(evalsArray || []).forEach((e: any) => {
+      evalToProfesor.set(String(e.id), String(e.profesor_id || ''))
+    })
+
+    const normalizeText = (text: string): string =>
+      String(text || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+
+    const acosoKeywords = [
+      'acoso', 'hostigamiento', 'abus', 'maltrato', 'intimidacion',
+      'inapropiado', 'violencia', 'amenaza', 'miedo', 'temor',
+      'humillacion', 'tocamiento', 'agresion', 'insinuacion'
+    ].map(normalizeText)
+
+    const acosoPorProfesor = new Map<string, { count: number; ejemplos: string[] }>()
+    const texts: string[] = respuestas
+      .map((r: any) => String(r.respuesta_texto || '').trim())
+      .filter((texto: string) => texto.length >= 3)
+
+    ;(respuestas || []).forEach((r: any) => {
+      const texto = String(r?.respuesta_texto || '').trim()
+      if (texto.length < 3) return
+      const low = normalizeText(texto)
+      const hasAcoso = acosoKeywords.some((k) => low.includes(k))
+      if (!hasAcoso) return
+      const profesorId = evalToProfesor.get(String(r?.evaluacion_id || ''))
+      if (!profesorId) return
+      const prev = acosoPorProfesor.get(profesorId) || { count: 0, ejemplos: [] }
+      prev.count += 1
+      if (prev.ejemplos.length < 2) prev.ejemplos.push(texto.slice(0, 160))
+      acosoPorProfesor.set(profesorId, prev)
+    })
+
+    const acosoProfesores = Array.from(acosoPorProfesor.entries())
+      .map(([profesorId, data]) => ({
+        profesorId,
+        nombre: profesorNombreById.get(profesorId) || `Docente ${profesorId}`,
+        menciones: data.count,
+        ejemplos: data.ejemplos
+      }))
+      .sort((a, b) => b.menciones - a.menciones)
+    
+    console.log(`✅ [by-career] Encontradas ${texts.length} respuestas válidas de la carrera ${carreraId}`)
+    
+    if (texts.length === 0) {
+      const ratings = evalsArray
+        .map((e: any) => Number(e.calificacion_promedio))
+        .filter((n: number) => Number.isFinite(n) && n >= 1 && n <= 5)
+
+      if (ratings.length > 0) {
+        const perTeacherAcc = new Map<string, { sum: number; count: number }>()
+        ;(evalsArray || []).forEach((e: any) => {
+          const pid = String(e.profesor_id || '')
+          const r = Number(e.calificacion_promedio || 0)
+          if (!pid || !Number.isFinite(r) || r <= 0) return
+          const prev = perTeacherAcc.get(pid) || { sum: 0, count: 0 }
+          prev.sum += r
+          prev.count += 1
+          perTeacherAcc.set(pid, prev)
+        })
+
+        const lowPerformers = Array.from(perTeacherAcc.entries())
+          .map(([profesorId, data]) => ({
+            profesorId,
+            nombre: profesorNombreById.get(profesorId) || `Docente ${profesorId}`,
+            promedio: data.count > 0 ? Number((data.sum / data.count).toFixed(2)) : 0
+          }))
+          .filter((p) => p.promedio > 0 && p.promedio < 4.0)
+          .sort((a, b) => a.promedio - b.promedio)
+
+        const quantitative = AiService.summarizeFromRatings(ratings, 'coordinador')
+        const alertaBajoDesempeno = lowPerformers.length > 0
+          ? ` Alerta: se detectaron ${lowPerformers.length} docentes con promedio menor a 4.0; se recomienda revisión y acompañamiento académico.`
+          : ' No se detectaron docentes con promedio menor a 4.0 en el período consultado.'
+
+        return res.json({
+          textsCount: 0,
+          ratingsCount: ratings.length,
+          lowPerformersCount: lowPerformers.length,
+          lowPerformers,
+          acosoProfesores,
+          analysisSource: 'quantitative_fallback',
+          summary: `${quantitative.summary}${alertaBajoDesempeno}`,
+          topics: [
+            ...(quantitative.topics || []),
+            lowPerformers.length > 0 ? 'docentes bajo 4.0' : 'sin alertas bajo 4.0'
+          ]
+        })
+      }
+
       const sqlCommand = `SELECT 
-  carrera_id,
-  carrera_nombre,
-  profesor_id,
-  evaluacion_id,
-  respuesta_id,
-  respuesta_texto,
-  respuesta_rating
-FROM vista_respuestas_abiertas_validas
-${sqlWhere}
-ORDER BY evaluacion_id, respuesta_id;`
-      
+  re.id AS respuesta_id,
+  re.evaluacion_id,
+  re.respuesta_texto
+FROM respuestas_evaluacion re
+WHERE re.evaluacion_id IN (
+  SELECT e.id
+  FROM evaluaciones e
+  WHERE e.profesor_id IN (
+    SELECT p.id FROM profesores p WHERE p.carrera_id = ${carreraId} AND p.activo = true
+  )
+  ${periodoIdNum ? `AND e.periodo_id = ${periodoIdNum}` : ''}
+  AND e.completada = true
+)
+AND re.respuesta_texto IS NOT NULL
+AND TRIM(re.respuesta_texto) <> ''
+AND LENGTH(TRIM(re.respuesta_texto)) >= 3
+ORDER BY re.evaluacion_id, re.id;`
       return res.json({ 
         textsCount: 0, 
         summary: 'No se encontraron respuestas abiertas válidas para esta carrera.', 
@@ -458,11 +626,6 @@ ORDER BY evaluacion_id, respuesta_id;`
       })
     }
     
-    // La vista ya tiene los filtros aplicados, solo necesitamos extraer los textos
-    const texts: string[] = respuestas
-      .map((r: any) => String(r.respuesta_texto).trim())
-      .filter((texto: string) => texto.length > 0 && texto.length >= 3)  // >= 3 coincide con el SQL
-    
     console.log(`✅ [by-career] ${texts.length} respuestas válidas listas para análisis IA`)
     
     // Paso 6: Generar resumen IA con contexto de coordinador (habla en general de todos los profesores)
@@ -470,7 +633,7 @@ ORDER BY evaluacion_id, respuesta_id;`
     const result = await AiService.summarizeOpenResponses(texts, 'coordinador')
     console.log(`✅ [by-career] Resumen generado exitosamente`)
     
-    res.json({ textsCount: texts.length, ...result })
+    res.json({ textsCount: texts.length, acosoProfesores, ...result })
   } catch (error: any) {
     console.error('❌ [by-career] Error:', error)
     console.error('   Stack:', error.stack)

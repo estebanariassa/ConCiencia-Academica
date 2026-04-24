@@ -30,6 +30,12 @@ export default function AISummaryCard({ texts, title, description, endpoint, par
     analysisSource?: 'open_text' | 'quantitative_fallback';
     acosoDetectado?: boolean;
     mensajeAcoso?: string;
+    acosoProfesores?: Array<{
+      profesorId: string;
+      nombre: string;
+      menciones: number;
+      ejemplos: string[];
+    }>;
   } | null>(null)
   
   // hasData es true si:
@@ -216,6 +222,18 @@ export default function AISummaryCard({ texts, title, description, endpoint, par
                     <p className="text-sm text-red-700 whitespace-pre-line">{result.mensajeAcoso}</p>
                   </div>
                 </div>
+              </div>
+            )}
+            {result.acosoProfesores && result.acosoProfesores.length > 0 && (
+              <div className="bg-rose-50 border border-rose-200 rounded-lg p-3">
+                <h4 className="text-sm font-semibold text-rose-800 mb-2">Docentes vinculados a menciones de acoso</h4>
+                <ul className="text-sm text-rose-700 space-y-1">
+                  {result.acosoProfesores.slice(0, 5).map((p, i) => (
+                    <li key={`${p.profesorId}-${i}`}>
+                      {p.nombre}: {p.menciones} mención(es)
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
             <div>

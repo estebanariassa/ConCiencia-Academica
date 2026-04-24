@@ -125,26 +125,29 @@ function generateSmartSummary(responses: string[]): string {
   
   const positivePct = Math.round((positiveCount / total) * 100)
   const negativePct = Math.round((negativeCount / total) * 100)
+  const genericTerms = new Set(['clase', 'profesor', 'contenido', 'material'])
   const topMentions = Object.entries(mentions)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
     .map(([k]) => k)
+    .filter((k) => !genericTerms.has(normalizeText(k)))
+    .slice(0, 3)
   
-  let summary = `Se analizaron ${total} respuestas de estudiantes. `
-  
+  let estado = 'Estado general regular con oportunidades de mejora.'
   if (positivePct > negativePct && positivePct > 30) {
-    summary += `Los comentarios son mayormente positivos (${positivePct}% mencionan aspectos favorables). `
+    estado = 'Estado general favorable en la percepción estudiantil.'
   } else if (negativePct > positivePct && negativePct > 30) {
-    summary += `Se identifican áreas de mejora en ${negativePct}% de las respuestas. `
-  } else {
-    summary += `Las opiniones muestran una mezcla de comentarios positivos y constructivos. `
+    estado = 'Estado general con señales de alerta y necesidad de intervención.'
   }
-  
-  if (topMentions.length > 0) {
-    summary += `Los temas más mencionados incluyen: ${topMentions.join(', ')}.`
-  }
-  
-  return summary
+
+  const fortalezas = topMentions.length > 0
+    ? `Fortalezas observadas en varios docentes: ${topMentions.slice(0, 2).join(', ')}.`
+    : 'Fortalezas observadas: buena disposición docente, cumplimiento y acompañamiento general.'
+
+  const fallas = negativePct >= 25
+    ? 'Aspectos a mejorar: claridad en explicaciones, ritmo de clase y acompañamiento en temas complejos.'
+    : 'Aspectos a mejorar: mantener consistencia metodológica y retroalimentación oportuna.'
+
+  return `${estado} ${fortalezas} ${fallas} Recomendación: priorizar seguimiento pedagógico a los docentes con evaluaciones más bajas y compartir buenas prácticas de quienes obtienen mejores resultados.`
 }
 
 export class AiService {
@@ -240,7 +243,13 @@ export class AiService {
     }
     
     if (acosoDetectado) {
-      mensajeAcoso = `⚠️ ALERTA: Se detectaron menciones que podrían referirse a situaciones de acoso o comportamiento inapropiado en ${textosConAcoso.length} respuesta(s). Se recomienda revisar estas respuestas inmediatamente y tomar las acciones correspondientes según los protocolos institucionales.`
+      const ejemplos = textosConAcoso
+        .slice(0, 5)
+        .map((t) => String(t).trim().replace(/\s+/g, ' '))
+      const ejemplosTexto = ejemplos.length > 0
+        ? `\nEjemplos detectados:\n- ${ejemplos.join('\n- ')}`
+        : ''
+      mensajeAcoso = `⚠️ ALERTA: Se detectaron menciones que podrían referirse a situaciones de acoso o comportamiento inapropiado en ${textosConAcoso.length} respuesta(s). Se recomienda revisar estas respuestas inmediatamente y tomar las acciones correspondientes según los protocolos institucionales.${ejemplosTexto}`
       console.warn('🚨 [AI Service] Posible acoso detectado:', textosConAcoso.length, 'respuesta(s)')
     }
     
@@ -253,11 +262,11 @@ export class AiService {
           model: 'gemini-2.5-flash',
           generationConfig: { 
             temperature: 0.3,
-            maxOutputTokens: 600
+            maxOutputTokens: 1000
           } 
         })
         
-        const joined = responses.slice(0, 50).join('\n- ') // Limitar a 50 respuestas para no exceder tokens
+        const joined = responses.slice(0, 90).join('\n- ') // Más contexto para evitar resúmenes muy cortos
         
         // Generar prompt según el contexto
         let contextoPrompt = ''
@@ -266,7 +275,7 @@ export class AiService {
 
 Analiza las siguientes opiniones de estudiantes sobre su experiencia académica con los profesores de la carrera y genera:
 
-1. Un resumen conciso (2-3 oraciones) que capture los puntos más importantes mencionados por los estudiantes sobre los profesores en general de la carrera.
+1. Un resumen ejecutivo y conciso (máximo 3-4 oraciones) que indique: estado general (bien/regular/crítico), fortalezas principales y fallas principales de los docentes de la carrera.
 2. Una lista de 5-10 temas o palabras clave más relevantes mencionados por los estudiantes sobre todos los profesores (separados por comas).
 
 IMPORTANTE: 
@@ -285,7 +294,7 @@ ${joined}`
 
 Analiza las siguientes opiniones de estudiantes sobre su experiencia académica con los profesores de la facultad y genera:
 
-1. Un resumen conciso (2-3 oraciones) que capture los puntos más importantes mencionados por los estudiantes sobre los profesores en general de la facultad.
+1. Un resumen claro y útil (4-6 oraciones) que capture los puntos más importantes mencionados por los estudiantes sobre los profesores en general de la facultad.
 2. Una lista de 5-10 temas o palabras clave más relevantes mencionados por los estudiantes sobre todos los profesores (separados por comas).
 
 IMPORTANTE: 
@@ -305,7 +314,7 @@ ${joined}`
 
 Analiza las siguientes opiniones de estudiantes sobre su experiencia académica y genera:
 
-1. Un resumen conciso (2-3 oraciones) que capture los puntos más importantes mencionados por los estudiantes.
+1. Un resumen claro y útil (4-6 oraciones) que capture los puntos más importantes mencionados por los estudiantes.
 2. Una lista de 5-10 temas o palabras clave más relevantes mencionados (separados por comas).
 
 IMPORTANTE: Responde SOLO en español y en este formato exacto:
@@ -341,14 +350,6 @@ ${joined}`
             // Combinar temas de IA con temas locales (priorizando IA)
             const combinedTopics = [...new Set([...temasIA, ...topics.slice(0, 5)])].slice(0, 10)
             
-            // Agregar mensaje de acoso si se detectó
-            if (acosoDetectado && mensajeAcoso) {
-              // Incluir el mensaje de acoso en el resumen si no está ya incluido
-              if (!aiSummary.includes('acoso') && !aiSummary.includes('Acoso')) {
-                aiSummary = `⚠️ ALERTA DE ACOSO: ${mensajeAcoso}\n\n${aiSummary}`
-              }
-            }
-            
             return { 
               summary: aiSummary, 
               topics: combinedTopics,
@@ -374,11 +375,6 @@ ${joined}`
     
     // Preferir resumen de IA si está disponible, sino usar local
     let summary = aiSummary.trim() || localSummary
-    
-    // Agregar mensaje de acoso si se detectó y no está en el resumen
-    if (acosoDetectado && mensajeAcoso && !summary.includes('acoso') && !summary.includes('Acoso')) {
-      summary = `⚠️ ALERTA DE ACOSO: ${mensajeAcoso}\n\n${summary}`
-    }
     
     return { 
       summary, 

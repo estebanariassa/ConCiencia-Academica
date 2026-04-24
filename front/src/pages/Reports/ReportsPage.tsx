@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { fetchTeacherHistoricalStats, fetchTeacherId, fetchTeacherStats, fetchTeacherPeriodStats, fetchTeacherPeriodCategoryStats } from '../../api/teachers';
+import { fetchTeacherHistoricalStats, fetchTeacherId, fetchTeacherPeriodStats, fetchTeacherPeriodCategoryStats, fetchCoordinatorReportsOverview } from '../../api/teachers';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -57,11 +57,11 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   const navigate = useNavigate();
   const reportRef = useRef<HTMLDivElement | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState('2026-1');
-  const [selectedFilter, setSelectedFilter] = useState('all');
   const [selectedCourse, setSelectedCourse] = useState('all');
   const [teacherId, setTeacherId] = useState<string>('');
   const [teacherStats, setTeacherStats] = useState<any>(null); // histórico o base si no hay histórico
   const [baseTeacherStats, setBaseTeacherStats] = useState<any>(null); // SIEMPRE: stats globales del profesor
+  const [coordinatorOverview, setCoordinatorOverview] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [historicalData, setHistoricalData] = useState<any[]>([]);
@@ -77,27 +77,32 @@ export default function ReportsPage({ user }: ReportsPageProps) {
       try {
         setLoadingStats(true);
         setStatsError(null);
-        console.log('🔍 Loading teacher stats for reports, user ID:', user.id, 'period:', selectedPeriod);
-        // Obtener el ID real del profesor desde el backend
-        const tId = await fetchTeacherId();
-        console.log('✅ Teacher ID obtenido:', tId);
-        setTeacherId(tId);
-
-        // Cargar en paralelo: histórico y stats base
-        const [historical, baseStats] = await Promise.all([
-          fetchTeacherHistoricalStats(tId, selectedPeriod),
-          fetchTeacherPeriodStats(selectedPeriod)
-        ]);
-        console.log('✅ Historical for reports:', historical);
-        console.log('✅ Base teacher-stats for cards:', baseStats);
-
-        setBaseTeacherStats(baseStats);
-
-        // Gráficas: usar histórico si hay datos, si no usar base
-        if (!historical || (historical.totalEvaluaciones ?? 0) === 0) {
-          setTeacherStats(baseStats);
+        if (user.type === 'coordinator') {
+          const coordinatorData = await fetchCoordinatorReportsOverview(selectedPeriod);
+          setCoordinatorOverview(coordinatorData);
+          setTeacherStats(null);
+          setBaseTeacherStats(null);
+          setTeacherId('');
         } else {
-          setTeacherStats(historical);
+          // Obtener el ID real del profesor desde el backend
+          const tId = await fetchTeacherId();
+          setTeacherId(tId);
+
+          // Cargar en paralelo: histórico y stats base
+          const [historical, baseStats] = await Promise.all([
+            fetchTeacherHistoricalStats(tId, selectedPeriod),
+            fetchTeacherPeriodStats(selectedPeriod)
+          ]);
+
+          setBaseTeacherStats(baseStats);
+          setCoordinatorOverview(null);
+
+          // Gráficas: usar histórico si hay datos, si no usar base
+          if (!historical || (historical.totalEvaluaciones ?? 0) === 0) {
+            setTeacherStats(baseStats);
+          } else {
+            setTeacherStats(historical);
+          }
         }
       } catch (error) {
         console.error('❌ Error loading teacher stats for reports:', error);
@@ -113,7 +118,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   // Cargar datos históricos para la gráfica de tendencia
   useEffect(() => {
     const loadHistoricalData = async () => {
-      if (!teacherId) return;
+      if (user.type === 'coordinator' || !teacherId) return;
 
       try {
         const periods = ['2024-1', '2024-2', '2025-1', '2025-2', '2026-1', '2026-2'];
@@ -144,7 +149,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
     };
 
     loadHistoricalData();
-  }, [teacherId]);
+  }, [teacherId, user.type]);
 
   // Función para manejar cambio de período
   const handlePeriodChange = (newPeriod: string) => {
@@ -157,6 +162,10 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   // Cargar promedios por categoría del período (y curso si aplica)
   useEffect(() => {
     const loadCategory = async () => {
+      if (user.type === 'coordinator') {
+        setCategoryStats(coordinatorOverview?.categoryStats || []);
+        return;
+      }
       try {
         const data = await fetchTeacherPeriodCategoryStats(selectedPeriod, selectedCourse !== 'all' ? selectedCourse : undefined);
         setCategoryStats(Array.isArray(data) ? data : []);
@@ -165,14 +174,17 @@ export default function ReportsPage({ user }: ReportsPageProps) {
       }
     };
     loadCategory();
-  }, [selectedPeriod, selectedCourse]);
+  }, [selectedPeriod, selectedCourse, user.type, coordinatorOverview]);
 
   const realCategoryData = categoryStats.length > 0
     ? categoryStats.map((c: any) => ({ category: c.nombre, rating: c.promedio }))
     : [];
 
+  // Coordinador: mantener la misma vista que docente, pero con promedio global por categoría.
   const categoryData = realCategoryData;
-  const trendData = historicalData;
+  const trendData = user.type === 'coordinator'
+    ? (coordinatorOverview?.trend || [])
+    : historicalData;
 
   // Radar usando solo datos reales por categoría
   const realRadarData = categoryStats.length > 0
@@ -189,24 +201,27 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   const radarData = realRadarData;
 
   // Distribución calculada desde cursos del período (ponderada por total de encuestas)
-  const distributionBuckets = [
-    { name: '5 Estrellas', value: 0, color: '#10B981' },
-    { name: '4 Estrellas', value: 0, color: '#3B82F6' },
-    { name: '3 Estrellas', value: 0, color: '#F59E0B' },
-    { name: '2 Estrellas', value: 0, color: '#EF4444' },
-    { name: '1 Estrella', value: 0, color: '#6B7280' }
-  ]
-  ;(baseTeacherStats?.evaluacionesPorCurso || []).forEach((curso: any) => {
-    const total = Number(curso?.total || 0)
-    const promedio = Number(curso?.promedio || 0)
-    if (total <= 0) return
-    const bucket = Math.max(1, Math.min(5, Math.round(promedio)))
-    const index = 5 - bucket
-    distributionBuckets[index].value += total
-  })
-  const distributionData = distributionBuckets.filter((b) => b.value > 0)
-
-  const departmentData: any[] = [];
+  const distributionData = (() => {
+    if (user.type === 'coordinator') {
+      return (coordinatorOverview?.distribution || []) as any[];
+    }
+    const distributionBuckets = [
+      { name: '5 Estrellas', value: 0, color: '#10B981' },
+      { name: '4 Estrellas', value: 0, color: '#3B82F6' },
+      { name: '3 Estrellas', value: 0, color: '#F59E0B' },
+      { name: '2 Estrellas', value: 0, color: '#EF4444' },
+      { name: '1 Estrella', value: 0, color: '#6B7280' }
+    ]
+    ;(baseTeacherStats?.evaluacionesPorCurso || []).forEach((curso: any) => {
+      const total = Number(curso?.total || 0)
+      const promedio = Number(curso?.promedio || 0)
+      if (total <= 0) return
+      const bucket = Math.max(1, Math.min(5, Math.round(promedio)))
+      const index = 5 - bucket
+      distributionBuckets[index].value += total
+    })
+    return distributionBuckets.filter((b) => b.value > 0)
+  })()
   
   // El backend ahora acepta el formato YYYY-X directamente
   const periodoId = selectedPeriod; // Ya está en formato YYYY-X
@@ -231,9 +246,17 @@ export default function ReportsPage({ user }: ReportsPageProps) {
   const improvement = prevTrend > 0 ? Number((((currentTrend - prevTrend) / prevTrend) * 100).toFixed(1)) : 0
 
   const summaryStats = {
-    totalEvaluations: baseTeacherStats?.totalEvaluaciones || 0,
-    averageRating: baseTeacherStats?.calificacionPromedio || 0,
-    responseRate: Number(baseTeacherStats?.tasaRespuesta || 0),
+    totalEvaluations: user.type === 'coordinator'
+      ? (coordinatorOverview?.summary?.totalEvaluaciones || 0)
+      : (baseTeacherStats?.totalEvaluaciones || 0),
+    averageRating: user.type === 'coordinator'
+      ? (coordinatorOverview?.summary?.calificacionPromedio || 0)
+      : (baseTeacherStats?.calificacionPromedio || 0),
+    responseRate: Number(
+      user.type === 'coordinator'
+        ? (coordinatorOverview?.summary?.tasaRespuesta || 0)
+        : (baseTeacherStats?.tasaRespuesta || 0)
+    ),
     improvement
   };
 
@@ -347,21 +370,6 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                </div>
             </div>
 
-            {user.type === 'coordinator' && (
-              <div className="flex gap-3">
-                <select 
-                  value={selectedFilter} 
-                  onChange={(e) => setSelectedFilter(e.target.value)}
-                  className="w-48 rounded-md border border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-red-500 focus:outline-none focus:ring-red-500 sm:text-sm"
-                >
-                  <option value="all">Todos los Departamentos</option>
-                  <option value="engineering">Ingeniería</option>
-                  <option value="sciences">Ciencias</option>
-                  <option value="humanities">Humanidades</option>
-                  <option value="business">Administración</option>
-                </select>
-              </div>
-            )}
           </motion.header>
 
            {/* Stats Cards */}
@@ -451,11 +459,13 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                      <div className="text-3xl font-bold text-red-600 mb-2">Error</div>
                    ) : (
                      <div className="text-4xl font-bold text-green-600 mb-2">
-                       {user.type === 'coordinator' ? '24' : (teacherStats?.totalCursos || 0)}
+                       {user.type === 'coordinator'
+                         ? (coordinatorOverview?.summary?.docentesEvaluados || 0)
+                         : (teacherStats?.totalCursos || 0)}
                      </div>
                    )}
                    <p className="text-sm text-gray-600">
-                     {loadingStats ? 'Cargando datos...' : (user.type === 'coordinator' ? 'Profesores activos' : 'Materias impartidas')}
+                     {loadingStats ? 'Cargando datos...' : (user.type === 'coordinator' ? 'Docentes evaluados en el período' : 'Materias impartidas')}
                    </p>
                  </CardContent>
                </Card>
@@ -484,7 +494,7 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                         <p>Cargando datos...</p>
                       </div>
                     </div>
-                  ) : (
+                  ) : categoryData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={350}>
                       <BarChart
                         data={categoryData}
@@ -505,6 +515,14 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                         <Bar dataKey="rating" fill="#E30613" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[350px] text-gray-500">
+                      <div className="text-center">
+                        <div className="text-4xl mb-2">📊</div>
+                        <p>No hay datos disponibles</p>
+                        <p className="text-sm text-gray-400">No se encontraron calificaciones por categoría en este período</p>
+                      </div>
+                    </div>
                   )}
                 </CardContent>
               </Card>
