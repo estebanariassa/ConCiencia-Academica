@@ -432,7 +432,7 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
     const gruposIds = Array.from(new Set(evalsArray.map((e: any) => e.grupo_id).filter(Boolean)))
     const { data: grupos } = await SupabaseDB.supabaseAdmin
       .from('grupos')
-      .select('id, curso_id')
+      .select('id, curso_id, numero_grupo')
       .in('id', gruposIds.length ? gruposIds : [-1])
     const gruposArray = Array.isArray(grupos) ? grupos : []
     const cursosEvaluados = new Set(gruposArray.map((g: any) => g.curso_id).filter(Boolean)).size

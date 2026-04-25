@@ -785,10 +785,8 @@ export default function ReportsPage({ user }: ReportsPageProps) {
                   <Button variant="outline" className="w-full" onClick={() => {
                     if (user.type === 'coordinator') {
                       const rows = coordinatorOverview?.reportRows || []
-                      if (rows.length > 0) {
-                        exportCoordinatorReportExcel(rows, `reporte-coordinador-${selectedPeriod}.xlsx`)
-                        return
-                      }
+                      exportCoordinatorReportExcel(rows, `reporte-coordinador-${selectedPeriod}.xlsx`)
+                      return
                     }
                     const sheets = [
                       { name: 'Resumen', rows: [summaryStats] },
