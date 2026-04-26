@@ -347,7 +347,7 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
       periodId = periodRow?.id ? Number(periodRow.id) : null
     }
 
-    const { data: profesores, error: profesoresError } = await SupabaseDB.supabaseAdmin
+    const { data: profesoresActivos, error: profesoresError } = await SupabaseDB.supabaseAdmin
       .from('profesores')
       .select('id')
       .eq('carrera_id', carreraId)
@@ -358,7 +358,16 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
       return res.status(500).json({ error: 'Error obteniendo profesores', details: profesoresError.message })
     }
 
-    const profesorIds = (profesores || []).map((p: any) => p.id).filter(Boolean)
+    let profesorIds = (profesoresActivos || []).map((p: any) => p.id).filter(Boolean)
+    if (profesorIds.length === 0) {
+      // Fallback: algunos coordinadores no tienen docentes marcados como "activo=true".
+      // Para reportes y exportación se toma toda la carrera.
+      const { data: profesoresCarrera } = await SupabaseDB.supabaseAdmin
+        .from('profesores')
+        .select('id')
+        .eq('carrera_id', carreraId)
+      profesorIds = (profesoresCarrera || []).map((p: any) => p.id).filter(Boolean)
+    }
     if (profesorIds.length === 0) {
       return res.json({
         summary: {
@@ -370,6 +379,7 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
           estudiantesRespondieron: 0
         },
         categoryStats: [],
+        reportRows: [],
         trend: [],
         distribution: []
       })
@@ -522,11 +532,64 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
       .filter((c) => c.promedio > 0)
       .sort((a, b) => b.promedio - a.promedio)
 
-    // Filas detalladas para exportación Excel (curso/grupo/docente + categorías)
-    const groupById = new Map<number, any>()
-    gruposArray.forEach((g: any) => groupById.set(Number(g.id), g))
+    // Filas detalladas para exportación Excel (curso/grupo/docente + categorías).
+    // Si el período no tiene respuestas, usar histórico para que el Excel sí liste docentes/grupos.
+    let evalsForReportRows = Array.isArray(evalsArray) ? [...evalsArray] : []
+    if (evalsForReportRows.length === 0) {
+      const { data: allCareerEvals } = await SupabaseDB.supabaseAdmin
+        .from('evaluaciones')
+        .select('id, profesor_id, calificacion_promedio, grupo_id, estudiante_id, fecha_creacion')
+        .in('profesor_id', profesorIds)
+        .eq('completada', true)
+      evalsForReportRows = Array.isArray(allCareerEvals) ? allCareerEvals : []
+    }
+    if (evalsForReportRows.length === 0) {
+      const { data: assignedGroups } = await SupabaseDB.supabaseAdmin
+        .from('asignaciones_profesor')
+        .select('profesor_id, grupo_id, activa')
+        .in('profesor_id', profesorIds)
+        .neq('activa', false)
 
-    const teacherIdsForExport = Array.from(new Set(evalsArray.map((e: any) => String(e.profesor_id)).filter(Boolean)))
+      const seenAssignments = new Set<string>()
+      const syntheticRows: any[] = []
+      ;(Array.isArray(assignedGroups) ? assignedGroups : []).forEach((a: any) => {
+        const profesorId = String(a?.profesor_id || '')
+        const grupoId = Number(a?.grupo_id || 0)
+        if (!profesorId || !grupoId) return
+        const key = `${profesorId}::${grupoId}`
+        if (seenAssignments.has(key)) return
+        seenAssignments.add(key)
+        syntheticRows.push({
+          id: null,
+          profesor_id: profesorId,
+          grupo_id: grupoId,
+          estudiante_id: null,
+          calificacion_promedio: null
+        })
+      })
+      evalsForReportRows = syntheticRows
+    }
+
+    const exportGroupIds = Array.from(new Set(evalsForReportRows.map((e: any) => Number(e.grupo_id)).filter(Boolean)))
+    const { data: exportGroups } = await SupabaseDB.supabaseAdmin
+      .from('grupos')
+      .select('id, curso_id, numero_grupo')
+      .in('id', exportGroupIds.length ? exportGroupIds : [-1])
+    const exportGroupsArray = Array.isArray(exportGroups) ? exportGroups : []
+    const exportGroupById = new Map<number, any>()
+    exportGroupsArray.forEach((g: any) => exportGroupById.set(Number(g.id), g))
+
+    const exportCourseIds = Array.from(new Set(exportGroupsArray.map((g: any) => Number(g.curso_id)).filter(Boolean)))
+    const { data: exportCourseRows } = await SupabaseDB.supabaseAdmin
+      .from('cursos')
+      .select('id, nombre, codigo')
+      .in('id', exportCourseIds.length ? exportCourseIds : [-1])
+    const exportCourseNameById = new Map<number, string>()
+    ;(Array.isArray(exportCourseRows) ? exportCourseRows : []).forEach((c: any) => {
+      exportCourseNameById.set(Number(c.id), `${c.codigo ? `${c.codigo} - ` : ''}${c.nombre || `Curso ${c.id}`}`)
+    })
+
+    const teacherIdsForExport = Array.from(new Set(evalsForReportRows.map((e: any) => String(e.profesor_id)).filter(Boolean)))
     const { data: teacherRowsForExport } = await SupabaseDB.supabaseAdmin
       .from('profesores')
       .select('id, usuario:usuarios(nombre, apellido)')
@@ -537,7 +600,7 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
       teacherNameByIdForExport.set(String(t.id), nombre)
     })
 
-    const groupIdsForEnroll = Array.from(new Set(evalsArray.map((e: any) => Number(e.grupo_id)).filter(Boolean)))
+    const groupIdsForEnroll = Array.from(new Set(evalsForReportRows.map((e: any) => Number(e.grupo_id)).filter(Boolean)))
     const { data: enrollments } = await SupabaseDB.supabaseAdmin
       .from('inscripciones')
       .select('id, grupo_id')
@@ -559,12 +622,12 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
       sumPromedio: number
       countPromedio: number
     }>()
-    evalsArray.forEach((e: any) => {
+    evalsForReportRows.forEach((e: any) => {
       const profesorId = String(e.profesor_id || '')
       const grupoId = Number(e.grupo_id || 0)
       if (!profesorId || !grupoId) return
-      const group = groupById.get(grupoId)
-      const cursoNombre = courseNameById.get(Number(group?.curso_id)) || `Curso ${group?.curso_id || ''}`.trim()
+      const group = exportGroupById.get(grupoId)
+      const cursoNombre = exportCourseNameById.get(Number(group?.curso_id)) || `Curso ${group?.curso_id || ''}`.trim()
       const key = keyFor(profesorId, grupoId)
       const prev = rowAgg.get(key) || {
         profesorId,
@@ -585,7 +648,7 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
       rowAgg.set(key, prev)
     })
 
-    const evalIdsForCategory = evalsArray.map((e: any) => e.id).filter(Boolean)
+    const evalIdsForCategory = evalsForReportRows.map((e: any) => e.id).filter(Boolean)
     const chunkArray = <T,>(arr: T[], size: number): T[][] => {
       const out: T[][] = []
       for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
@@ -609,7 +672,7 @@ router.get('/reports-overview', authenticateToken, async (req: any, res) => {
     }
 
     const evalToKey = new Map<string, string>()
-    evalsArray.forEach((e: any) => {
+    evalsForReportRows.forEach((e: any) => {
       const profesorId = String(e.profesor_id || '')
       const grupoId = Number(e.grupo_id || 0)
       if (!profesorId || !grupoId) return

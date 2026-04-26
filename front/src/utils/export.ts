@@ -157,7 +157,31 @@ export function exportCoordinatorReportExcel(rows: any[], filename = 'reporte-co
   ])
   docentesSheet['!cols'] = [{ wch: 48 }]
 
+  // Hoja de consulta estilo plantilla: misma vista pero con autofiltro nativo (sin fórmulas dinámicas).
+  const queryHeaderRow = 8
+  const querySheet = XLSX.utils.aoa_to_sheet([
+    ['EVALUACION DOCENTE'],
+    ['REPORTE CONSOLIDADO POR DOCENTE'],
+    [''],
+    ['Usa +Filtrar en la fila de encabezados para filtrar por DOCENTE, ASIGNATURA o GRUPO'],
+    [''],
+    ['Tip: puedes revisar la hoja "Docentes" para ver nombres disponibles'],
+    [''],
+    headerRow,
+    ...dataRows
+  ])
+  const queryLastRow = Math.max(queryHeaderRow, queryHeaderRow + dataRows.length)
+  querySheet['!autofilter'] = { ref: `A${queryHeaderRow}:${lastCol}${queryLastRow}` }
+  querySheet['!freeze'] = { xSplit: 0, ySplit: queryHeaderRow }
+  querySheet['!cols'] = columns.map((col) => {
+    const label = coordinatorExcelHeader(col)
+    const sample = safeRows.slice(0, 200).map((row) => String(row?.[col] ?? ''))
+    const maxContent = Math.max(label.length, ...sample.map((s) => s.length), 8)
+    return { wch: Math.min(48, Math.max(10, maxContent + 2)) }
+  })
+
   XLSX.utils.book_append_sheet(workbook, mainSheet, 'Evaluaciones')
+  XLSX.utils.book_append_sheet(workbook, querySheet, 'Consulta')
   XLSX.utils.book_append_sheet(workbook, docentesSheet, 'Docentes')
   const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
   const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
