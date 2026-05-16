@@ -1,6 +1,6 @@
 # Scripts para Agregar Estudiantes con Inscripciones
 
-Este directorio contiene scripts para crear estudiantes en el sistema ConCiencia Académica, incluyendo su registro en la tabla `usuarios`, creación automática en `estudiantes` y realización de inscripciones a grupos.
+Este directorio contiene scripts para crear estudiantes en el sistema EntreAulas, incluyendo su registro en la tabla `usuarios`, creación automática en `estudiantes` y realización de inscripciones a grupos.
 
 ## Archivos Disponibles
 

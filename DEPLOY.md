@@ -1,4 +1,4 @@
-# Guía de Despliegue - ConCiencia Académica
+# Guía de Despliegue - EntreAulas
 
 Esta guía te ayudará a desplegar tu aplicación en diferentes plataformas.
 

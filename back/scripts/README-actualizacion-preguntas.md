@@ -202,7 +202,7 @@ Si encuentras problemas:
 
 **Fecha de creación**: $(date)
 **Versión**: 1.0.0
-**Autor**: Sistema ConCiencia Académica
+**Autor**: Sistema EntreAulas
 
 ## ✅ Checklist de Ejecución
 

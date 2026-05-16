@@ -1,4 +1,4 @@
-# ConCiencia-Academica
+# EntreAulas
 
 ## Descripcion del proyecto
 Este proyecto trata sobre una nueva alternativa para realizar la evaluacion temprana a los docentes en la facultad de ingenierias, el fin de este proyecto consiste en darle un nuevo rediseño a las encuestas que se realizan actualmente con forms, donde se vea algo que represente a la universidad(como colores, la estatua de prometeo, entre otros).
@@ -18,8 +18,8 @@ Este proyecto trata sobre una nueva alternativa para realizar la evaluacion temp
 
 1. Clona el repositorio:
 ```bash
-git clone https://github.com/tu-usuario/ConCiencia-Academica.git
-cd ConCiencia-Academica
+git clone https://github.com/tu-usuario/EntreAulas.git
+cd EntreAulas
 ```
 
 2. Instala las dependencias:

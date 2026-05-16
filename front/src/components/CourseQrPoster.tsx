@@ -42,7 +42,7 @@ export function CourseQrPoster({
             <div className="rounded-full bg-white p-1 shadow-sm ring-1 ring-gray-200">
               <img
                 src={logoProyecto}
-                alt="ConCiencia Académica"
+                alt="EntreAulas"
                 className="h-7 w-7 object-contain"
               />
             </div>

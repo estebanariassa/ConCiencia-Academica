@@ -1,4 +1,4 @@
-# Configuración del Backend - ConCiencia Académica
+# Configuración del Backend - EntreAulas
 
 ## Requisitos Previos
 

@@ -1,6 +1,6 @@
 # 🚀 Guía de Despliegue en Render - Paso a Paso
 
-Esta guía te ayudará a desplegar tu aplicación ConCiencia Académica en Render.
+Esta guía te ayudará a desplegar tu aplicación EntreAulas en Render.
 
 ## 📋 Prerrequisitos
 
@@ -29,7 +29,7 @@ git push origin despliegue
 1. Ve a https://dashboard.render.com
 2. Haz clic en **"New +"** → **"Web Service"**
 3. Conecta tu repositorio de GitHub si aún no lo has hecho
-4. Selecciona el repositorio `ConCiencia-Academica`
+4. Selecciona el repositorio `EntreAulas`
 5. Selecciona la rama `despliegue`
 
 ### 2.2 Configurar el Backend
