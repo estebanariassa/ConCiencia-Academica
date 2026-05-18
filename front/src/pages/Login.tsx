@@ -255,7 +255,7 @@ export default function Login() {
                 className="h-20 w-20 sm:h-[140px] sm:w-[150px] object-contain"
               />
             </motion.div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">ConCiencia Académica</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">EntreAulas</h1>
             <p className="text-gray-600 mt-2 text-xs sm:text-sm">
               Accede con tus credenciales institucionales
             </p>
@@ -415,7 +415,7 @@ export default function Login() {
 
           {/* Footer */}
           <div className="text-center">
-            <p className="text-xs text-gray-600">Universidad de Medellín - ConCiencia Académica</p>
+            <p className="text-xs text-gray-600">Universidad de Medellín - EntreAulas</p>
           </div>
         </Card>
 

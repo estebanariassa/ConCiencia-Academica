@@ -241,7 +241,7 @@ export default function ForgotPassword() {
                 className="h-16 w-16 sm:h-24 sm:w-24 object-contain"
               />
             </motion.div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">ConCiencia Académica</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">EntreAulas</h1>
             <p className="text-gray-600 mt-2 text-xs sm:text-sm">
               {step === 'request' && 'Recuperar tu contraseña'}
               {step === 'reset' && 'Crear nueva contraseña'}
@@ -524,7 +524,7 @@ export default function ForgotPassword() {
 
           {/* Footer */}
           <div className="text-center mt-6 pt-4 border-t border-gray-200">
-            <p className="text-xs text-gray-600">Universidad de Medellín - ConCiencia Academica</p>
+            <p className="text-xs text-gray-600">Universidad de Medellín - EntreAulas</p>
           </div>
         </Card>
       </motion.div>

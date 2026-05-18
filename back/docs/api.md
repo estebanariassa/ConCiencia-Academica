@@ -1,4 +1,4 @@
-# API Documentation - ConCiencia Académica
+# API Documentation - EntreAulas
 
 ## Base URL
 ```

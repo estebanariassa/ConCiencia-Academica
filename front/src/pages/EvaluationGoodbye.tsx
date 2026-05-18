@@ -41,7 +41,7 @@ export default function EvaluationGoodbye() {
           >
             <img
               src={logoUniversidadImg}
-              alt="Logo ConCiencia Académica"
+              alt="Logo EntreAulas"
               className="h-24 w-24 object-contain"
             />
           </motion.div>

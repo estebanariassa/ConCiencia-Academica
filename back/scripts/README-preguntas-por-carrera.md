@@ -264,4 +264,4 @@ Para problemas o dudas:
 
 **Fecha de implementación**: $(date)
 **Versión**: 1.0.0
-**Autor**: Sistema ConCiencia Académica
+**Autor**: Sistema EntreAulas

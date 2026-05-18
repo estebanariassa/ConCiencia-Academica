@@ -1,7 +1,7 @@
 -- =====================================================
--- Preguntas encuesta ConCiencia Académica - Versión nueva (13 preguntas)
+-- Preguntas encuesta EntreAulas - Versión nueva (13 preguntas)
 -- Ingeniería de Sistemas (id_carrera obtenido por nombre)
--- Reemplaza completamente las preguntas anteriores de ConCiencia Académica
+-- Reemplaza completamente las preguntas anteriores de EntreAulas
 -- para esta carrera.
 -- =====================================================
 
@@ -20,7 +20,7 @@ BEGIN
     RAISE EXCEPTION 'No se encontró la carrera "Ingeniería de Sistemas" en la tabla carreras. Crea la carrera o ajusta el nombre en este script.';
   END IF;
 
-  -- Eliminar preguntas anteriores de ConCiencia Académica para esta carrera
+  -- Eliminar preguntas anteriores de EntreAulas para esta carrera
   DELETE FROM preguntas_evaluacion
   WHERE id_carrera = carrera_id;
 
@@ -326,5 +326,5 @@ BEGIN
   );
 END $$;
 
-SELECT 'Preguntas ConCiencia Académica (nueva versión, 13 preguntas) insertadas correctamente.' AS resultado;
+SELECT 'Preguntas EntreAulas (nueva versión, 13 preguntas) insertadas correctamente.' AS resultado;
 
